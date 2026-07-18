@@ -1,0 +1,201 @@
+import { env } from '@/config/env';
+
+const brand = env.EMAIL_FROM_NAME;
+
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function layout(title: string, body: string): string {
+  return `<!doctype html><html><body style="margin:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#18181b">
+  <div style="max-width:560px;margin:0 auto;padding:32px 16px">
+    <div style="background:#fff;border-radius:12px;padding:32px;border:1px solid #e4e4e7">
+      <h1 style="margin:0 0 16px;font-size:20px">${title}</h1>
+      ${body}
+      <hr style="border:none;border-top:1px solid #e4e4e7;margin:24px 0" />
+      <p style="font-size:12px;color:#71717a;margin:0">${brand} · This is an automated message, please do not reply.</p>
+    </div>
+  </div></body></html>`;
+}
+
+function button(href: string, label: string): string {
+  return `<a href="${href}" style="display:inline-block;background:#ea580c;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold">${label}</a>`;
+}
+
+export interface EmailContent {
+  subject: string;
+  html: string;
+  text: string;
+}
+
+export function verifyEmailTemplate(name: string, link: string): EmailContent {
+  const safeName = escapeHtml(name);
+  return {
+    subject: `Verify your ${brand} account`,
+    html: layout(
+      'Confirm your email',
+      `<p>Hi ${safeName}, welcome to ${brand}!</p>
+       <p>Please confirm your email address to activate your account. This link expires in 24 hours.</p>
+       <p style="margin:24px 0">${button(link, 'Verify email')}</p>
+       <p style="font-size:12px;color:#71717a">If the button doesn't work, copy this link:<br>${link}</p>`,
+    ),
+    text: `Hi ${name}, confirm your ${brand} email within 24 hours: ${link}`,
+  };
+}
+
+export function resetPasswordTemplate(name: string, link: string): EmailContent {
+  const safeName = escapeHtml(name);
+  return {
+    subject: `Reset your ${brand} password`,
+    html: layout(
+      'Reset your password',
+      `<p>Hi ${safeName},</p>
+       <p>We received a request to reset your password. This link expires in 1 hour. If you didn't request this, you can ignore this email.</p>
+       <p style="margin:24px 0">${button(link, 'Reset password')}</p>
+       <p style="font-size:12px;color:#71717a">If the button doesn't work, copy this link:<br>${link}</p>`,
+    ),
+    text: `Hi ${name}, reset your ${brand} password within 1 hour: ${link}`,
+  };
+}
+
+export function notificationTemplate(
+  name: string,
+  title: string,
+  message: string,
+  orderNumber?: string,
+): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  const safeOrderNumber = orderNumber ? escapeHtml(orderNumber) : undefined;
+  return {
+    subject: safeOrderNumber ? `${title} · ${orderNumber}` : title,
+    html: layout(
+      safeTitle,
+      `<p>Hi ${safeName},</p>
+       <p>${safeMessage}</p>
+       ${safeOrderNumber ? `<p style="font-size:13px;color:#71717a">Order: <strong>${safeOrderNumber}</strong></p>` : ''}`,
+    ),
+    text: `${title}\n\nHi ${name}, ${message}${orderNumber ? `\nOrder: ${orderNumber}` : ''}`,
+  };
+}
+
+export interface SecurityAlertData {
+  name: string;
+  reason: string;
+  ip?: string;
+  browser?: string;
+  time: string;
+}
+
+export function securityAlertTemplate(d: SecurityAlertData): EmailContent {
+  const safeName = escapeHtml(d.name);
+  const safeReason = escapeHtml(d.reason);
+  const safeIp = d.ip ? escapeHtml(d.ip) : undefined;
+  const safeBrowser = d.browser ? escapeHtml(d.browser) : undefined;
+  const safeTime = escapeHtml(d.time);
+  return {
+    subject: `⚠️ Security alert on your ${brand} account`,
+    html: layout(
+      'Security alert',
+      `<p>Hi ${safeName},</p>
+       <p>${safeReason}</p>
+       <table style="font-size:14px;color:#3f3f46;margin:16px 0">
+         <tr><td style="padding:4px 12px 4px 0;color:#71717a">When</td><td>${safeTime}</td></tr>
+         <tr><td style="padding:4px 12px 4px 0;color:#71717a">IP address</td><td>${safeIp ?? 'unknown'}</td></tr>
+         <tr><td style="padding:4px 12px 4px 0;color:#71717a">Browser</td><td>${safeBrowser ?? 'unknown'}</td></tr>
+       </table>
+       <p>If this was you, no action is needed. If not, please reset your password immediately and contact support.</p>`,
+    ),
+    text: `Security alert: ${d.reason} (IP ${d.ip ?? 'unknown'}, ${d.browser ?? 'unknown'}, ${d.time})`,
+  };
+}
+
+export function valetCheckInTemplate(name: string, carNumber: string, parkingSlot: string, time: string, token: string): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeCarNumber = escapeHtml(carNumber);
+  const safeParkingSlot = escapeHtml(parkingSlot);
+  const formattedTime = new Date(time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const trackLink = `${env.APP_URL}/valet/track/${token}`;
+  return {
+    subject: `🚗 Valet Parking Check-In Confirmation - ${carNumber}`,
+    html: layout(
+      'Valet Parking Check-In',
+      `<p>Hi ${safeName},</p>
+       <p>Your vehicle has been successfully parked by our valet team.</p>
+       <table style="font-size:14px;color:#3f3f46;margin:16px 0;border-collapse:collapse;width:100%">
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a;width:120px">Car Number</td><td style="padding:8px 0;font-weight:bold">${safeCarNumber}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Parking Slot</td><td style="padding:8px 0;font-weight:bold">${safeParkingSlot}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Check-In Time</td><td style="padding:8px 0">${formattedTime}</td></tr>
+       </table>
+       <div style="margin:24px 0;text-align:center">
+         <a href="${trackLink}" style="display:inline-block;background-color:#D8B854;color:#181d24;padding:12px 24px;font-weight:bold;text-decoration:none;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1)">
+           Track & Request Vehicle
+         </a>
+       </div>
+       <p style="font-size:12px;color:#71717a;margin-top:16px">
+         If the button doesn't work, copy and paste this link in your browser: <br />
+         <a href="${trackLink}" style="color:#D8B854">${trackLink}</a>
+       </p>`,
+    ),
+    text: `Valet Check-In: Hi ${name}, your vehicle ${carNumber} was checked in to slot ${parkingSlot} at ${formattedTime}. Live status link: ${trackLink}`,
+  };
+}
+
+export function valetReadyTemplate(name: string, carNumber: string): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeCarNumber = escapeHtml(carNumber);
+  return {
+    subject: `✨ Your vehicle ${carNumber} is ready for pick-up!`,
+    html: layout(
+      'Vehicle Ready Outside',
+      `<p>Hi ${safeName},</p>
+       <p>Your vehicle with plate number <strong>${safeCarNumber}</strong> is ready and waiting for you outside the main hotel lobby entrance.</p>
+       <p>Our valet team is ready to hand over the keys upon arrival.</p>
+       <p>Safe travels!</p>`,
+    ),
+    text: `Vehicle Ready: Hi ${name}, your vehicle ${carNumber} is ready outside the main lobby entrance.`,
+  };
+}
+
+export function valetDeliveredTemplate(name: string, carNumber: string): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeCarNumber = escapeHtml(carNumber);
+  return {
+    subject: `` + `✅ Vehicle Delivered - ${carNumber}` + ``,
+    html: layout(
+      'Vehicle Handed Over',
+      `<p>Hi ${safeName},</p>
+       <p>Your vehicle <strong>${safeCarNumber}</strong> has been successfully delivered and handed over to you.</p>
+       <p>Thank you for using our valet service. We hope you have a pleasant journey!</p>`,
+    ),
+    text: `Vehicle Delivered: Hi ${name}, your vehicle ${carNumber} has been successfully handed over to you.`,
+  };
+}
+
+export function valetWelcomeTemplate(name: string, email: string, tempPassword: string): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeEmail = escapeHtml(email);
+  const safePassword = escapeHtml(tempPassword);
+  return {
+    subject: `🎉 Welcome to the Valet Team - ${brand}`,
+    html: layout(
+      'Account Created Successfully',
+      `<p>Hi ${safeName},</p>
+       <p>You have been registered as a Valet Manager at <strong>${brand}</strong>.</p>
+       <p>Here are your temporary login credentials. Please use these to sign in:</p>
+       <div style="background:#f4f4f5;border-radius:8px;padding:16px;margin:16px 0;font-family:monospace;font-size:14px;border:1px solid #e4e4e7">
+         <strong>Email:</strong> ${safeEmail}<br/>
+         <strong>Password:</strong> ${safePassword}
+       </div>
+       <p>To access your dashboard, visit the valet entry terminal login page.</p>`,
+    ),
+    text: `Hi ${name}, welcome to the valet team at ${brand}! Your login email is ${email} and temporary password is ${tempPassword}.`,
+  };
+}

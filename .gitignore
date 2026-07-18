@@ -1,0 +1,25 @@
+# ── Dependencies ──
+node_modules/
+
+# ── Build output ──
+dist/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+
+# ── Secrets / env (NEVER commit) ──
+.env
+.env.*
+!.env.example
+*.local
+
+# ── Logs ──
+*.log
+npm-debug.log*
+
+# ── Editor / OS ──
+.idea/
+.DS_Store
+Thumbs.db
