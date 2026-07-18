@@ -162,7 +162,7 @@ export default function BanquetManagementPage() {
                 onChange={e => setKitchenIdFilter(e.target.value)}
               >
                 <option value="">All Kitchens</option>
-                {kitchens.map(k => (
+                {kitchens?.map(k => (
                   <option key={k._id} value={k._id}>{k.name}</option>
                 ))}
               </select>

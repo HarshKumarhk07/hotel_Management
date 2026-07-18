@@ -63,6 +63,7 @@ function OrderInner() {
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   if (isLoading) return <CenteredSpinner label="Loading order…" />;
   if (!order) return <EmptyState title="Order not found" />;
@@ -106,7 +107,6 @@ function OrderInner() {
     }
   };
 
-  const [downloading, setDownloading] = useState(false);
   const downloadInvoice = async () => {
     setDownloading(true);
     try {

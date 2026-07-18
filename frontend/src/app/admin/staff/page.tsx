@@ -204,7 +204,7 @@ export default function StaffManagementPage() {
                 onChange={e => setKitchenIdFilter(e.target.value)}
               >
                 <option value="">All Kitchens</option>
-                {kitchens.map(k => (
+                {kitchens?.map(k => (
                   <option key={k._id} value={k._id}>{k.name}</option>
                 ))}
               </select>
@@ -460,7 +460,7 @@ export default function StaffManagementPage() {
                   className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand font-sans"
                 >
                   <option value="">Select kitchen…</option>
-                  {kitchens.map(k => (
+                  {kitchens?.map(k => (
                     <option key={k._id} value={k._id}>{k.name}</option>
                   ))}
                 </select>
