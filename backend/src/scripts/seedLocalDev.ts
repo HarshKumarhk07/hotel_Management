@@ -183,7 +183,7 @@ async function seedLocalDev(): Promise<void> {
   ];
 
   for (const hData of hallsData) {
-    let hall = await BanquetHall.findOne({ name: hData.name });
+    const hall = await BanquetHall.findOne({ name: hData.name });
     if (!hall) {
       await BanquetHall.create({
         name: hData.name,
