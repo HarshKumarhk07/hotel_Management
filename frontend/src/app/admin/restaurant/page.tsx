@@ -239,6 +239,11 @@ export default function RestaurantPage() {
   const [sectionFilter, setSectionFilter] = useState('');
   const [floorFilter, setFloorFilter] = useState('');
   const [error, setError] = useState('');
+  const [requestBillTarget, setRequestBillTarget] = useState<RestaurantTable | null>(null);
+  const [billInputAmount, setBillInputAmount] = useState('');
+  const [closeTableTarget, setCloseTableTarget] = useState<RestaurantTable | null>(null);
+  const [regenQRTarget, setRegenQRTarget] = useState<RestaurantTable | null>(null);
+  const [removeGuestTarget, setRemoveGuestTarget] = useState<WaitlistEntry | null>(null);
 
   // Waitlist data queries & mutations
   const { data: waitlistQueue, isLoading: waitlistLoading } = useWaitlistQueue('PENDING');
@@ -438,19 +443,11 @@ export default function RestaurantPage() {
                             table={t}
                             onSeat={(tbl) => { setSeatTarget(tbl); resetSeat(); }}
                             onRequestBill={(tbl) => {
-                              const amt = prompt(`Enter final bill amount for Table ${tbl.number} (optional):`);
-                              if (amt === null) return;
-                              const billAmount = amt.trim() ? parseFloat(amt) : undefined;
-                              if (billAmount !== undefined && isNaN(billAmount)) {
-                                alert("Invalid amount entered");
-                                return;
-                              }
-                              requestBillMutation.mutate({ id: tbl._id, billAmount });
+                              setRequestBillTarget(tbl);
+                              setBillInputAmount('');
                             }}
                             onClose={(tbl) => {
-                              if (confirm(`Close table ${tbl.number} and mark all TABLE_BILLING orders as paid?`)) {
-                                closeMutation.mutate(tbl._id);
-                              }
+                              setCloseTableTarget(tbl);
                             }}
                             onViewBill={(tbl) => setBillTarget(tbl._id)}
                             onRegen={(tbl) => {
@@ -520,9 +517,7 @@ export default function RestaurantPage() {
                         size="sm"
                         variant="ghost"
                         onClick={() => {
-                          if (confirm(`Remove ${guest.guestName} from waitlist?`)) {
-                            cancelWaitlistMutation.mutate(guest._id);
-                          }
+                          setRemoveGuestTarget(guest);
                         }}
                         className="text-red-500 hover:bg-red-50 hover:text-red-600 text-[10px] px-2 h-7"
                         disabled={cancelWaitlistMutation.isPending}
@@ -639,6 +634,134 @@ export default function RestaurantPage() {
 
       {/* Bill Modal */}
       {billTarget && <BillModal tableId={billTarget} onClose={() => setBillTarget(null)} />}
+
+      {/* Custom Request Bill Dialog */}
+      {requestBillTarget && (
+        <Dialog open onClose={() => setRequestBillTarget(null)} title="Request Table Bill">
+          <div className="space-y-4 text-left">
+            <p className="text-sm text-zinc-500">
+              Please enter the final bill amount for **Table {requestBillTarget.number}** (optional):
+            </p>
+            <div className="space-y-2">
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Bill amount (e.g. 1500)"
+                value={billInputAmount}
+                onChange={(e) => setBillInputAmount(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-3 border-t">
+              <Button variant="outline" onClick={() => setRequestBillTarget(null)} className="text-xs">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const amt = billInputAmount.trim();
+                  const billAmount = amt ? parseFloat(amt) : undefined;
+                  if (billAmount !== undefined && isNaN(billAmount)) {
+                    alert("Invalid amount entered");
+                    return;
+                  }
+                  requestBillMutation.mutate(
+                    { id: requestBillTarget._id, billAmount },
+                    { onSuccess: () => setRequestBillTarget(null) }
+                  );
+                }}
+                disabled={requestBillMutation.isPending}
+                className="bg-[#D4AF37] hover:bg-[#AE963C] text-white text-xs font-bold"
+              >
+                {requestBillMutation.isPending ? 'Requesting...' : 'Request Bill'}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Custom Close Table Dialog */}
+      {closeTableTarget && (
+        <Dialog open onClose={() => setCloseTableTarget(null)} title="Close Table">
+          <div className="space-y-4 text-left">
+            <p className="text-sm text-zinc-600">
+              Are you sure you want to close **Table {closeTableTarget.number}** and mark all billing orders as paid?
+            </p>
+            <div className="flex justify-end gap-3 pt-3 border-t">
+              <Button variant="outline" onClick={() => setCloseTableTarget(null)} className="text-xs">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  closeMutation.mutate(closeTableTarget._id, {
+                    onSuccess: () => setCloseTableTarget(null)
+                  });
+                }}
+                disabled={closeMutation.isPending}
+                className="bg-black hover:bg-zinc-800 text-white text-xs font-bold"
+              >
+                {closeMutation.isPending ? 'Closing...' : 'Yes, Close Table'}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Custom Regenerate QR Dialog */}
+      {regenQRTarget && (
+        <Dialog open onClose={() => setRegenQRTarget(null)} title="Regenerate Table QR">
+          <div className="space-y-4 text-left">
+            <p className="text-sm text-zinc-600">
+              Are you sure you want to regenerate the QR code for **Table {regenQRTarget.number}**?
+            </p>
+            <p className="text-xs text-red-500 font-semibold bg-red-50 p-2.5 rounded-lg">
+              Warning: The old QR code on the table printout will stop working immediately.
+            </p>
+            <div className="flex justify-end gap-3 pt-3 border-t">
+              <Button variant="outline" onClick={() => setRegenQRTarget(null)} className="text-xs">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  regenMutation.mutate(regenQRTarget._id, {
+                    onSuccess: () => setRegenQRTarget(null)
+                  });
+                }}
+                disabled={regenMutation.isPending}
+                className="bg-[#D4AF37] hover:bg-[#AE963C] text-white text-xs font-bold"
+              >
+                {regenMutation.isPending ? 'Regenerating...' : 'Regenerate QR'}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Custom Remove Waitlist Guest Dialog */}
+      {removeGuestTarget && (
+        <Dialog open onClose={() => setRemoveGuestTarget(null)} title="Cancel Waitlist Ticket">
+          <div className="space-y-4 text-left">
+            <p className="text-sm text-zinc-600">
+              Are you sure you want to remove **{removeGuestTarget.guestName}** (Party of {removeGuestTarget.guestsCount}) from the waitlist?
+            </p>
+            <div className="flex justify-end gap-3 pt-3 border-t">
+              <Button variant="outline" onClick={() => setRemoveGuestTarget(null)} className="text-xs">
+                Keep in Queue
+              </Button>
+              <Button
+                onClick={() => {
+                  cancelWaitlistMutation.mutate(removeGuestTarget._id, {
+                    onSuccess: () => setRemoveGuestTarget(null)
+                  });
+                }}
+                disabled={cancelWaitlistMutation.isPending}
+                className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold"
+              >
+                {cancelWaitlistMutation.isPending ? 'Removing...' : 'Remove Guest'}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
     </AdminShell>
   );
 }
