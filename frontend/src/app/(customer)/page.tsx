@@ -199,10 +199,10 @@ export default function HomePage() {
             <button onClick={() => router.push('/rooms')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
               Rooms
             </button>
-            <button onClick={() => handleScrollToSection('banquet')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+            <button onClick={() => router.push('/banquets')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
               Banquet
             </button>
-            <button onClick={() => handleScrollToSection('dining')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+            <button onClick={() => router.push('/restaurant/waitlist')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
               Restaurant
             </button>
           </nav>
@@ -265,10 +265,10 @@ export default function HomePage() {
               <button onClick={() => { router.push('/rooms'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
                 Rooms
               </button>
-              <button onClick={() => handleScrollToSection('banquet')} className="text-white hover:text-[#D4AF37] text-left">
+              <button onClick={() => { router.push('/banquets'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
                 Banquet
               </button>
-              <button onClick={() => handleScrollToSection('dining')} className="text-white hover:text-[#D4AF37] text-left">
+              <button onClick={() => { router.push('/restaurant/waitlist'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
                 Restaurant
               </button>
               <button onClick={() => handleScrollToSection('amenities')} className="text-white hover:text-[#D4AF37] text-left">
@@ -492,7 +492,7 @@ export default function HomePage() {
                   desc: "Choose from grand ballrooms, heritage courtyards, and palace gardens. Each venue transforms your special moments into legendary celebrations.",
                   img: "/bnk2.png",
                   actionText: "Explore Venues →",
-                  onClick: () => handleScrollToSection('banquet')
+                  onClick: () => router.push('/banquets')
                 },
                 {
                   id: 3,
@@ -501,7 +501,7 @@ export default function HomePage() {
                   desc: "Our master chefs present a symphony of flavors—from royal Awadhi cuisine to contemporary international gastronomy.",
                   img: "/dining-banner.png",
                   actionText: "Reserve Table →",
-                  onClick: () => handleScrollToSection('dining')
+                  onClick: () => router.push('/restaurant/waitlist')
                 }
               ].map((card, idx) => (
                 <motion.div
@@ -912,9 +912,9 @@ export default function HomePage() {
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Quick Links</h4>
             <div className="flex flex-col gap-2.5 text-xs text-zinc-400 font-light">
               <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-white transition-colors text-left">Home</button>
-              <button onClick={() => handleScrollToSection('rooms')} className="hover:text-white transition-colors text-left">Accommodation</button>
-              <button onClick={() => handleScrollToSection('banquet')} className="hover:text-white transition-colors text-left">Banquets</button>
-              <button onClick={() => handleScrollToSection('dining')} className="hover:text-white transition-colors text-left">Dining</button>
+              <button onClick={() => router.push('/rooms')} className="hover:text-white transition-colors text-left">Accommodation</button>
+              <button onClick={() => router.push('/banquets')} className="hover:text-white transition-colors text-left">Banquets</button>
+              <button onClick={() => router.push('/restaurant/waitlist')} className="hover:text-white transition-colors text-left">Dining</button>
             </div>
           </div>
 
