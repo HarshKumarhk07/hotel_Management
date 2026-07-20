@@ -24,6 +24,9 @@ import { AppError } from '@/utils/AppError';
 import { generateSecureToken } from '@/utils/crypto';
 import { getPageParams, pageMeta } from '@/utils/pagination';
 import { recordAudit } from '@/services/audit.service';
+import { emailService } from '@/services/email/brevo.service';
+import { env } from '@/config/env';
+import { logger } from '@/config/logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -156,7 +159,7 @@ export async function regenerateTableQr(id: string, actorId: string) {
 
 export async function seatTable(
   id: string,
-  data: { partySize: number; guestName?: string; phone?: string; reservationId?: string; notes?: string },
+  data: { partySize: number; guestName?: string; phone?: string; email?: string; reservationId?: string; notes?: string },
   actorId: string,
 ) {
   const table = await RestaurantTable.findById(id);
@@ -169,6 +172,7 @@ export async function seatTable(
     partySize:     data.partySize,
     guestName:     data.guestName,
     phone:         data.phone,
+    email:         data.email,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     reservationId: data.reservationId as any,
     notes:         data.notes,
@@ -233,12 +237,25 @@ export async function closeTable(id: string, actorId: string) {
     await TableReservation.findByIdAndUpdate(table.currentSession.reservationId, { status: RESERVATION_STATUS.COMPLETED });
   }
 
+  // Capture session details before clearing for feedback email
+  const sessionEmail    = table.currentSession?.email;
+  const sessionName     = table.currentSession?.guestName || 'Valued Guest';
+  const tableNumber     = table.number;
+
   table.status = TABLE_STATUS.AVAILABLE;
   table.currentSession = undefined;
   await table.save();
 
   emitToAdmins(SOCKET_EVENTS.TABLE_STATUS_CHANGED, { tableId: id, status: TABLE_STATUS.AVAILABLE, number: table.number });
   void recordAudit({ action: AUDIT_ACTIONS.TABLE_CLOSED, actor: actorId, metadata: { tableId: id } });
+
+  // Send post-dining feedback email if guest email was captured
+  if (sessionEmail) {
+    const feedbackLink = `${env.APP_URL}/feedback?table=${encodeURIComponent(tableNumber)}`;
+    emailService.sendCheckoutFeedback(sessionEmail, sessionName, `Table ${tableNumber}`, feedbackLink)
+      .catch((err) => logger.error({ err }, 'Failed to send table close feedback email'));
+  }
+
   return table;
 }
 

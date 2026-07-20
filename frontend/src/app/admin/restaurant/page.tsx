@@ -19,6 +19,7 @@ import {
   CalendarDays,
   Play,
   CheckCircle2,
+  Mail,
 } from 'lucide-react';
 import Link from 'next/link';
 import { AdminShell } from '@/components/admin/AdminShell';
@@ -64,6 +65,7 @@ const seatSchema = z.object({
   partySize: z.coerce.number().int().min(1),
   guestName: z.string().max(120).optional(),
   phone: z.string().optional(),
+  email: z.string().email('Invalid email').optional().or(z.literal('')),
   notes: z.string().max(300).optional(),
 });
 type SeatForm = z.infer<typeof seatSchema>;
@@ -286,6 +288,15 @@ export default function RestaurantPage() {
   });
   const tables = tableData?.data?.items ?? [];
 
+  // Fetch today's upcoming reservations
+  const today = new Date().toISOString().split('T')[0];
+  const { data: reservationsData } = useQuery<{ data: { items: { _id: string; table?: { _id: string }; guestName: string; scheduledAt: string; partySize: number; status: string }[] } }>({
+    queryKey: ['restaurant-reservations-today'],
+    queryFn: () => api.get(`/restaurant/reservations?date=${today}&limit=100`).then(r => r.data),
+    refetchInterval: 60_000,
+  });
+  const todayReservations = reservationsData?.data?.items ?? [];
+
   // Counts
   const counts = {
     available: tables.filter(t => t.status === 'AVAILABLE').length,
@@ -465,71 +476,113 @@ export default function RestaurantPage() {
             )}
           </div>
 
-          {/* RIGHT 1 COLUMN: Guest Waitlist Queue */}
-          <div className="lg:col-span-1 border-l border-zinc-200 pl-6 space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h2 className="font-bold text-lg text-zinc-900">Waitlist Queue</h2>
-                <p className="text-[11px] text-zinc-400">Manage waiting guests in queue</p>
+          {/* RIGHT 1 COLUMN: Reservations + Waitlist Queue */}
+          <div className="lg:col-span-1 border-l border-zinc-200 pl-6 space-y-6">
+
+            {/* Today's Reservations */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b pb-3">
+                <div>
+                  <h2 className="font-bold text-lg text-zinc-900">Today's Reservations</h2>
+                  <p className="text-[11px] text-zinc-400">{todayReservations.length} booked for today</p>
+                </div>
+                <Link href="/admin/restaurant/reservations">
+                  <Button size="sm" variant="outline" className="text-xs h-8 border-zinc-200 text-zinc-500 hover:text-zinc-700">
+                    <CalendarDays className="h-3 w-3 mr-1" /> All
+                  </Button>
+                </Link>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-xs h-8 border-[#D4AF37] text-[#D4AF37] hover:bg-[#FAF8F0]"
-                onClick={() => autoAssign.mutate()}
-                disabled={autoAssign.isPending || !waitlistQueue || waitlistQueue.length === 0}
-              >
-                <Play className="h-3 w-3 mr-1" /> Auto-Assign
-              </Button>
+              {todayReservations.length === 0 ? (
+                <div className="py-6 text-center text-xs text-zinc-400">
+                  <CalendarDays className="mx-auto h-6 w-6 text-zinc-300 mb-2" />
+                  No reservations today
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                  {todayReservations.map(r => {
+                    const time = new Date(r.scheduledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const statusColor = r.status === 'CONFIRMED' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' :
+                                       r.status === 'PENDING'   ? 'text-amber-600 bg-amber-50 border-amber-200' :
+                                       r.status === 'SEATED'    ? 'text-blue-600 bg-blue-50 border-blue-200' :
+                                                                   'text-zinc-500 bg-zinc-50 border-zinc-200';
+                    return (
+                      <div key={r._id} className="flex items-start justify-between p-2.5 rounded-lg border border-zinc-100 hover:border-[#D4AF37]/40 bg-white text-xs gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-zinc-900 truncate">{r.guestName}</p>
+                          <p className="text-zinc-400 mt-0.5">{time} · {r.partySize} guests</p>
+                        </div>
+                        <span className={`shrink-0 px-1.5 py-0.5 rounded-full border text-[10px] font-semibold ${statusColor}`}>{r.status}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {waitlistLoading ? (
-              <div className="flex py-10 justify-center"><div className="h-5 w-5 animate-spin rounded-full border-2 border-brand border-t-transparent" /></div>
-            ) : !waitlistQueue || waitlistQueue.length === 0 ? (
-              <div className="py-12 text-center text-xs text-zinc-400">
-                <Users className="mx-auto h-8 w-8 text-zinc-300 mb-2" />
-                No guests in queue.
+            {/* Waitlist Queue */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b pb-3">
+                <div>
+                  <h2 className="font-bold text-lg text-zinc-900">Waitlist Queue</h2>
+                  <p className="text-[11px] text-zinc-400">Manage waiting guests in queue</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-8 border-[#D4AF37] text-[#D4AF37] hover:bg-[#FAF8F0]"
+                  onClick={() => autoAssign.mutate()}
+                  disabled={autoAssign.isPending || !waitlistQueue || waitlistQueue.length === 0}
+                >
+                  <Play className="h-3 w-3 mr-1" /> Auto-Assign
+                </Button>
               </div>
-            ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                {waitlistQueue.map((guest) => (
-                  <Card key={guest._id} className="p-3.5 space-y-2.5 border-zinc-200 hover:border-[#D4AF37]/50 shadow-sm">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-sm text-zinc-900">{guest.guestName}</span>
-                          <Badge className="bg-[#FAF8F0] text-[#D4AF37] border-none text-[10px] px-1.5 py-0.5">#{guest.position}</Badge>
-                        </div>
-                        <p className="text-[11px] text-zinc-400">Party of {guest.guestsCount} · Est. {guest.position * 10} mins</p>
-                      </div>
-                      <span className="text-[10px] font-semibold text-zinc-500">{guest.phone}</span>
-                    </div>
 
-                    <div className="flex gap-2 justify-end">
-                      <Button
-                        size="sm"
-                        onClick={() => setSeatWaitlistTarget(guest)}
-                        className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-[10px] px-2.5 py-1 h-7"
-                      >
-                        Seat Group
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setRemoveGuestTarget(guest);
-                        }}
-                        className="text-red-500 hover:bg-red-50 hover:text-red-600 text-[10px] px-2 h-7"
-                        disabled={cancelWaitlistMutation.isPending}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
+              {waitlistLoading ? (
+                <div className="flex py-10 justify-center"><div className="h-5 w-5 animate-spin rounded-full border-2 border-brand border-t-transparent" /></div>
+              ) : !waitlistQueue || waitlistQueue.length === 0 ? (
+                <div className="py-12 text-center text-xs text-zinc-400">
+                  <Users className="mx-auto h-8 w-8 text-zinc-300 mb-2" />
+                  No guests in queue.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {waitlistQueue.map((guest) => (
+                    <Card key={guest._id} className="p-3.5 space-y-2.5 border-zinc-200 hover:border-[#D4AF37]/50 shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-zinc-900">{guest.guestName}</span>
+                            <Badge className="bg-[#FAF8F0] text-[#D4AF37] border-none text-[10px] px-1.5 py-0.5">#{guest.position}</Badge>
+                          </div>
+                          <p className="text-[11px] text-zinc-400">Party of {guest.guestsCount} · Est. {guest.position * 10} mins</p>
+                        </div>
+                        <span className="text-[10px] font-semibold text-zinc-500">{guest.phone}</span>
+                      </div>
+
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          onClick={() => setSeatWaitlistTarget(guest)}
+                          className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-[10px] px-2.5 py-1 h-7"
+                        >
+                          Seat Group
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setRemoveGuestTarget(guest); }}
+                          className="text-red-500 hover:bg-red-50 hover:text-red-600 text-[10px] px-2 h-7"
+                          disabled={cancelWaitlistMutation.isPending}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>{/* end waitlist */}
+          </div>{/* end right column */}
         </div>
       </div>
 
@@ -585,6 +638,13 @@ export default function RestaurantPage() {
             </Field>
             <Field label="Phone">
               <Input {...regSeat('phone')} placeholder="Optional" />
+            </Field>
+            <Field label="Email (for feedback after visit)">
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                <Input {...regSeat('email')} type="email" placeholder="guest@example.com (optional)" className="pl-9" />
+              </div>
+              <FieldError message={seatErrors.email?.message} />
             </Field>
             <Field label="Notes">
               <Input {...regSeat('notes')} placeholder="Special requirements…" />

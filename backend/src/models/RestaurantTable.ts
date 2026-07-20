@@ -10,6 +10,7 @@ export interface ITableSession {
   partySize: number;
   guestName?: string;
   phone?: string;
+  email?: string;
   reservationId?: Types.ObjectId;
   notes?: string;
   billAmount?: number;
@@ -62,6 +63,7 @@ const tableSchema = new Schema<IRestaurantTable>(
       partySize:     { type: Number, min: 1 },
       guestName:     { type: String, trim: true, maxlength: 120 },
       phone:         { type: String, trim: true },
+      email:         { type: String, trim: true, lowercase: true },
       reservationId: { type: Schema.Types.ObjectId, ref: 'TableReservation' },
       notes:         { type: String, trim: true, maxlength: 300 },
       billAmount:    { type: Number, min: 0 },
