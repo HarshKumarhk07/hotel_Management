@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -23,7 +23,7 @@ const complaintSchema = z.object({
 
 type ComplaintForm = z.infer<typeof complaintSchema>;
 
-export default function GuestServicesPage() {
+function GuestServicesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roomId = searchParams.get('room');
@@ -332,5 +332,13 @@ export default function GuestServicesPage() {
 
       <SiteFooter />
     </div>
+  );
+}
+
+export default function GuestServicesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-50 flex items-center justify-center text-zinc-400 text-sm">Loading...</div>}>
+      <GuestServicesInner />
+    </Suspense>
   );
 }

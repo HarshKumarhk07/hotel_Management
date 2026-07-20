@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -25,7 +25,8 @@ const feedbackSchema = z.object({
 
 type FeedbackForm = z.infer<typeof feedbackSchema>;
 
-export default function GuestFeedbackPage() {
+// Inner component — uses useSearchParams, must be inside <Suspense>
+function FeedbackForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefillRoom = searchParams.get('room') || '';
@@ -92,7 +93,6 @@ export default function GuestFeedbackPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col font-sans">
-
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-8">
         <div className="mb-6">
           <button
@@ -164,8 +164,8 @@ export default function GuestFeedbackPage() {
                   className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900"
                 >
                   <option value="GENERAL">General Services</option>
-                  <option value="ROOM">Room Stay & Housekeeping</option>
-                  <option value="FOOD">Dining & Restaurant</option>
+                  <option value="ROOM">Room Stay &amp; Housekeeping</option>
+                  <option value="FOOD">Dining &amp; Restaurant</option>
                   <option value="VALET">Valet Parking</option>
                 </select>
               </div>
@@ -222,5 +222,14 @@ export default function GuestFeedbackPage() {
 
       <SiteFooter />
     </div>
+  );
+}
+
+// Default export wraps the inner component in Suspense (required for useSearchParams)
+export default function GuestFeedbackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-50 flex items-center justify-center text-zinc-400 text-sm">Loading...</div>}>
+      <FeedbackForm />
+    </Suspense>
   );
 }

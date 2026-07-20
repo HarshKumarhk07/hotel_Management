@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import NextImage from 'next/image';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -30,7 +30,7 @@ interface RoomDetail {
   checkOutTime: string;
 }
 
-export default function RoomDetailsPage() {
+function RoomDetailsInner() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -273,5 +273,13 @@ export default function RoomDetailsPage() {
 
       <SiteFooter />
     </div>
+  );
+}
+
+export default function RoomDetailsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center text-zinc-400 text-sm">Loading...</div>}>
+      <RoomDetailsInner />
+    </Suspense>
   );
 }

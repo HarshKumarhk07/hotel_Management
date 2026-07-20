@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Landmark, ArrowLeft, ArrowRight, ShieldCheck, Tag, Info } from 'lucide-react';
@@ -28,7 +28,7 @@ interface RoomDetail {
   kitchen?: string | { _id: string; name: string };
 }
 
-export default function BookRoomPage() {
+function BookRoomInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -494,5 +494,13 @@ export default function BookRoomPage() {
 
       <SiteFooter />
     </div>
+  );
+}
+
+export default function BookRoomPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center text-zinc-400 text-sm">Loading...</div>}>
+      <BookRoomInner />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingBag, Minus, Plus, Trash2 } from 'lucide-react';
@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 
-export default function KitchenMenuPage() {
+function KitchenMenuInner() {
   const router = useRouter();
   const { kitchenId } = useParams<{ kitchenId: string }>();
   const search = useSearchParams();
@@ -432,5 +432,13 @@ export default function KitchenMenuPage() {
 
       <CartSheet open={cartOpen} onClose={() => setCartOpen(false)} />
     </div>
+  );
+}
+
+export default function KitchenMenuPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-zinc-400 text-sm">Loading...</div>}>
+      <KitchenMenuInner />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -24,7 +24,7 @@ interface GuestOrder {
   createdAt: string;
 }
 
-export default function GuestOrderPage() {
+function GuestOrderInner() {
   const { token } = useParams<{ token: string }>();
   const search = useSearchParams();
   const justPlaced = search.get('placed') === '1';
@@ -224,5 +224,13 @@ function Row({ label, value }: { label: string; value: number }) {
       <span>{label}</span>
       <span>{formatINR(value)}</span>
     </div>
+  );
+}
+
+export default function GuestOrderPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-zinc-400 text-sm">Loading...</div>}>
+      <GuestOrderInner />
+    </Suspense>
   );
 }
