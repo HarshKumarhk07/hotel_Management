@@ -5,8 +5,23 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Landmark, Users, DollarSign, Calendar, Clock, Sparkles, CheckCircle2, ArrowRight, X } from 'lucide-react';
+import {
+  Landmark,
+  Users,
+  Calendar,
+  Clock,
+  Sparkles,
+  CheckCircle2,
+  ArrowRight,
+  X,
+  Search,
+  Maximize,
+  Briefcase,
+  Layers,
+  Info
+} from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, FieldError } from '@/components/ui/input';
@@ -14,7 +29,7 @@ import { Badge, Card, CenteredSpinner } from '@/components/ui/primitives';
 import { api, apiErrorMessage } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
 
-// ── Validation Schema ─────────────────────────────────────────────────────────
+// ── Validation Schema for Booking ─────────────────────────────────────────────
 
 const bookingSchema = z.object({
   guestName: z.string().trim().min(1, 'Full name is required'),
@@ -48,12 +63,78 @@ interface BookingResponse {
   status: string;
 }
 
-// ── Page Component ─────────────────────────────────────────────────────────────
+// ── Premium static enrichments ──────────────────────────────────────────────────
+
+const HALL_ENRICHMENTS: Record<string, {
+  image: string;
+  area: string;
+  eventTypes: string[];
+  features: string[];
+  description: string;
+}> = {
+  'Royal Ballroom': {
+    image: '/bnk2.png',
+    area: '12,000 sq. ft.',
+    eventTypes: ['Weddings', 'Gala Dinners', 'Receptions'],
+    features: ['Crystal Chandeliers', 'Pillar-less Design', 'Custom Lighting', 'Built-in Stage'],
+    description: 'A grand pillar-less venue featuring majestic crystal chandeliers and high ceilings, ideal for royal weddings and large-scale celebrations.'
+  },
+  'Imperial Banquet Hall': {
+    image: '/abt1.png',
+    area: '8,500 sq. ft.',
+    eventTypes: ['Corporate Events', 'Seminars', 'Gala Lunches'],
+    features: ['AV Technology', 'Premium Sound System', 'Flexible Layouts', 'Corporate Lounge Access'],
+    description: 'A sophisticated, contemporary space equipped with state-of-the-art audiovisual capabilities, perfect for prestigious corporate meetings and assemblies.'
+  },
+  'Crystal Palace': {
+    image: '/hotel1.png',
+    area: '20,000 sq. ft.',
+    eventTypes: ['Exhibitions', 'Conventions', 'Social Gatherings'],
+    features: ['Panoramic Glass Walls', 'Private Lawns', 'Expansive Car Parking', 'Pre-function Lounge'],
+    description: 'Our largest and most magnificent venue, featuring towering glass walls overlooking manicured palace lawns, designed for spectacular grand-scale occasions.'
+  },
+  'Grand Celebration Hall': {
+    image: '/dining-banner.png',
+    area: '10,000 sq. ft.',
+    eventTypes: ['Theme Parties', 'Birthdays', 'Anniversaries'],
+    features: ['Modular Acoustic Walls', 'Dedicated Buffet Stations', 'Integrated DJ Console'],
+    description: 'A vibrant yet elegant space featuring smart configurations and custom banquet catering counters, perfect for celebratory parties and family reunions.'
+  },
+  'Heritage Courtyard': {
+    image: '/abt2.png',
+    area: '7,500 sq. ft.',
+    eventTypes: ['Traditional Ceremonies', 'Outdoor Cocktails', 'Sangeet Nights'],
+    features: ['Open-air Skyview', 'Carved Stone Arches', 'Traditional Seating Setup'],
+    description: 'An exquisite open-air courtyard framed by carved stone arches and heritage architecture, perfect for hosting magical events under the stars.'
+  },
+  'Emerald Ballroom': {
+    image: '/bnk2.png',
+    area: '5,000 sq. ft.',
+    eventTypes: ['Private Dinners', 'Executive Meetings', 'Press Conferences'],
+    features: ['Private Foyer', 'Dedicated Butler Service', 'Silent Acoustics'],
+    description: 'A luxurious, intimate ballroom tailored for VIP conferences, private executive dinners, and premium brand launches with unmatched hospitality.'
+  }
+};
+
+const defaultEnrichment = {
+  image: '/bnk2.png',
+  area: '6,000 sq. ft.',
+  eventTypes: ['Event Celebrations', 'Meetings'],
+  features: ['Central AC', 'Premium Sound System', 'Flexible Layouts'],
+  description: 'A luxurious multi-functional space designed to accommodate a variety of royal social and corporate gatherings.'
+};
 
 export default function CustomerBanquetsPage() {
   const [selectedHall, setSelectedHall] = useState<BanquetHall | null>(null);
+  const [detailsHall, setDetailsHall] = useState<BanquetHall | null>(null);
   const [successBooking, setSuccessBooking] = useState<BookingResponse | null>(null);
   const [error, setError] = useState('');
+
+  // Search & Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [capacityFilter, setCapacityFilter] = useState('all');
+  const [priceFilter, setPriceFilter] = useState('all');
+  const [eventTypeFilter, setEventTypeFilter] = useState('all');
 
   // Fetch active halls
   const { data: hallsData, isLoading } = useQuery<{ data: { halls: BanquetHall[] } }>({
@@ -92,25 +173,66 @@ export default function CustomerBanquetsPage() {
     }
   }
 
+  // Filter logic
+  const filteredHalls = halls.filter((hall) => {
+    // 1. Search Query
+    if (searchQuery && !hall.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+
+    // 2. Capacity filter
+    if (capacityFilter !== 'all') {
+      if (capacityFilter === 'small' && hall.capacity > 250) return false;
+      if (capacityFilter === 'medium' && (hall.capacity <= 250 || hall.capacity > 500)) return false;
+      if (capacityFilter === 'large' && hall.capacity <= 500) return false;
+    }
+
+    // 3. Price filter
+    if (priceFilter !== 'all') {
+      if (priceFilter === 'budget' && hall.pricePerHour >= 10000) return false;
+      if (priceFilter === 'mid' && (hall.pricePerHour < 10000 || hall.pricePerHour > 20000)) return false;
+      if (priceFilter === 'premium' && hall.pricePerHour <= 20000) return false;
+    }
+
+    // 4. Event type filter
+    if (eventTypeFilter !== 'all') {
+      const enrich = HALL_ENRICHMENTS[hall.name] || defaultEnrichment;
+      const match = enrich.eventTypes.some(t => t.toLowerCase().includes(eventTypeFilter.toLowerCase()));
+      if (!match) return false;
+    }
+
+    return true;
+  });
+
   return (
-    <div className="min-h-screen bg-zinc-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl space-y-8">
-        
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <Link href="/" className="inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline">
-            ← Back to Home
-          </Link>
-          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl font-sans">
-            Reserve Banquet Halls & Ballrooms
-          </h1>
-          <p className="text-sm text-zinc-500 max-w-md mx-auto font-sans">
-            Choose the perfect venue for your weddings, corporate meetings, and family parties.
+    <div className="min-h-screen bg-[#FAF9F6] pb-24 font-sans text-zinc-800">
+      {/* Hero Banner Section */}
+      <section className="relative bg-[#111111] py-28 text-white overflow-hidden border-b border-white/5">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#D4AF37_0%,transparent_50%)] opacity-25 pointer-events-none" />
+        <div className="relative mx-auto max-w-7xl px-8 text-center space-y-5">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/5 px-5 py-2 text-xs font-bold uppercase tracking-[0.25em] text-[#D4AF37] ring-1 ring-[#D4AF37]/35 border border-[#D4AF37]/20">
+            MAJESTIC SPACES
+          </span>
+          <h1 className="text-4xl font-serif sm:text-6xl tracking-wide uppercase">Palatial Venues &amp; Ballrooms</h1>
+          <p className="mx-auto max-w-xl text-zinc-300 text-xs sm:text-sm font-light leading-relaxed">
+            Host your weddings, corporate meetings, and celebrations in our signature imperial halls, where heritage architecture meets luxury hospitality.
           </p>
+        </div>
+      </section>
+
+      {/* Main Listing & Filters container */}
+      <div className="mx-auto max-w-7xl px-6 py-12 space-y-10">
+        
+        {/* Breadcrumb & Navigation */}
+        <div className="flex items-center justify-between border-b border-zinc-200 pb-5">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#D4AF37] hover:text-[#AE963C] transition-colors">
+            ← Return to Home
+          </Link>
+          <span className="text-xs text-zinc-400 font-medium font-serif italic">The Page Rohtak NCR</span>
         </div>
 
         {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3.5 text-sm text-red-700 flex items-center justify-between font-sans shadow-sm">
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3.5 text-xs text-red-700 flex items-center justify-between font-sans shadow-sm">
             {error}
             <button onClick={() => setError('')}><X className="h-4 w-4" /></button>
           </div>
@@ -118,23 +240,23 @@ export default function CustomerBanquetsPage() {
 
         {/* Success confirmation */}
         {successBooking && (
-          <Card className="p-8 text-center max-w-md mx-auto space-y-4 border-brand/20 bg-brand/5/10 shadow-lg">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-brand" />
-            <div>
-              <h2 className="text-xl font-bold text-zinc-900 font-sans">Reservation Submitted!</h2>
-              <p className="text-sm text-zinc-500 mt-1 font-sans">
-                Thanks, {successBooking.guestName}. Your reservation request is <strong>PENDING</strong> verification. Our event coordinator will call you shortly.
+          <Card className="p-8 text-center max-w-md mx-auto space-y-6 border-[#D4AF37]/30 bg-white shadow-2xl rounded-3xl">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-[#D4AF37]" />
+            <div className="space-y-2">
+              <h2 className="text-2xl font-serif font-bold text-zinc-900">Enquiry Submitted</h2>
+              <p className="text-xs text-zinc-500 font-light leading-relaxed">
+                Thank you, {successBooking.guestName}. Your reservation request is currently <strong>PENDING</strong> verification. Our private event specialist will reach out shortly.
               </p>
             </div>
-            <div className="p-3 bg-white rounded-xl border border-brand/10 font-sans">
-              <p className="text-xs text-zinc-400">Estimated Event Bill</p>
-              <p className="text-xl font-bold text-brand mt-0.5">{formatINR(successBooking.totalPrice)}</p>
+            <div className="p-4 bg-[#FAF8F0] rounded-2xl border border-[#D4AF37]/20">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Estimated Event Bill</p>
+              <p className="text-2xl font-bold text-[#D4AF37] mt-0.5">{formatINR(successBooking.totalPrice)}</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 font-sans border-[#D4AF37] text-[#D4AF37] hover:bg-[#FAF8F0]"
+                className="flex-1 font-sans border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#FAF8F0] rounded-xl text-xs py-2.5"
                 onClick={() => window.open(`${api.defaults.baseURL}/banquets/bookings/${successBooking._id}/quotation`, '_blank')}
               >
                 Quotation PDF
@@ -142,74 +264,277 @@ export default function CustomerBanquetsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 font-sans border-[#D4AF37] text-[#D4AF37] hover:bg-[#FAF8F0]"
+                className="flex-1 font-sans border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#FAF8F0] rounded-xl text-xs py-2.5"
                 onClick={() => window.open(`${api.defaults.baseURL}/banquets/bookings/${successBooking._id}/estimation`, '_blank')}
               >
                 Proposal PDF
               </Button>
             </div>
-            <Button className="w-full font-sans" onClick={() => setSuccessBooking(null)}>
-              Book Another Hall
+            <Button className="w-full bg-[#111111] hover:bg-zinc-800 text-white rounded-xl text-xs py-3" onClick={() => setSuccessBooking(null)}>
+              Browse Other Venues
             </Button>
           </Card>
         )}
 
-        {/* Main List */}
-        {isLoading ? (
-          <CenteredSpinner />
-        ) : halls.length === 0 ? (
-          <Card className="py-20 text-center">
-            <Landmark className="mx-auto h-12 w-12 text-zinc-300 mb-3" />
-            <h3 className="text-zinc-600 font-semibold text-base font-sans">No venues listed at the moment</h3>
-            <p className="text-xs text-zinc-400 mt-1">Please call hotel reception directly to inquire about banquet dates.</p>
-          </Card>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2">
-            {halls.map(hall => (
-              <Card key={hall._id} className="p-6 flex flex-col justify-between hover:shadow-lg transition-all border border-zinc-200/60 bg-white">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-extrabold text-zinc-900 text-lg font-sans">{hall.name}</h3>
-                    <Badge className="bg-brand/5 text-brand border-brand/10 font-mono">
-                      Max: {hall.capacity} pax
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 py-3 border-y border-zinc-100 text-xs text-zinc-600 font-sans">
-                    <div>
-                      <p className="text-zinc-400 font-medium">Rental Charges</p>
-                      <p className="text-sm font-bold text-zinc-800 mt-0.5">{formatINR(hall.pricePerHour)}/hour</p>
-                    </div>
-                    <div>
-                      <p className="text-zinc-400 font-medium">Catering Charges</p>
-                      <p className="text-sm font-bold text-zinc-800 mt-0.5">{formatINR(hall.pricePerPlate)}/plate</p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-zinc-500 font-sans leading-relaxed">
-                    Includes sound setup, seating configurations, staging fixtures, and custom lightning settings.
-                  </p>
+        {!successBooking && (
+          <>
+            {/* Filter and Search Bar */}
+            <div className="bg-white rounded-3xl border border-zinc-200/80 p-6 shadow-sm grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 items-end text-left">
+              
+              {/* Search */}
+              <div className="space-y-1.5 lg:col-span-2">
+                <label className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37]">Search Venue Name</label>
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                  <input
+                    type="text"
+                    placeholder="Search ballroom, palace..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-10 w-full pl-10 pr-4 rounded-xl border border-zinc-200 bg-[#FAF9F6] text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  />
                 </div>
+              </div>
 
-                <Button
-                  className="mt-6 w-full font-sans flex items-center justify-center gap-1.5"
-                  onClick={() => {
-                    reset();
-                    setSelectedHall(hall);
-                  }}
+              {/* Capacity Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37]">Capacity</label>
+                <select
+                  value={capacityFilter}
+                  onChange={(e) => setCapacityFilter(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-[#FAF9F6] px-3.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
                 >
-                  Book Venue <ArrowRight className="h-4 w-4" />
+                  <option value="all">All Capacities</option>
+                  <option value="small">Under 250 Guests</option>
+                  <option value="medium">250 - 500 Guests</option>
+                  <option value="large">Over 500 Guests</option>
+                </select>
+              </div>
+
+              {/* Price Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37]">Starting Price</label>
+                <select
+                  value={priceFilter}
+                  onChange={(e) => setPriceFilter(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-[#FAF9F6] px-3.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                >
+                  <option value="all">All Prices</option>
+                  <option value="budget">Under ₹10,000 / hr</option>
+                  <option value="mid">₹10,000 - ₹20,000 / hr</option>
+                  <option value="premium">Over ₹20,000 / hr</option>
+                </select>
+              </div>
+
+              {/* Event Type Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37]">Event Type</label>
+                <select
+                  value={eventTypeFilter}
+                  onChange={(e) => setEventTypeFilter(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-[#FAF9F6] px-3.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                >
+                  <option value="all">All Event Types</option>
+                  <option value="weddings">Weddings</option>
+                  <option value="corporate">Corporate</option>
+                  <option value="exhibitions">Exhibitions</option>
+                  <option value="parties">Parties</option>
+                  <option value="sangeet">Sangeet Nights</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Banquet Listing Grid */}
+            {isLoading ? (
+              <div className="py-24">
+                <CenteredSpinner />
+              </div>
+            ) : filteredHalls.length === 0 ? (
+              <Card className="py-24 text-center border-dashed border-zinc-200 bg-white rounded-3xl">
+                <Landmark className="mx-auto h-12 w-12 text-zinc-300 mb-4" />
+                <h3 className="text-zinc-700 font-serif font-bold text-lg">No Venues Match Your Filters</h3>
+                <p className="text-xs text-zinc-400 mt-1 max-w-sm mx-auto font-light">
+                  Please clear your search query or adjust filter parameters to explore our catalog of royal spaces.
+                </p>
+                <Button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setCapacityFilter('all');
+                    setPriceFilter('all');
+                    setEventTypeFilter('all');
+                  }}
+                  className="mt-6 bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl text-xs py-2 px-6"
+                >
+                  Clear Filters
                 </Button>
               </Card>
-            ))}
-          </div>
+            ) : (
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {filteredHalls.map((hall) => {
+                  const enrichment = HALL_ENRICHMENTS[hall.name] || defaultEnrichment;
+                  return (
+                    <Card
+                      key={hall._id}
+                      className="group flex flex-col justify-between hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 border border-zinc-200 bg-white rounded-3xl overflow-hidden text-left"
+                    >
+                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100">
+                        <Image
+                          src={enrichment.image}
+                          alt={hall.name}
+                          fill
+                          className="object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+                        
+                        {/* Status tag */}
+                        <div className="absolute top-4 right-4">
+                          <span className={`text-[8px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full text-white ${hall.isActive ? 'bg-[#D4AF37]' : 'bg-zinc-500'}`}>
+                            {hall.isActive ? 'Available' : 'Closed'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-6 flex-1 flex flex-col justify-between space-y-6">
+                        <div className="space-y-3">
+                          <h3 className="text-xl font-serif font-semibold text-zinc-900 group-hover:text-[#D4AF37] transition-colors">{hall.name}</h3>
+                          <p className="text-xs text-zinc-500 font-light leading-relaxed line-clamp-3">
+                            {enrichment.description}
+                          </p>
+
+                          {/* Quick specs grid */}
+                          <div className="grid grid-cols-2 gap-3 py-4 border-y border-zinc-100 text-[11px] text-zinc-600">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-[#D4AF37] shrink-0" />
+                              <span>Max: <strong>{hall.capacity} pax</strong></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Maximize className="h-4 w-4 text-[#D4AF37] shrink-0" />
+                              <span>Area: <strong>{enrichment.area}</strong></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-[#D4AF37] shrink-0" />
+                              <span>Hourly: <strong>{formatINR(hall.pricePerHour)}/hr</strong></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Landmark className="h-4 w-4 text-[#D4AF37] shrink-0" />
+                              <span>Catering: <strong>{formatINR(hall.pricePerPlate)}/plt</strong></span>
+                            </div>
+                          </div>
+
+                          {/* Event types */}
+                          <div className="space-y-1.5">
+                            <span className="text-[8px] font-extrabold uppercase tracking-widest text-[#D4AF37]">Suited For</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {enrichment.eventTypes.map((type) => (
+                                <span key={type} className="text-[9px] bg-[#FAF8F0] border border-[#D4AF37]/20 text-[#AE963C] px-2 py-0.5 rounded-full font-medium">
+                                  {type}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                          <Button
+                            variant="outline"
+                            className="font-sans text-xs border-zinc-200 text-zinc-600 hover:bg-zinc-50 rounded-xl"
+                            onClick={() => setDetailsHall(hall)}
+                          >
+                            View Details
+                          </Button>
+                          <Button
+                            className="font-sans text-xs bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl"
+                            onClick={() => {
+                              reset();
+                              setSelectedHall(hall);
+                            }}
+                          >
+                            Book Now
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {/* Banquet Details Info Modal */}
+      {detailsHall && (
+        <Dialog open onClose={() => setDetailsHall(null)} title={detailsHall.name} widthClass="max-w-lg">
+          {(() => {
+            const enrich = HALL_ENRICHMENTS[detailsHall.name] || defaultEnrichment;
+            return (
+              <div className="space-y-6 text-left font-sans">
+                <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-zinc-100">
+                  <Image
+                    src={enrich.image}
+                    alt={detailsHall.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-xl font-serif font-bold text-zinc-900">About the Venue</h3>
+                  <p className="text-xs text-zinc-500 font-light leading-relaxed">{enrich.description}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-y border-zinc-100 py-4 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-zinc-400 block">Total Capacity</span>
+                    <span className="font-semibold text-zinc-800">{detailsHall.capacity} guests</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-zinc-400 block">Venue Size Area</span>
+                    <span className="font-semibold text-zinc-800">{enrich.area}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-zinc-400 block">Hall Rental Tariff</span>
+                    <span className="font-semibold text-[#D4AF37]">{formatINR(detailsHall.pricePerHour)} / Hour</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-zinc-400 block">Catering Rate</span>
+                    <span className="font-semibold text-[#D4AF37]">{formatINR(detailsHall.pricePerPlate)} / Plate (min billing)</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] block">Hall Specifications &amp; Features</span>
+                  <ul className="grid grid-cols-2 gap-2 text-xs text-zinc-600 list-disc pl-4">
+                    {enrich.features.map(feat => (
+                      <li key={feat} className="font-light">{feat}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="pt-2">
+                  <Button
+                    className="w-full bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl text-xs py-3"
+                    onClick={() => {
+                      setDetailsHall(null);
+                      reset();
+                      setSelectedHall(detailsHall);
+                    }}
+                  >
+                    Proceed with Reservation
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </Dialog>
+      )}
 
       {/* Reservation Booking Form Modal */}
       {selectedHall && (
         <Dialog open onClose={() => setSelectedHall(null)} title={`Book: ${selectedHall.name}`} widthClass="max-w-md">
-          <form onSubmit={handleSubmit(d => submitBookingMutation.mutate(d))} className="space-y-4">
+          <form onSubmit={handleSubmit(d => submitBookingMutation.mutate(d))} className="space-y-4 text-left">
             <Field label="Full Name *">
               <Input {...register('guestName')} placeholder="Elon Musk" />
               <FieldError message={errors.guestName?.message} />
@@ -258,16 +583,16 @@ export default function CustomerBanquetsPage() {
 
             {/* Price Estimator panel */}
             {estimatedPrice > 0 && (
-              <div className="rounded-xl border border-brand/20 bg-brand/5/10 p-3.5 flex items-center justify-between font-sans">
+              <div className="rounded-xl border border-[#D4AF37]/35 bg-[#FAF8F0] p-3.5 flex items-center justify-between font-sans">
                 <div>
                   <p className="text-[10px] text-zinc-400 font-bold tracking-wider uppercase">Estimated Invoice</p>
                   <p className="text-xs text-zinc-500 mt-0.5">Includes rental time + plates count</p>
                 </div>
-                <p className="text-lg font-extrabold text-brand">{formatINR(estimatedPrice)}</p>
+                <p className="text-lg font-extrabold text-[#D4AF37]">{formatINR(estimatedPrice)}</p>
               </div>
             )}
 
-            <Button type="submit" className="w-full font-sans flex items-center justify-center gap-1.5" disabled={submitBookingMutation.isPending}>
+            <Button type="submit" className="w-full bg-[#111111] hover:bg-zinc-800 text-white rounded-xl py-3 font-semibold text-xs flex items-center justify-center gap-1.5" disabled={submitBookingMutation.isPending}>
               {submitBookingMutation.isPending ? 'Requesting...' : 'Request Reservation'}
             </Button>
           </form>

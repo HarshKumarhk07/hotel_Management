@@ -1,7 +1,7 @@
 import { connectDatabase, disconnectDatabase } from '@/config/db';
 import { logger } from '@/config/logger';
 import { AUTH_PROVIDERS, ROLES } from '@/constants';
-import { User, Kitchen, Room, Category, MenuItem } from '@/models';
+import { User, Kitchen, Room, Category, MenuItem, BanquetHall } from '@/models';
 
 async function seedLocalDev(): Promise<void> {
   logger.info('Starting local development database seeding...');
@@ -169,6 +169,37 @@ async function seedLocalDev(): Promise<void> {
       room.images = rData.images;
       await room.save();
       logger.info(`✅ Updated Room Details: ${rData.roomNumber}`);
+    }
+  }
+
+  // Seed Banquet Halls
+  const hallsData = [
+    { name: 'Royal Ballroom', capacity: 500, pricePerHour: 15000, pricePerPlate: 2500 },
+    { name: 'Imperial Banquet Hall', capacity: 300, pricePerHour: 10000, pricePerPlate: 2000 },
+    { name: 'Crystal Palace', capacity: 800, pricePerHour: 25000, pricePerPlate: 3500 },
+    { name: 'Grand Celebration Hall', capacity: 400, pricePerHour: 12000, pricePerPlate: 1800 },
+    { name: 'Heritage Courtyard', capacity: 250, pricePerHour: 8000, pricePerPlate: 1500 },
+    { name: 'Emerald Ballroom', capacity: 150, pricePerHour: 6000, pricePerPlate: 1200 },
+  ];
+
+  for (const hData of hallsData) {
+    let hall = await BanquetHall.findOne({ name: hData.name });
+    if (!hall) {
+      await BanquetHall.create({
+        name: hData.name,
+        capacity: hData.capacity,
+        pricePerHour: hData.pricePerHour,
+        pricePerPlate: hData.pricePerPlate,
+        kitchen: kitchen._id,
+        isActive: true,
+      });
+      logger.info(`✅ Created Banquet Hall: ${hData.name}`);
+    } else {
+      hall.capacity = hData.capacity;
+      hall.pricePerHour = hData.pricePerHour;
+      hall.pricePerPlate = hData.pricePerPlate;
+      await hall.save();
+      logger.info(`✅ Updated Banquet Hall: ${hData.name}`);
     }
   }
 

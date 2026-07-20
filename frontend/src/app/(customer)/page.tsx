@@ -68,6 +68,16 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-open QR scanner if requested in query parameter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('scan') === 'true') {
+      setScannerOpen(true);
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -191,9 +201,30 @@ export default function HomePage() {
       {/* ── Navbar Layout ── */}
       <header className="absolute top-0 left-0 right-0 z-50 bg-black/10 backdrop-blur-[2px] border-b border-white/10">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          {/* Left Navigation links */}
-          <nav className="hidden lg:flex items-center gap-8 text-[11px] font-extrabold uppercase tracking-[0.2em] text-white">
-            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-[#D4AF37] transition-colors border-b-2 border-[#D4AF37] pb-1">
+          {/* Left Side: Logo and Brand Title */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-white/15 backdrop-blur-sm ring-1 ring-white/20 transition-all duration-300 group-hover:bg-white/25">
+              <NextImage
+                src="/logo.png"
+                alt="The Page Logo"
+                width={40}
+                height={40}
+                className="h-full w-full object-contain p-1.5"
+              />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-sm font-bold tracking-[0.25em] text-[#D4AF37] font-serif uppercase leading-none">
+                THE PAGE
+              </span>
+              <span className="text-[7px] font-semibold tracking-[0.3em] text-white/60 uppercase mt-1">
+                LUXURY HOTEL
+              </span>
+            </div>
+          </Link>
+
+          {/* Center: Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-8 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white">
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
               Home
             </button>
             <button onClick={() => router.push('/rooms')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
@@ -205,27 +236,17 @@ export default function HomePage() {
             <button onClick={() => router.push('/restaurant/waitlist')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
               Restaurant
             </button>
-          </nav>
-
-          {/* Center Brand Title */}
-          <div className="flex flex-col items-center justify-center text-center">
-            <span className="text-xl md:text-2xl font-bold tracking-[0.25em] text-[#D4AF37] font-serif uppercase">
-              THE PAGE
-            </span>
-            <span className="text-[8px] font-semibold tracking-[0.3em] text-white/70 uppercase -mt-0.5">
-              EST. 2016
-            </span>
-          </div>
-
-          {/* Right Navigation links */}
-          <nav className="hidden lg:flex items-center gap-8 text-[11px] font-extrabold uppercase tracking-[0.2em] text-white">
             <button onClick={() => handleScrollToSection('amenities')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
               Amenities
             </button>
-            <button onClick={() => handleScrollToSection('about')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+            <button onClick={() => router.push('/about')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
               About
             </button>
-            <button onClick={() => setScannerOpen(true)} className="hover:text-[#D4AF37] transition-colors text-[#D4AF37] border border-[#D4AF37] px-3.5 py-1.5 rounded-full hover:bg-[#D4AF37]/10 transition-all">
+          </nav>
+
+          {/* Right Side: Scan QR & Login */}
+          <nav className="hidden lg:flex items-center gap-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white">
+            <button onClick={() => setScannerOpen(true)} className="hover:text-[#D4AF37] transition-colors text-[#D4AF37] border border-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37]/15 transition-all">
               Scan QR
             </button>
             <Link href="/login" className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
@@ -271,10 +292,10 @@ export default function HomePage() {
               <button onClick={() => { router.push('/restaurant/waitlist'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
                 Restaurant
               </button>
-              <button onClick={() => handleScrollToSection('amenities')} className="text-white hover:text-[#D4AF37] text-left">
+              <button onClick={() => { handleScrollToSection('amenities'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
                 Amenities
               </button>
-              <button onClick={() => handleScrollToSection('about')} className="text-white hover:text-[#D4AF37] text-left">
+              <button onClick={() => { router.push('/about'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
                 About
               </button>
               <Link href="/login" className="text-white hover:text-[#D4AF37] text-left">
@@ -633,7 +654,7 @@ export default function HomePage() {
                       transition: { delay: customIndex * 0.1, duration: 0.7, ease: "easeOut" }
                     })
                   }}
-                  className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-6 space-y-4 hover:border-[#D4AF37]/30 hover:bg-zinc-900/60 hover:-translate-y-1 transition-all duration-300 text-left"
+                  className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-6 space-y-4 hover:border-[#D4AF37]/30 hover:bg-zinc-900/60 hover:-translate-y-2 hover:shadow-[0_10px_30px_rgba(212,175,55,0.08)] transition-all duration-300 text-left"
                 >
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -652,9 +673,6 @@ export default function HomePage() {
                         {amenity.desc}
                       </p>
                     </div>
-                  </div>
-                  <div className="pt-2 text-[10px] font-bold tracking-wider text-[#D4AF37]/60 group-hover:text-[#D4AF37] uppercase flex items-center gap-1 cursor-pointer transition-colors">
-                    Learn More ✦
                   </div>
                 </motion.div>
               ))}
@@ -698,12 +716,6 @@ export default function HomePage() {
                 className="flex items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg hover:bg-[#AE963C] transition-all hover:scale-[1.03] active:scale-[0.98]"
               >
                 Explore Venues
-              </button>
-              <button
-                onClick={() => router.push('/banquets')}
-                className="flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-black/20 backdrop-blur-sm px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/10 transition-all hover:scale-[1.03] active:scale-[0.98]"
-              >
-                Plan Your Event
               </button>
             </div>
           </motion.div>
