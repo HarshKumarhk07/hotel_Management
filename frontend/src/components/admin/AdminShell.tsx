@@ -353,7 +353,7 @@ function Shell({ children }: { children: ReactNode }) {
           </div>
           <NotificationBell role={user?.role ?? ''} align="left-flyout" />
         </div>
-        <nav className="flex-1 space-y-1 px-3 py-2">
+        <nav className="flex-1 space-y-1 px-3 py-2 overflow-y-auto">
           {NAV.map((item) => {
             const active = pathname === item.href;
             if (!item.ready) {

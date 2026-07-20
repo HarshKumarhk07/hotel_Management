@@ -255,7 +255,13 @@ export default function HomePage() {
             </button>
             {status === 'authenticated' ? (
               <Link
-                href={user?.role === 'VALET_MANAGER' ? '/valet/dashboard' : '/admin'}
+                href={
+                  user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
+                    ? '/admin'
+                    : user?.role === 'VALET_MANAGER'
+                    ? '/valet/dashboard'
+                    : '/orders'
+                }
                 className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
               >
                 Dashboard
@@ -313,7 +319,13 @@ export default function HomePage() {
               </button>
               {status === 'authenticated' ? (
                 <Link
-                  href={user?.role === 'VALET_MANAGER' ? '/valet/dashboard' : '/admin'}
+                  href={
+                    user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
+                      ? '/admin'
+                      : user?.role === 'VALET_MANAGER'
+                      ? '/valet/dashboard'
+                      : '/orders'
+                  }
                   onClick={() => setMobileMenuOpen(false)}
                   className="text-white hover:text-[#D4AF37] text-left"
                 >

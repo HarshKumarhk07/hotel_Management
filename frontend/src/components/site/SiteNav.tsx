@@ -76,7 +76,13 @@ export function SiteNav({ fullMenuHref }: { fullMenuHref: string }) {
           
           {status === 'authenticated' ? (
             <Link
-              href={user?.role === 'VALET_MANAGER' ? '/valet/dashboard' : '/admin'}
+              href={
+                user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
+                  ? '/admin'
+                  : user?.role === 'VALET_MANAGER'
+                  ? '/valet/dashboard'
+                  : '/orders'
+              }
               className="hidden md:inline-flex h-9 items-center justify-center rounded-full bg-[#D4AF37] px-5 text-white transition-all duration-300 hover:bg-[#AE963C]"
             >
               Dashboard
@@ -131,7 +137,13 @@ export function SiteNav({ fullMenuHref }: { fullMenuHref: string }) {
             </Link>
             {status === 'authenticated' ? (
               <Link
-                href={user?.role === 'VALET_MANAGER' ? '/valet/dashboard' : '/admin'}
+                href={
+                  user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
+                    ? '/admin'
+                    : user?.role === 'VALET_MANAGER'
+                    ? '/valet/dashboard'
+                    : '/orders'
+                }
                 onClick={() => setMobileMenuOpen(false)}
                 className="inline-flex h-10 items-center justify-center rounded-xl bg-[#D4AF37] text-white text-center font-bold tracking-wider uppercase mt-2"
               >
