@@ -60,7 +60,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function ReservationsPage() {
   const qc = useQueryClient();
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Reservation | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -124,7 +124,9 @@ export default function ReservationsPage() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold text-zinc-900">Reservations</h1>
-              <p className="text-sm text-zinc-500 mt-0.5">{reservations.length} for {date}</p>
+              <p className="text-sm text-zinc-500 mt-0.5">
+                {date ? `${reservations.length} reservations for ${date}` : `${reservations.length} total reservations (All Dates)`}
+              </p>
             </div>
           </div>
           <Button size="sm" onClick={() => { setShowCreate(true); reset(); }}>
@@ -148,7 +150,26 @@ export default function ReservationsPage() {
             onChange={e => setDate(e.target.value)}
             className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
           />
-          <button onClick={() => refetch()} className="text-sm text-zinc-400 hover:text-zinc-700">Refresh</button>
+          {date ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDate('')}
+              className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 h-8"
+            >
+              Show All Dates
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDate(new Date().toISOString().split('T')[0])}
+              className="text-xs text-zinc-500 hover:text-zinc-700 h-8"
+            >
+              Show Today Only
+            </Button>
+          )}
+          <button onClick={() => refetch()} className="text-sm text-zinc-400 hover:text-zinc-700 ml-auto">Refresh</button>
         </div>
 
         {isLoading ? <CenteredSpinner /> : (
