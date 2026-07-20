@@ -199,7 +199,7 @@ export default function HomePage() {
       />
 
       {/* ── Navbar Layout ── */}
-      <header className="absolute top-0 left-0 right-0 z-50 bg-black/10 backdrop-blur-[2px] border-b border-white/10">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-black/40 backdrop-blur-md border-b border-white/10 transition-all duration-300">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
           {/* Left Side: Logo and Brand Title */}
           <Link href="/" className="flex items-center gap-3 group">
@@ -427,20 +427,6 @@ export default function HomePage() {
             }}
             className="max-w-4xl mx-auto text-center space-y-6"
           >
-            <motion.div variants={{ hidden: { scale: 0.8, opacity: 0 }, visible: { scale: 1, opacity: 1 } }} className="flex justify-center mb-2">
-              <motion.span
-                animate={{ y: [0, -6, 0] }}
-                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                className="p-3.5 rounded-full border border-[#D4AF37]/30 bg-white shadow-md inline-block cursor-pointer"
-              >
-                <Sparkles className="h-6 w-6 text-[#D4AF37]" />
-              </motion.span>
-            </motion.div>
-
-            <motion.span variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="block text-[10px] md:text-xs font-bold text-[#D4AF37] uppercase tracking-[0.25em]">
-              DELHI NCR&apos;S CROWN JEWEL OF HOSPITALITY
-            </motion.span>
-
             <motion.h2 variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="text-4xl md:text-6xl font-serif text-[#111111] leading-tight">
               A Symphony of Regal Grandeur<br />
               <span className="font-serif italic text-[#D4AF37]">&amp; Timeless Elegance</span>
