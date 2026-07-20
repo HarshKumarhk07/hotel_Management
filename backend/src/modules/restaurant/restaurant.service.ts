@@ -245,17 +245,16 @@ export async function closeTable(id: string, actorId: string) {
 export async function getTableBill(id: string) {
   const table = await RestaurantTable.findById(id);
   if (!table) throw AppError.notFound('Table not found');
-  if (!table.currentSession?.seatedAt) {
-    throw AppError.badRequest('Table has no active session', 'NO_ACTIVE_SESSION');
-  }
+  
+  const seatedAt = table.currentSession?.seatedAt || table.updatedAt || new Date();
 
   const orders = await Order.find({
     table: id,
-    createdAt: { $gte: table.currentSession.seatedAt },
+    createdAt: { $gte: seatedAt },
   }).select('orderNumber status items pricing payment createdAt');
 
   let grandTotal = orders.reduce((sum, o) => sum + o.pricing.total, 0);
-  if (grandTotal === 0 && table.currentSession.billAmount !== undefined) {
+  if (grandTotal === 0 && table.currentSession?.billAmount !== undefined) {
     grandTotal = table.currentSession.billAmount;
   }
   return { table, orders, grandTotal };

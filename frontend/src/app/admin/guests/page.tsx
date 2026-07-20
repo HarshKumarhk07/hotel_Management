@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -14,6 +14,8 @@ import {
   User,
   Utensils,
   ChevronRight,
+  Bed,
+  Sparkles,
 } from 'lucide-react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Card, CenteredSpinner } from '@/components/ui/primitives';
@@ -34,6 +36,8 @@ interface GuestHistory {
   orders: any[];
   vehicles: any[];
   reservations: any[];
+  roomBookings?: any[];
+  banquetBookings?: any[];
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
@@ -100,6 +104,32 @@ export default function GuestManagementPage() {
         badge: r.status,
       });
     });
+
+    if (history.roomBookings) {
+      history.roomBookings.forEach((rb: any) => {
+        items.push({
+          date: new Date(rb.checkInDate),
+          type: 'room',
+          title: `Room Stay: ${rb.room?.roomNumber ? `Chamber ${rb.room.roomNumber}` : 'Hotel Chamber'}`,
+          desc: `Check-in: ${new Date(rb.checkInDate).toLocaleDateString()} · Check-out: ${new Date(rb.checkOutDate).toLocaleDateString()}`,
+          amount: rb.totalPrice,
+          badge: rb.status,
+        });
+      });
+    }
+
+    if (history.banquetBookings) {
+      history.banquetBookings.forEach((bb: any) => {
+        items.push({
+          date: new Date(bb.eventDate),
+          type: 'banquet',
+          title: `Banquet: ${bb.hall?.name || 'Grand Ballroom'}`,
+          desc: `${bb.eventType} event · ${bb.guestCount} guests`,
+          amount: bb.totalPrice,
+          badge: bb.status,
+        });
+      });
+    }
 
     return items.sort((a, b) => b.date.getTime() - a.date.getTime());
   };
@@ -201,6 +231,8 @@ export default function GuestManagementPage() {
                             {item.type === 'order' && <Utensils className="h-3 w-3 text-zinc-500" />}
                             {item.type === 'valet' && <Car className="h-3 w-3 text-zinc-500" />}
                             {item.type === 'reservation' && <CalendarDays className="h-3 w-3 text-zinc-500" />}
+                            {item.type === 'room' && <Bed className="h-3 w-3 text-zinc-500" />}
+                            {item.type === 'banquet' && <Sparkles className="h-3 w-3 text-zinc-500" />}
                           </span>
 
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">

@@ -1,7 +1,7 @@
-﻿import type { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { asyncHandler } from '@/utils/asyncHandler';
 import { ok } from '@/utils/apiResponse';
-import { User, Order, Vehicle, TableReservation } from '@/models';
+import { User, Order, Vehicle, TableReservation, RoomBooking, BanquetBooking } from '@/models';
 
 export const listGuests = asyncHandler(async (req: Request, res: Response) => {
   const q = (req.query.q as string || '').trim();
@@ -24,7 +24,7 @@ export const listGuests = asyncHandler(async (req: Request, res: Response) => {
     User.find({ role: 'CUSTOMER', $or: [{ name: regex }, { email: regex }, { phone: regex }] }).limit(50).lean(),
     Order.find({ $or: [{ 'guestInfo.name': regex }, { 'guestInfo.email': regex }, { 'guestInfo.phone': regex }] }).limit(50).lean(),
     Vehicle.find({ $or: [{ 'guestInfo.name': regex }, { 'guestInfo.phone': regex }] }).limit(50).lean(),
-    TableReservation.find({ $or: [{ guestName: regex }, { phone: regex }, { email: regex }] }).limit(50).lean(),
+    TableReservation.find({ $or: [{ guestName: regex }, { email: regex }, { phone: regex }] }).limit(50).lean(),
   ]);
 
   const guestMap = new Map<string, { name: string; email?: string; phone?: string; userId?: string }>();
@@ -82,9 +82,27 @@ export const getGuestDetails = asyncHandler(async (req: Request, res: Response) 
     ? await TableReservation.find({ $or: resQueries }).sort({ scheduledAt: -1 }).lean()
     : [];
 
+  // Get room bookings
+  const roomQueries: any[] = [];
+  if (email) roomQueries.push({ email });
+  if (phone) roomQueries.push({ phone });
+  const roomBookings = roomQueries.length > 0
+    ? await RoomBooking.find({ $or: roomQueries }).populate('room').sort({ checkInDate: -1 }).lean()
+    : [];
+
+  // Get banquet bookings
+  const banquetQueries: any[] = [];
+  if (email) banquetQueries.push({ email });
+  if (phone) banquetQueries.push({ phone });
+  const banquetBookings = banquetQueries.length > 0
+    ? await BanquetBooking.find({ $or: banquetQueries }).populate('hall').sort({ eventDate: -1 }).lean()
+    : [];
+
   return ok(res, {
     orders,
     vehicles,
     reservations,
+    roomBookings,
+    banquetBookings,
   });
 });

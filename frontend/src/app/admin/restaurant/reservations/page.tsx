@@ -82,7 +82,13 @@ export default function ReservationsPage() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: (d: CreateForm) => api.post('/restaurant/reservations', d),
+    mutationFn: (d: CreateForm) => {
+      const payload = {
+        ...d,
+        scheduledAt: new Date(d.scheduledAt).toISOString(),
+      };
+      return api.post('/restaurant/reservations', payload);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['reservations'] }); setShowCreate(false); },
     onError: e => setError(apiErrorMessage(e)),
   });
