@@ -281,3 +281,29 @@ export function roomBookingPendingTemplate(
     text: `${subjectPrefix}: Hi ${name}, your booking for Room ${roomNumber} from ${formattedCheckIn} to ${formattedCheckOut} is registered. Confirmation Code: ${confirmationNumber}. Amount: ₹${totalAmount}. ${payAtHotel ? 'Please pay at the hotel front desk on arrival.' : 'Payment is pending. Please settle at the hotel on arrival.'}`,
   };
 }
+
+export function checkoutFeedbackTemplate(
+  name: string,
+  roomNumber: string,
+  feedbackLink: string
+): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeRoomNumber = escapeHtml(roomNumber);
+  
+  return {
+    subject: `🛎️ Hope you enjoyed your stay at The Page Hotel! - Feedback Request`,
+    html: layout(
+      'Thank You for Staying With Us',
+      `<p>Dear ${safeName},</p>
+       <p>Thank you for choosing <strong>The Page Hotel</strong> for your recent stay in Chamber ${safeRoomNumber}. It was our absolute privilege to host you.</p>
+       <p>As part of our commitment to delivering a truly bespoke luxury experience, we would love to hear your feedback on your stay, service quality, and dining experience.</p>
+       <div style="text-align: center; margin: 30px 0;">
+         <a href="${feedbackLink}" style="background-color: #D4AF37; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: sans-serif;">Share Your Feedback</a>
+       </div>
+       <p>If you cannot click the button above, copy and paste this link into your browser: <br/><a href="${feedbackLink}" style="color: #D4AF37;">${feedbackLink}</a></p>
+       <p>We hope to welcome you back for another exceptional stay in the near future.</p>
+       <p>Warmest regards,<br/>The Front Desk Team<br/>The Page Hotel</p>`,
+    ),
+    text: `Hope you enjoyed your stay at The Page Hotel! Dear ${name}, thank you for staying with us in Chamber ${roomNumber}. Please share your feedback on your stay: ${feedbackLink}`,
+  };
+}

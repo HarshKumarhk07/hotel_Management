@@ -6,6 +6,7 @@ import type { FilterQuery } from 'mongoose';
 import { validateCoupon, reserveCoupon } from '@/modules/coupon/coupon.service';
 import { emailService } from '@/services/email/brevo.service';
 import { logger } from '@/config/logger';
+import { env } from '@/config/env';
 
 export async function searchAvailableRooms(query: {
   checkInDate: string;
@@ -558,6 +559,18 @@ export async function checkOutGuest(bookingId: string, updatedBy?: string) {
   await booking.save();
 
   await Room.findByIdAndUpdate(booking.room, { status: 'CLEANING' });
+
+  // Send post-checkout feedback email
+  if (booking.email) {
+    const roomNumberStr = (booking.room as any)?.roomNumber || '';
+    const feedbackLink = `${env.APP_URL}/feedback?room=${encodeURIComponent(roomNumberStr)}`;
+    emailService.sendCheckoutFeedback(
+      booking.email,
+      booking.guestName,
+      roomNumberStr || 'Stay',
+      feedbackLink
+    ).catch((err) => logger.error({ err }, 'Failed to send checkout feedback email'));
+  }
 
   return { booking: await booking.populate('room'), invoice };
 }

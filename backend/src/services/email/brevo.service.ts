@@ -12,6 +12,7 @@ import {
   valetWelcomeTemplate,
   roomBookingConfirmationTemplate,
   roomBookingPendingTemplate,
+  checkoutFeedbackTemplate,
   type EmailContent,
   type SecurityAlertData,
 } from './templates';
@@ -124,5 +125,8 @@ export const emailService = {
         payAtHotel
       )
     );
+  },
+  sendCheckoutFeedback(to: string, name: string, roomNumber: string, feedbackLink: string) {
+    return send(to, checkoutFeedbackTemplate(name, roomNumber, feedbackLink));
   },
 };
