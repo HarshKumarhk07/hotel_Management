@@ -26,6 +26,7 @@ describe('Room Booking — API Endpoints', () => {
       roomNumber: '101',
       floor: 1,
       isActive: true,
+      pricePerNight: 5000,
       qr: { token: 'qr-token-101', isActive: true, version: 1 },
     });
 
@@ -33,6 +34,7 @@ describe('Room Booking — API Endpoints', () => {
       roomNumber: '102',
       floor: 1,
       isActive: true,
+      pricePerNight: 5000,
       qr: { token: 'qr-token-102', isActive: true, version: 1 },
     });
   });
@@ -91,7 +93,8 @@ describe('Room Booking — API Endpoints', () => {
       .expect(201);
 
     expect(res.body.data.booking.guestName).toBe('Jane Smith');
-    expect(res.body.data.booking.totalPrice).toBe(25000); // 5 nights * 5000
+    // 5000/night * 5 nights = 25000 base + 18% GST (4500) + 5% service charge (1250) = 30750
+    expect(res.body.data.booking.totalPrice).toBe(30750);
     expect(res.body.data.booking.status).toBe('PENDING');
   });
 
