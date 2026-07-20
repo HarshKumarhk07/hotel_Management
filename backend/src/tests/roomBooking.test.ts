@@ -59,6 +59,7 @@ describe('Room Booking — API Endpoints', () => {
       checkOutDate: new Date('2026-08-05T12:00:00.000Z'),
       totalPrice: 20000,
       status: 'CONFIRMED',
+      priceBreakdown: { roomPrice: 4000, nights: 5, grandTotal: 20000 },
     });
 
     // Search again, only Room 102 should be returned
@@ -121,6 +122,7 @@ describe('Room Booking — API Endpoints', () => {
       checkOutDate: new Date('2026-10-05T12:00:00.000Z'),
       totalPrice: 20000,
       status: 'CONFIRMED',
+      priceBreakdown: { roomPrice: 4000, nights: 4, grandTotal: 20000 },
     });
 
     const res = await request(app)
@@ -142,6 +144,7 @@ describe('Room Booking — API Endpoints', () => {
       checkOutDate: new Date('2026-11-05T12:00:00.000Z'),
       totalPrice: 20000,
       status: 'PENDING',
+      priceBreakdown: { roomPrice: 4000, nights: 4, grandTotal: 20000 },
     });
 
     // List bookings (admin)
