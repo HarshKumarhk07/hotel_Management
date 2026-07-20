@@ -173,9 +173,11 @@ export default function GuestRoomsPage() {
                     <option value="PRESIDENTIAL">Presidential Penthouse</option>
                   </select>
                 </Field>
-                <Button type="submit" className="bg-[#D4AF37] hover:bg-[#AE963C] text-white h-11 w-full rounded-xl gap-2 font-bold uppercase tracking-wider text-xs shadow-md">
-                  <Search className="h-4 w-4" /> Check Availability
-                </Button>
+                <div className="flex items-end h-full">
+                  <Button type="submit" className="bg-[#D4AF37] hover:bg-[#AE963C] text-white h-11 w-full rounded-xl gap-2 font-bold uppercase tracking-wider text-xs shadow-md">
+                    <Search className="h-4 w-4" /> Check Availability
+                  </Button>
+                </div>
               </div>
 
               {/* Extra Filters */}
@@ -297,16 +299,16 @@ export default function GuestRoomsPage() {
             </div>
 
             <Card className="p-5 border-[#ECECEC] bg-[#FAF9F6] rounded-3xl">
-              <form onSubmit={handleLookup} className="flex gap-2">
+              <form onSubmit={handleLookup} className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
                   required
                   placeholder="Enter email or phone (e.g. guest@example.com)"
                   value={lookupValue}
                   onChange={(e) => setLookupValue(e.target.value)}
-                  className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] min-w-0"
                 />
-                <Button type="submit" className="bg-[#111111] hover:bg-[#222222] text-white rounded-xl px-6 h-11 font-bold text-xs uppercase tracking-wider shadow">
+                <Button type="submit" className="bg-[#111111] hover:bg-[#222222] text-white rounded-xl px-6 h-11 font-bold text-xs uppercase tracking-wider shadow shrink-0">
                   Search Bookings
                 </Button>
               </form>
@@ -320,7 +322,7 @@ export default function GuestRoomsPage() {
                   <p className="text-center text-sm text-zinc-500">No active bookings found matching your request details.</p>
                 ) : (
                   myBookings.map((b) => (
-                    <Card key={b._id} className="p-5 border-[#ECECEC] bg-white rounded-2xl flex justify-between items-center shadow-sm">
+                    <Card key={b._id} className="p-5 border-[#ECECEC] bg-white rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 shadow-sm text-left">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-zinc-900 text-lg">Room {b.room?.roomNumber || 'Unknown'}</p>
@@ -331,7 +333,7 @@ export default function GuestRoomsPage() {
                         </p>
                         <p className="text-xs font-semibold text-zinc-700">Guest: {b.guestName} | Total Price: {formatINR(b.totalPrice)}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
+                      <div className="flex flex-col items-start sm:items-end gap-2">
                         <Badge className={`
                           ${b.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' : ''}
                           ${b.status === 'CONFIRMED' ? 'bg-blue-50 text-blue-700' : ''}

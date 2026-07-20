@@ -333,27 +333,27 @@ export default function HomePage() {
           {/* Left & Right Interactive Arrows */}
           <button
             onClick={() => setCurrentSlide((prev) => (prev - 1 + HERO_IMAGES.length) % HERO_IMAGES.length)}
-            className="absolute left-6 z-20 flex h-12 w-12 items-center justify-center border border-white/20 bg-black/30 hover:bg-[#D4AF37] hover:border-[#D4AF37] text-white backdrop-blur-md transition-all duration-300 active:scale-95"
+            className="absolute left-2 md:left-6 z-20 flex h-9 w-9 md:h-12 md:w-12 items-center justify-center border border-white/20 bg-black/30 hover:bg-[#D4AF37] hover:border-[#D4AF37] text-white backdrop-blur-md transition-all duration-300 active:scale-95"
             aria-label="Previous Slide"
           >
-            <ChevronLeft className="h-6 w-6" />
+            <ChevronLeft className="h-4 w-4 md:h-6 md:w-6" />
           </button>
           <button
             onClick={() => setCurrentSlide((prev) => (prev + 1) % HERO_IMAGES.length)}
-            className="absolute right-6 z-20 flex h-12 w-12 items-center justify-center border border-white/20 bg-black/30 hover:bg-[#D4AF37] hover:border-[#D4AF37] text-white backdrop-blur-md transition-all duration-300 active:scale-95"
+            className="absolute right-2 md:right-6 z-20 flex h-9 w-9 md:h-12 md:w-12 items-center justify-center border border-white/20 bg-black/30 hover:bg-[#D4AF37] hover:border-[#D4AF37] text-white backdrop-blur-md transition-all duration-300 active:scale-95"
             aria-label="Next Slide"
           >
-            <ChevronRight className="h-6 w-6" />
+            <ChevronRight className="h-4 w-4 md:h-6 md:w-6" />
           </button>
-
+ 
           {/* Hero Content Overlay */}
-          <div className="relative z-10 max-w-4xl px-6 text-center space-y-6 text-white mt-12">
+          <div className="relative z-10 max-w-4xl px-8 text-center space-y-6 text-white mt-12">
             <motion.span
               key={`tag-${currentSlide}`}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="inline-block text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-[#D4AF37] border-b border-[#D4AF37]/30 pb-2"
+              className="inline-block text-[9px] md:text-xs font-bold uppercase tracking-[0.3em] text-[#D4AF37] border-b border-[#D4AF37]/30 pb-2"
             >
               {HERO_IMAGES[currentSlide].tag}
             </motion.span>
@@ -362,7 +362,7 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 25 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
-              className="text-5xl md:text-8xl font-serif tracking-[0.05em] leading-tight uppercase font-medium text-white"
+              className="text-3xl sm:text-5xl md:text-8xl font-serif tracking-[0.05em] leading-tight uppercase font-medium text-white"
             >
               {HERO_IMAGES[currentSlide].title}
             </motion.h1>

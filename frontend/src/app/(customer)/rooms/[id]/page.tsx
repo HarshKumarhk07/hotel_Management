@@ -95,18 +95,9 @@ function RoomDetailsInner() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FAF9F6] font-sans selection:bg-[#D4AF37]/20">
-      <header className="bg-zinc-950 text-white py-6 px-8 border-b border-white/10 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/rooms" className="text-zinc-400 hover:text-[#D4AF37] flex items-center gap-1 text-sm font-semibold transition-colors">
-            <ArrowLeft className="h-4 w-4" /> Back to Accommodations
-          </Link>
-          <span className="text-lg font-bold tracking-widest text-[#D4AF37] font-serif uppercase">THE PAGE</span>
-        </div>
-      </header>
-
       <main className="flex-1">
         {/* Hero image slider area */}
-        <section className="relative h-[450px] w-full overflow-hidden bg-zinc-900 text-white">
+        <section className="relative h-[300px] sm:h-[450px] w-full overflow-hidden bg-zinc-900 text-white">
           <NextImage
             src={room.images?.[0] || '/hotel1.png'}
             alt={room.roomType}
@@ -115,11 +106,11 @@ function RoomDetailsInner() {
             priority
           />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent" />
-          <div className="absolute bottom-12 left-10 right-10 max-w-7xl mx-auto space-y-3">
+          <div className="absolute bottom-6 left-4 right-4 md:bottom-12 md:left-10 md:right-10 max-w-7xl mx-auto space-y-3">
             <Badge className="bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">
               {room.roomType} SUITE
             </Badge>
-            <h1 className="text-4xl md:text-6xl font-serif tracking-tight text-white uppercase">{room.roomType} Room #{room.roomNumber}</h1>
+            <h1 className="text-2xl sm:text-4xl md:text-6xl font-serif tracking-tight text-white uppercase leading-tight">{room.roomType} Room #{room.roomNumber}</h1>
             <p className="text-zinc-300 text-sm max-w-2xl">
               Experience the pinnacle of royal heritage hospitality on Floor {room.floor} with fully insulated walls, direct concierge connectivity, and private services.
             </p>
@@ -158,7 +149,7 @@ function RoomDetailsInner() {
             {/* Amenities */}
             <div className="space-y-4">
               <h2 className="text-2xl font-serif text-zinc-900 border-b pb-3 font-semibold">Included Amenities</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {room.amenities.map((amenity, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-zinc-700 text-xs py-1.5 px-3 bg-white border rounded-xl shadow-sm">
                     <Check className="h-4 w-4 text-[#D4AF37] flex-shrink-0" />

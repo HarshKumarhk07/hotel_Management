@@ -102,7 +102,7 @@ export default function GuestWaitlistPage() {
                 <Field label="Guest Name">
                   <Input required placeholder="John Doe" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
                 </Field>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Phone Number">
                     <Input required placeholder="+91 99999 88888" value={phone} onChange={(e) => setPhone(e.target.value)} />
                   </Field>
@@ -142,16 +142,16 @@ export default function GuestWaitlistPage() {
             </div>
 
             <Card className="p-6 border-[#ECECEC] bg-white rounded-3xl space-y-6">
-              <form onSubmit={handleLookup} className="flex gap-2">
+              <form onSubmit={handleLookup} className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
                   required
                   placeholder="Enter email or phone"
                   value={lookupValue}
                   onChange={(e) => setLookupValue(e.target.value)}
-                  className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] min-w-0"
                 />
-                <Button type="submit" className="bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl px-5 h-11 font-semibold">
+                <Button type="submit" className="bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl px-5 h-11 font-semibold shrink-0">
                   Track
                 </Button>
               </form>
