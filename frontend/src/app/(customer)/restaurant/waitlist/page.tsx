@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Users, Phone, Mail, Sparkles, Shield, Clock, Search, ArrowRight, CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react';
-import { SiteNav } from '@/components/site/SiteNav';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { Button } from '@/components/ui/button';
 import { Card, CenteredSpinner, EmptyState, Badge } from '@/components/ui/primitives';
@@ -73,7 +72,6 @@ export default function GuestWaitlistPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FAF9F6]">
-      <SiteNav fullMenuHref="/" />
 
       <main className="flex-1">
         {/* Banner Section */}

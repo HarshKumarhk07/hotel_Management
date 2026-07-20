@@ -75,7 +75,11 @@ export default function BanquetManagementPage() {
   const user = useAuthStore(s => s.user);
   const status = useAuthStore(s => s.status);
 
-  const [activeTab, setActiveTab] = useState<'bookings' | 'halls'>('bookings');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedHallFilter, setSelectedHallFilter] = useState('');
+
+  const [activeTab, setActiveTab] = useState<'bookings' | 'halls' | 'calendar'>('bookings');
   const [showCreateHall, setShowCreateHall] = useState(false);
   const [editBookingTarget, setEditBookingTarget] = useState<BanquetBooking | null>(null);
   const [editHallTarget, setEditHallTarget] = useState<BanquetHall | null>(null);
@@ -193,6 +197,14 @@ export default function BanquetManagementPage() {
             Reservations Timeline
           </button>
           <button
+            onClick={() => setActiveTab('calendar')}
+            className={`pb-2.5 text-sm font-semibold border-b-2 transition-all ${
+              activeTab === 'calendar' ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Availability Calendar
+          </button>
+          <button
             onClick={() => setActiveTab('halls')}
             className={`pb-2.5 text-sm font-semibold border-b-2 transition-all ${
               activeTab === 'halls' ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-800'
@@ -285,6 +297,8 @@ export default function BanquetManagementPage() {
               ))}
             </div>
           )
+        ) : activeTab === 'calendar' ? (
+          <BanquetCalendarView bookings={bookings} halls={halls} />
         ) : (
           loadingHalls ? (
             <CenteredSpinner />
@@ -455,5 +469,187 @@ export default function BanquetManagementPage() {
         </Dialog>
       )}
     </AdminShell>
+  );
+}
+
+function BanquetCalendarView({ bookings, halls }: { bookings: BanquetBooking[]; halls: BanquetHall[] }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedHallFilter, setSelectedHallFilter] = useState('');
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const prevDaysInMonth = new Date(year, month, 0).getDate();
+
+  const calendarDays = [];
+
+  // Pad previous month days
+  for (let i = firstDayIndex - 1; i >= 0; i--) {
+    calendarDays.push({
+      day: prevDaysInMonth - i,
+      isCurrentMonth: false,
+      date: new Date(year, month - 1, prevDaysInMonth - i),
+    });
+  }
+
+  // Current month days
+  for (let i = 1; i <= daysInMonth; i++) {
+    calendarDays.push({
+      day: i,
+      isCurrentMonth: true,
+      date: new Date(year, month, i),
+    });
+  }
+
+  // Pad next month days
+  const remainingCells = 42 - calendarDays.length;
+  for (let i = 1; i <= remainingCells; i++) {
+    calendarDays.push({
+      day: i,
+      isCurrentMonth: false,
+      date: new Date(year, month + 1, i),
+    });
+  }
+
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+
+  const getBookingsForDate = (date: Date) => {
+    const dStr = date.toDateString();
+    return bookings.filter(b => {
+      const matchDate = new Date(b.eventDate).toDateString() === dStr;
+      const matchHall = selectedHallFilter ? b.hall?._id === selectedHallFilter : true;
+      return matchDate && matchHall && b.status !== 'CANCELLED';
+    });
+  };
+
+  const selectedDateBookings = selectedDate ? getBookingsForDate(selectedDate) : [];
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 font-sans">
+      {/* Calendar Grid Column */}
+      <Card className="p-5 lg:col-span-8 space-y-4">
+        <div className="flex items-center justify-between border-b pb-3 mb-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-extrabold text-zinc-800 text-base">
+              {MONTH_NAMES[month]} {year}
+            </h3>
+            <select
+              value={selectedHallFilter}
+              onChange={(e) => setSelectedHallFilter(e.target.value)}
+              className="border rounded text-xs font-semibold px-2 py-1 bg-white text-zinc-700 focus:outline-none"
+            >
+              <option value="">All Halls</option>
+              {halls.map((h) => (
+                <option key={h._id} value={h._id}>{h.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="outline" onClick={handlePrevMonth}>&larr; Prev</Button>
+            <Button size="sm" variant="outline" onClick={handleNextMonth}>Next &rarr;</Button>
+          </div>
+        </div>
+
+        {/* Days Header */}
+        <div className="grid grid-cols-7 text-center text-xs font-bold text-zinc-400 py-1 uppercase tracking-wider">
+          <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+        </div>
+
+        {/* Calendar Cells */}
+        <div className="grid grid-cols-7 gap-1 border-t pt-1">
+          {calendarDays.map((cell, idx) => {
+            const dateBookings = getBookingsForDate(cell.date);
+            const isSelected = selectedDate?.toDateString() === cell.date.toDateString();
+            const isToday = new Date().toDateString() === cell.date.toDateString();
+
+            return (
+              <div
+                key={idx}
+                onClick={() => setSelectedDate(cell.date)}
+                className={`min-h-[70px] p-1.5 border rounded-lg flex flex-col justify-between cursor-pointer transition-all hover:bg-zinc-50 ${
+                  cell.isCurrentMonth ? 'bg-white text-zinc-800' : 'bg-zinc-50/50 text-zinc-400 border-zinc-100'
+                } ${isSelected ? 'border-brand ring-1 ring-brand bg-brand/5' : 'border-zinc-100'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${isToday ? 'bg-brand text-white rounded-full h-5 w-5 flex items-center justify-center' : ''}`}>
+                    {cell.day}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1 mt-1">
+                  {dateBookings.slice(0, 2).map((b) => (
+                    <div
+                      key={b._id}
+                      className="text-[9px] font-bold px-1 py-0.5 rounded truncate text-zinc-700 bg-brand/10 border border-brand/20"
+                      title={`${b.guestName} - ${b.eventType}`}
+                    >
+                      {b.eventType}
+                    </div>
+                  ))}
+                  {dateBookings.length > 2 && (
+                    <div className="text-[8px] font-bold text-zinc-400 pl-1">
+                      +{dateBookings.length - 2} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Day details list Column */}
+      <div className="lg:col-span-4 space-y-4">
+        <Card className="p-5 space-y-4">
+          <div className="border-b pb-3">
+            <h3 className="font-extrabold text-zinc-800 text-sm">
+              Schedule: {selectedDate ? selectedDate.toLocaleDateString('en-IN', { dateStyle: 'long' }) : 'Selected Date'}
+            </h3>
+            <p className="text-[10px] text-zinc-400 mt-0.5">
+              {selectedDateBookings.length} event{selectedDateBookings.length !== 1 ? 's' : ''} scheduled
+            </p>
+          </div>
+
+          <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+            {selectedDateBookings.length === 0 ? (
+              <div className="py-12 text-center text-zinc-400 text-xs">
+                No events scheduled for this date.
+              </div>
+            ) : (
+              selectedDateBookings.map((b) => (
+                <div key={b._id} className="p-3 border rounded-lg bg-zinc-50 hover:bg-zinc-100/50 transition-all space-y-2">
+                  <div className="flex justify-between items-start">
+                    <span className="font-bold text-xs text-zinc-800">{b.guestName}</span>
+                    <Badge className="text-[9px] font-semibold bg-green-50 text-green-700 border-green-200">
+                      {b.status}
+                    </Badge>
+                  </div>
+                  <div className="text-[10px] text-zinc-500 space-y-1">
+                    <p>Event: <strong className="text-zinc-700">{b.eventType}</strong></p>
+                    <p>Hall: <strong className="text-zinc-700">{b.hall?.name || 'Grand Hall'}</strong></p>
+                    <p>Guests: <strong>{b.guestCount} Pax</strong></p>
+                    <p>Time: <strong>{new Date(b.startTime).toLocaleTimeString('en-IN', { timeStyle: 'short' })} - {new Date(b.endTime).toLocaleTimeString('en-IN', { timeStyle: 'short' })}</strong></p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
   );
 }

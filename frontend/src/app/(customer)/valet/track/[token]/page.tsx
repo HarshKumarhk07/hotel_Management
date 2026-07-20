@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
-import { SiteNav } from '@/components/site/SiteNav';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -142,7 +141,6 @@ export default function GuestValetTokenPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50">
-      <SiteNav fullMenuHref="/" />
 
       <main className="flex-1 mx-auto w-full max-w-xl px-4 py-8 sm:py-12">
         <div className="space-y-8 text-center">

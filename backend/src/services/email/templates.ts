@@ -199,3 +199,85 @@ export function valetWelcomeTemplate(name: string, email: string, tempPassword: 
     text: `Hi ${name}, welcome to the valet team at ${brand}! Your login email is ${email} and temporary password is ${tempPassword}.`,
   };
 }
+
+export function roomBookingConfirmationTemplate(
+  name: string,
+  roomNumber: string,
+  checkInDate: string,
+  checkOutDate: string,
+  confirmationNumber: string,
+  amountPaid: number
+): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeRoomNumber = escapeHtml(roomNumber);
+  const safeConfirmationNumber = escapeHtml(confirmationNumber);
+  const formattedCheckIn = new Date(checkInDate).toLocaleDateString('en-IN', { dateStyle: 'long' });
+  const formattedCheckOut = new Date(checkOutDate).toLocaleDateString('en-IN', { dateStyle: 'long' });
+
+  return {
+    subject: `🛎️ Stay Confirmation: Room ${safeRoomNumber} - ${safeConfirmationNumber}`,
+    html: layout(
+      'Reservation Confirmed',
+      `<p>Hi ${safeName},</p>
+       <p>Your royal stay at <strong>The Page Hotel</strong> has been confirmed. Below are your reservation details:</p>
+       <table style="font-size:14px;color:#3f3f46;margin:16px 0;border-collapse:collapse;width:100%">
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a;width:150px">Confirmation Code</td><td style="padding:8px 0;font-weight:bold;font-family:monospace">${safeConfirmationNumber}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Room Number</td><td style="padding:8px 0;font-weight:bold">Room ${safeRoomNumber}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Check-In Date</td><td style="padding:8px 0">${formattedCheckIn} (After 14:00)</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Check-Out Date</td><td style="padding:8px 0">${formattedCheckOut} (Before 12:00)</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Amount Paid</td><td style="padding:8px 0;font-weight:bold">₹${amountPaid}</td></tr>
+       </table>
+       <p>Please present the QR code on your booking confirmation page at the front desk for immediate check-in key hand-off.</p>
+       <p>We look forward to welcoming you!</p>`,
+    ),
+    text: `Stay Confirmation: Hi ${name}, your booking for Room ${roomNumber} from ${formattedCheckIn} to ${formattedCheckOut} has been confirmed. Confirmation Code: ${confirmationNumber}. Amount Paid: ₹${amountPaid}.`,
+  };
+}
+
+export function roomBookingPendingTemplate(
+  name: string,
+  roomNumber: string,
+  checkInDate: string,
+  checkOutDate: string,
+  confirmationNumber: string,
+  totalAmount: number,
+  payAtHotel: boolean
+): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeRoomNumber = escapeHtml(roomNumber);
+  const safeConfirmationNumber = escapeHtml(confirmationNumber);
+  const formattedCheckIn = new Date(checkInDate).toLocaleDateString('en-IN', { dateStyle: 'long' });
+  const formattedCheckOut = new Date(checkOutDate).toLocaleDateString('en-IN', { dateStyle: 'long' });
+
+  const paymentNote = payAtHotel
+    ? `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:16px 0">
+        <p style="margin:0;color:#c2410c;font-weight:bold">💳 Payment Due at Hotel</p>
+        <p style="margin:8px 0 0;color:#92400e;font-size:13px">Your room is reserved. Please settle the amount of <strong>₹${totalAmount}</strong> at the hotel front desk upon arrival.</p>
+      </div>`
+    : `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:16px 0">
+        <p style="margin:0;color:#c2410c;font-weight:bold">⚠️ Payment Pending</p>
+        <p style="margin:8px 0 0;color:#92400e;font-size:13px">Your online payment could not be completed. Your reservation is still held. You can complete the payment online or settle <strong>₹${totalAmount}</strong> at the hotel front desk on arrival.</p>
+      </div>`;
+
+  const subjectPrefix = payAtHotel ? '🏨 Booking Confirmed (Pay at Hotel)' : '⏳ Booking Registered – Payment Pending';
+
+  return {
+    subject: `${subjectPrefix}: Room ${safeRoomNumber} - ${safeConfirmationNumber}`,
+    html: layout(
+      payAtHotel ? 'Reservation Registered – Pay on Arrival' : 'Reservation Registered – Payment Pending',
+      `<p>Hi ${safeName},</p>
+       <p>Your reservation at <strong>The Page Hotel</strong> has been registered. Here are your booking details:</p>
+       <table style="font-size:14px;color:#3f3f46;margin:16px 0;border-collapse:collapse;width:100%">
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a;width:150px">Confirmation Code</td><td style="padding:8px 0;font-weight:bold;font-family:monospace">${safeConfirmationNumber}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Room Number</td><td style="padding:8px 0;font-weight:bold">Room ${safeRoomNumber}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Check-In Date</td><td style="padding:8px 0">${formattedCheckIn} (After 14:00)</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Check-Out Date</td><td style="padding:8px 0">${formattedCheckOut} (Before 12:00)</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Total Amount</td><td style="padding:8px 0;font-weight:bold">₹${totalAmount}</td></tr>
+       </table>
+       ${paymentNote}
+       <p>If you have any questions, please contact us and quote your confirmation code above.</p>
+       <p>We look forward to welcoming you!</p>`,
+    ),
+    text: `${subjectPrefix}: Hi ${name}, your booking for Room ${roomNumber} from ${formattedCheckIn} to ${formattedCheckOut} is registered. Confirmation Code: ${confirmationNumber}. Amount: ₹${totalAmount}. ${payAtHotel ? 'Please pay at the hotel front desk on arrival.' : 'Payment is pending. Please settle at the hotel on arrival.'}`,
+  };
+}

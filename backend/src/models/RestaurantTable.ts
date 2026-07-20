@@ -1,4 +1,4 @@
-﻿import { Schema, model, type Document, type Types } from 'mongoose';
+import { Schema, model, type Document, type Types } from 'mongoose';
 import {
   ALL_TABLE_STATUSES,
   TABLE_STATUS,
@@ -12,6 +12,7 @@ export interface ITableSession {
   phone?: string;
   reservationId?: Types.ObjectId;
   notes?: string;
+  billAmount?: number;
 }
 
 export interface IRestaurantTable extends Document {
@@ -63,6 +64,7 @@ const tableSchema = new Schema<IRestaurantTable>(
       phone:         { type: String, trim: true },
       reservationId: { type: Schema.Types.ObjectId, ref: 'TableReservation' },
       notes:         { type: String, trim: true, maxlength: 300 },
+      billAmount:    { type: Number, min: 0 },
     },
   },
   { timestamps: true },

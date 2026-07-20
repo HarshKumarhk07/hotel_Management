@@ -51,9 +51,13 @@ export type UpdateRoomInput = z.infer<typeof updateRoomSchema>;
 
 // Room Booking validation schemas
 export const searchRoomsSchema = z.object({
-  checkInDate: z.string().datetime({ precision: 3, offset: true }),
-  checkOutDate: z.string().datetime({ precision: 3, offset: true }),
+  checkInDate: z.string().min(1),
+  checkOutDate: z.string().min(1),
   floor: z.coerce.number().int().optional(),
+  roomType: z.enum(['STANDARD', 'DELUXE', 'EXECUTIVE', 'SUITE', 'PRESIDENTIAL']).optional(),
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
+  guestCount: z.coerce.number().int().min(1).optional(),
 });
 
 export const createBookingSchema = z.object({
@@ -63,6 +67,20 @@ export const createBookingSchema = z.object({
   email: z.string().email(),
   checkInDate: z.string(),
   checkOutDate: z.string(),
+  address: z.string().trim().optional(),
+  city: z.string().trim().optional(),
+  country: z.string().trim().optional(),
+  governmentId: z.string().trim().optional(),
+  specialRequests: z
+    .object({
+      lateCheckIn: z.boolean().default(false),
+      extraBed: z.boolean().default(false),
+      airportPickup: z.boolean().default(false),
+      note: z.string().optional(),
+    })
+    .optional(),
+  couponCode: z.string().optional(),
+  paymentMethod: z.enum(['RAZORPAY', 'CASH']).optional(),
 });
 
 export const updateBookingStatusSchema = z.object({
@@ -70,6 +88,15 @@ export const updateBookingStatusSchema = z.object({
 });
 
 export const setRoomStatusSchema = z.object({
-  status: z.enum(['AVAILABLE', 'OCCUPIED', 'CLEANING', 'MAINTENANCE']),
+  status: z.enum([
+    'AVAILABLE',
+    'RESERVED',
+    'OCCUPIED',
+    'CLEANING',
+    'MAINTENANCE',
+    'BLOCKED',
+    'OUT_OF_SERVICE',
+    'VIP_RESERVED',
+  ]),
 });
 

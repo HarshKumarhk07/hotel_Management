@@ -192,20 +192,32 @@ function BillModal({ tableId, onClose }: { tableId: string; onClose: () => void 
   return (
     <Dialog open onClose={onClose} title="Table Bill">
       {isLoading ? <CenteredSpinner /> : bill ? (
-        <div className="space-y-3">
-          <p className="text-sm text-zinc-500">{bill.orders.length} order(s) this session</p>
-          <div className="divide-y divide-zinc-100 rounded-lg border">
-            {bill.orders.map(o => (
-              <div key={o._id} className="flex items-center justify-between px-3 py-2 text-sm">
-                <span className="font-mono text-zinc-700">{o.orderNumber}</span>
-                <Badge>{o.status}</Badge>
-                <span className="font-semibold">₹{o.pricing.total.toFixed(2)}</span>
+        <div className="space-y-4">
+          {bill.orders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center space-y-2">
+              <UtensilsCrossed className="h-10 w-10 text-zinc-300" />
+              <p className="font-semibold text-zinc-600">No orders this session</p>
+              <p className="text-xs text-zinc-400">Guests haven&apos;t placed any orders from the table QR code yet.</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-zinc-500">{bill.orders.length} order(s) this session</p>
+              <div className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 overflow-hidden">
+                {bill.orders.map(o => (
+                  <div key={o._id} className="flex items-center justify-between px-4 py-3 text-sm bg-white hover:bg-zinc-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded">{o.orderNumber}</span>
+                      <Badge className={o.status === 'DELIVERED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>{o.status}</Badge>
+                    </div>
+                    <span className="font-bold text-zinc-900">₹{o.pricing.total.toFixed(2)}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3">
-            <span className="font-semibold text-zinc-700">Grand Total</span>
-            <span className="text-xl font-bold text-zinc-900">₹{bill.grandTotal.toFixed(2)}</span>
+            </>
+          )}
+          <div className="flex items-center justify-between rounded-xl bg-zinc-900 text-white px-5 py-4">
+            <span className="font-semibold text-zinc-300">Grand Total</span>
+            <span className="text-2xl font-bold">₹{bill.grandTotal.toFixed(2)}</span>
           </div>
         </div>
       ) : null}
@@ -289,8 +301,12 @@ export default function RestaurantPage() {
   });
 
   const requestBillMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/restaurant/tables/${id}/request-bill`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['restaurant-tables'] }),
+    mutationFn: ({ id, billAmount }: { id: string; billAmount?: number }) =>
+      api.post(`/restaurant/tables/${id}/request-bill`, { billAmount }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['restaurant-tables'] });
+      setError('');
+    },
     onError: (e) => setError(apiErrorMessage(e)),
   });
 
@@ -421,7 +437,16 @@ export default function RestaurantPage() {
                             key={t._id}
                             table={t}
                             onSeat={(tbl) => { setSeatTarget(tbl); resetSeat(); }}
-                            onRequestBill={(tbl) => requestBillMutation.mutate(tbl._id)}
+                            onRequestBill={(tbl) => {
+                              const amt = prompt(`Enter final bill amount for Table ${tbl.number} (optional):`);
+                              if (amt === null) return;
+                              const billAmount = amt.trim() ? parseFloat(amt) : undefined;
+                              if (billAmount !== undefined && isNaN(billAmount)) {
+                                alert("Invalid amount entered");
+                                return;
+                              }
+                              requestBillMutation.mutate({ id: tbl._id, billAmount });
+                            }}
                             onClose={(tbl) => {
                               if (confirm(`Close table ${tbl.number} and mark all TABLE_BILLING orders as paid?`)) {
                                 closeMutation.mutate(tbl._id);

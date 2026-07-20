@@ -6,14 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Download, Plus, Power, QrCode, RefreshCw, Ban, ArrowLeftRight, Calendar, User, Phone, Mail, DollarSign } from 'lucide-react';
+import { Download, Plus, Power, QrCode, RefreshCw, Ban, ArrowLeftRight, Calendar, User, Phone, Mail, DollarSign, Printer, FileText } from 'lucide-react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, FieldError } from '@/components/ui/input';
 import { Badge, Card, CenteredSpinner, EmptyState, Spinner } from '@/components/ui/primitives';
 import { useAdminKitchens } from '@/hooks/useAdminKitchens';
-import { useAdminRooms, useRoomMutations, useAdminBookings, useBookingMutations, type AdminRoom } from '@/hooks/useAdminRooms';
+import { useAdminRooms, useRoomMutations, useAdminBookings, useBookingMutations, type AdminRoom, type RoomBookingInfo } from '@/hooks/useAdminRooms';
 import { api, apiErrorMessage } from '@/lib/api';
 import { downloadAuthed } from '@/lib/download';
 import { formatDate } from '@/lib/utils';
@@ -28,7 +28,13 @@ type CreateForm = z.infer<typeof createSchema>;
 
 function CreateRoomDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { create } = useRoomMutations();
-  const { data: kitchens } = useAdminKitchens();
+  const { data: kitchens } = useQuery({
+    queryKey: ['public-kitchens-list'],
+    queryFn: async () => {
+      const res = await api.get<{ data: { kitchens: { id: string; name: string }[] } }>('/kitchens/public');
+      return res.data.data.kitchens;
+    },
+  });
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -70,7 +76,7 @@ function CreateRoomDialog({ open, onClose }: { open: boolean; onClose: () => voi
           >
             <option value="">— None —</option>
             {kitchens?.map((k) => (
-              <option key={k._id} value={k._id}>
+              <option key={k.id} value={k.id}>
                 {k.name}
               </option>
             ))}
@@ -187,9 +193,73 @@ function QrDialog({
   );
 }
 
-function BookingsList() {
+function TransferDialog({
+  booking,
+  onClose,
+}: {
+  booking: RoomBookingInfo;
+  onClose: () => void;
+}) {
+  const { data: rooms } = useAdminRooms();
+  const { transfer } = useBookingMutations();
+  const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const availableRooms = rooms?.filter((r) => r.status === 'AVAILABLE' && r.isActive) || [];
+
+  const handleTransfer = async () => {
+    if (!selectedRoomId) return;
+    setError(null);
+    try {
+      await transfer.mutateAsync({ id: booking._id, newRoomId: selectedRoomId });
+      onClose();
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Failed to transfer room.'));
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} title={`Transfer Booking · ${booking.guestName}`}>
+      <div className="space-y-4">
+        <p className="text-xs text-zinc-500">
+          Current Room: <b>Room {booking.room?.roomNumber} (Floor {booking.room?.floor})</b>
+        </p>
+        <Field label="Select New Available Room">
+          <select
+            value={selectedRoomId}
+            onChange={(e) => setSelectedRoomId(e.target.value)}
+            className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+          >
+            <option value="">— Choose a Room —</option>
+            {availableRooms.map((r) => (
+              <option key={r._id} value={r._id}>
+                Room {r.roomNumber} ({r.roomType || 'Standard'} · Floor {r.floor})
+              </option>
+            ))}
+          </select>
+        </Field>
+        {error && <FieldError message={error} />}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleTransfer}
+            disabled={!selectedRoomId || transfer.isPending}
+            className="bg-[#D4AF37] hover:bg-[#AE963C] text-white"
+          >
+            {transfer.isPending ? 'Transferring…' : 'Transfer Room'}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }) {
   const { data: bookings, isLoading } = useAdminBookings();
   const { updateStatus } = useBookingMutations();
+  const [transferBooking, setTransferBooking] = useState<RoomBookingInfo | null>(null);
 
   if (isLoading) return <CenteredSpinner />;
   if (!bookings || bookings.length === 0) {
@@ -277,6 +347,13 @@ function BookingsList() {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => setTransferBooking(booking)}
+                  >
+                    Transfer Room
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="text-red-600 hover:bg-red-50 border-red-200"
                     onClick={() => updateStatus.mutate({ id: booking._id, status: 'CANCELLED' })}
                     disabled={updateStatus.isPending}
@@ -286,19 +363,44 @@ function BookingsList() {
                 </>
               )}
               {booking.status === 'CHECKED_IN' && (
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-zinc-800 hover:bg-zinc-900"
+                    onClick={() => updateStatus.mutate({ id: booking._id, status: 'CHECKED_OUT' })}
+                    disabled={updateStatus.isPending}
+                  >
+                    Check Out
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTransferBooking(booking)}
+                  >
+                    Transfer Room
+                  </Button>
+                </>
+              )}
+              {(booking.status === 'CHECKED_IN' || booking.status === 'CHECKED_OUT') && (
                 <Button
                   size="sm"
-                  className="bg-zinc-800 hover:bg-zinc-900"
-                  onClick={() => updateStatus.mutate({ id: booking._id, status: 'CHECKED_OUT' })}
-                  disabled={updateStatus.isPending}
+                  variant="outline"
+                  onClick={() => onViewInvoice(booking._id)}
                 >
-                  Check Out
+                  Invoice
                 </Button>
               )}
             </div>
           </div>
         </Card>
       ))}
+
+      {transferBooking && (
+        <TransferDialog
+          booking={transferBooking}
+          onClose={() => setTransferBooking(null)}
+        />
+      )}
     </div>
   );
 }
@@ -309,6 +411,7 @@ function RoomsInner() {
   const [createOpen, setCreateOpen] = useState(false);
   const [qrRoomId, setQrRoomId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'rooms' | 'bookings'>('rooms');
+  const [invoiceBookingId, setInvoiceBookingId] = useState<string | null>(null);
 
   // Resolve from the live list so the QR dialog reflects regenerate/reassign.
   const qrRoom = rooms?.find((r) => r._id === qrRoomId) ?? null;
@@ -369,16 +472,22 @@ function RoomsInner() {
           <EmptyState title="No rooms yet" description="Add rooms — each gets a unique QR automatically." />
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {rooms.map((r) => (
-              <Card key={r._id} className="p-5 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
+            {rooms.map((r) => {
+              const statusBorderColor =
+                r.status === 'OCCUPIED' ? 'border-l-amber-400' :
+                r.status === 'CLEANING' ? 'border-l-blue-400' :
+                r.status === 'MAINTENANCE' ? 'border-l-red-400' :
+                'border-l-emerald-400';
+              return (
+                <Card key={r._id} className={`p-0 flex flex-col border-l-4 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 ${statusBorderColor}`}>
+                  {/* Card Header */}
+                  <div className="flex items-start justify-between px-5 pt-5 pb-3">
                     <div>
-                      <p className="text-lg font-bold text-zinc-900">Room {r.roomNumber}</p>
-                      <p className="text-xs text-zinc-500">Floor {r.floor}</p>
+                      <p className="text-xl font-bold text-zinc-900 tracking-tight">Room {r.roomNumber}</p>
+                      <p className="text-xs text-zinc-400 font-medium mt-0.5">Floor {r.floor} · {typeof r.kitchen === 'object' && r.kitchen !== null ? (r.kitchen as { name: string }).name : 'No kitchen linked'}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
-                      <Badge className={r.isActive ? 'bg-green-50 text-green-700' : 'bg-zinc-200 text-zinc-600'}>
+                      <Badge className={r.isActive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-zinc-100 text-zinc-500 border-zinc-200'}>
                         {r.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                       <Badge className={getStatusColor(r.status || 'AVAILABLE')}>
@@ -387,76 +496,91 @@ function RoomsInner() {
                     </div>
                   </div>
 
-                  {/* Housekeeping Status Select */}
-                  <div className="flex items-center justify-between rounded-lg border bg-zinc-50 p-2 text-xs">
-                    <span className="font-semibold text-zinc-500">Housekeeping:</span>
+                  {/* Divider */}
+                  <div className="mx-5 border-t border-zinc-100" />
+
+                  {/* Housekeeping Row */}
+                  <div className="px-5 py-3 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Housekeeping</span>
                     <select
                       value={r.status || 'AVAILABLE'}
                       onChange={(e) => setStatus.mutate({ id: r._id, status: e.target.value })}
-                      className="font-semibold text-zinc-700 bg-transparent border-none focus:outline-none cursor-pointer"
+                      className="text-xs font-bold text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40 cursor-pointer"
                       disabled={setStatus.isPending}
                     >
                       <option value="AVAILABLE">Available</option>
+                      <option value="RESERVED">Reserved</option>
                       <option value="OCCUPIED">Occupied</option>
                       <option value="CLEANING">Cleaning</option>
                       <option value="MAINTENANCE">Maintenance</option>
+                      <option value="BLOCKED">Blocked</option>
+                      <option value="OUT_OF_SERVICE">Out of Service</option>
+                      <option value="VIP_RESERVED">VIP Reserved</option>
                     </select>
                   </div>
 
-                  <p className="text-xs text-zinc-400">
-                    QR {r.qr.isActive ? 'active' : 'disabled'} · v{r.qr.version}
-                  </p>
-                </div>
+                  {/* QR Status */}
+                  <div className="px-5 pb-3">
+                    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-2.5 py-1 ${r.qr.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${r.qr.isActive ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
+                      QR {r.qr.isActive ? 'Active' : 'Disabled'} · v{r.qr.version}
+                    </span>
+                  </div>
 
-                <div className="mt-5 flex gap-2">
-                  {r.qr.isActive ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-red-600 hover:bg-red-50 border-red-200"
-                      onClick={() => {
-                        if (confirm(`Check-out Room ${r.roomNumber}? This will disable the current ordering QR code.`)) {
-                          disableQr.mutate(r._id);
-                          setStatus.mutate({ id: r._id, status: 'CLEANING' });
-                        }
-                      }}
-                      disabled={disableQr.isPending}
-                    >
-                      Check-out
+                  {/* Actions */}
+                  <div className="mt-auto bg-zinc-50 border-t border-zinc-100 px-4 py-3 flex gap-2">
+                    {r.qr.isActive ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-red-600 hover:bg-red-50 border-red-200 font-semibold text-xs"
+                        onClick={() => {
+                          if (confirm(`Check-out Room ${r.roomNumber}? This will disable the current ordering QR code.`)) {
+                            disableQr.mutate(r._id);
+                            setStatus.mutate({ id: r._id, status: 'CLEANING' });
+                          }
+                        }}
+                        disabled={disableQr.isPending}
+                      >
+                        Check-out
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-green-700 hover:bg-green-50 border-green-200 font-semibold text-xs"
+                        onClick={() => {
+                          if (confirm(`Check-in Room ${r.roomNumber}? This will generate a fresh ordering QR code.`)) {
+                            regenerateQr.mutate(r._id);
+                            setStatus.mutate({ id: r._id, status: 'OCCUPIED' });
+                          }
+                        }}
+                        disabled={regenerateQr.isPending}
+                      >
+                        Check-in
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => setQrRoomId(r._id)} title="QR Details">
+                      <QrCode className="h-4 w-4" />
                     </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-green-700 hover:bg-green-50 border-green-200"
-                      onClick={() => {
-                        if (confirm(`Check-in Room ${r.roomNumber}? This will generate a fresh ordering QR code.`)) {
-                          regenerateQr.mutate(r._id);
-                          setStatus.mutate({ id: r._id, status: 'OCCUPIED' });
-                        }
-                      }}
-                      disabled={regenerateQr.isPending}
-                    >
-                      Check-in
+                    <Button variant="ghost" size="sm" onClick={() => setActive.mutate({ id: r._id, active: !r.isActive })} title={r.isActive ? 'Deactivate room' : 'Activate room'}>
+                      <Power className="h-4 w-4" />
                     </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => setQrRoomId(r._id)} title="QR Details">
-                    <QrCode className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setActive.mutate({ id: r._id, active: !r.isActive })} title={r.isActive ? 'Deactivate room' : 'Activate room'}>
-                    <Power className="h-4 w-4" />
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )
       ) : (
-        <BookingsList />
+        <BookingsList onViewInvoice={setInvoiceBookingId} />
       )}
 
       <CreateRoomDialog open={createOpen} onClose={() => setCreateOpen(false)} />
       {qrRoom ? <QrDialog room={qrRoom} rooms={rooms ?? []} onClose={() => setQrRoomId(null)} /> : null}
+      {invoiceBookingId && (
+        <InvoiceModal bookingId={invoiceBookingId} onClose={() => setInvoiceBookingId(null)} />
+      )}
     </div>
   );
 }
@@ -466,5 +590,183 @@ export default function AdminRoomsPage() {
     <AdminShell>
       <RoomsInner />
     </AdminShell>
+  );
+}
+
+function InvoiceModal({ bookingId, onClose }: { bookingId: string; onClose: () => void }) {
+  const { data: res, isLoading } = useQuery({
+    queryKey: ['booking-invoice', bookingId],
+    queryFn: () => api.get(`/rooms/bookings/${bookingId}/invoice`).then((r) => r.data),
+  });
+
+  const invoice = res?.data?.invoice;
+
+  const handleDownload = async () => {
+    try {
+      const res = await api.get(`/rooms/bookings/${bookingId}/invoice/download`, {
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-room-${bookingId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Failed to download invoice PDF. Please try again.');
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <Dialog open onClose={onClose} title="Consolidated Bill / Tax Invoice" widthClass="max-w-2xl">
+      {isLoading || !invoice ? (
+        <CenteredSpinner label="Loading billing statements..." />
+      ) : (
+        <div className="space-y-6 font-sans text-zinc-800">
+          <div className="flex justify-between items-start border-b pb-4">
+            <div>
+              <h3 className="font-extrabold text-zinc-900 text-lg">THE PAGE HOTEL</h3>
+              <p className="text-[10px] text-zinc-500 mt-0.5">GSTIN: 27AAAAA1111A1Z1</p>
+            </div>
+            <div className="text-right text-xs text-zinc-500 space-y-0.5">
+              <p className="font-bold text-zinc-900">TAX INVOICE</p>
+              <p>Invoice: INV-RM-{invoice.booking._id.toString().substring(18).toUpperCase()}</p>
+              <p>Room: Room {invoice.booking.room?.roomNumber}</p>
+              <p>Nights: {invoice.nights} Nights</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div>
+              <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider">Billed To</span>
+              <p className="font-bold mt-1 text-zinc-900">{invoice.booking.guestName}</p>
+              <p>{invoice.booking.phone}</p>
+              <p>{invoice.booking.email}</p>
+            </div>
+            <div className="text-right">
+              <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider">Stay Period</span>
+              <p className="mt-1">In: {formatDate(invoice.booking.checkInDate)}</p>
+              <p>Out: {formatDate(invoice.booking.checkOutDate || new Date().toISOString())}</p>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="border rounded-lg overflow-hidden bg-white">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-zinc-50 border-b">
+                  <th className="p-3 font-bold text-zinc-500 uppercase tracking-wider">Description</th>
+                  <th className="p-3 font-bold text-zinc-500 uppercase tracking-wider text-center">Qty</th>
+                  <th className="p-3 font-bold text-zinc-500 uppercase tracking-wider text-right">Tax (Rs)</th>
+                  <th className="p-3 font-bold text-zinc-500 uppercase tracking-wider text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {/* Stay charges */}
+                <tr>
+                  <td className="p-3 font-medium">Room stay (Room {invoice.booking.room?.roomNumber})</td>
+                  <td className="p-3 text-center">{invoice.nights}</td>
+                  <td className="p-3 text-right">₹{invoice.stayGst.toFixed(2)}</td>
+                  <td className="p-3 text-right font-semibold">₹{invoice.stayCost.toFixed(2)}</td>
+                </tr>
+
+                {/* Orders */}
+                {invoice.orders.length > 0 && (
+                  <>
+                    <tr className="bg-zinc-50/50">
+                      <td colSpan={4} className="px-3 py-1.5 font-bold text-zinc-500 text-[10px] uppercase tracking-wider">
+                        In-Room Dining
+                      </td>
+                    </tr>
+                    {invoice.orders.map((o: any) => (
+                      <tr key={o.orderNumber}>
+                        <td className="p-3 pl-6 text-zinc-600">Order #{o.orderNumber} (via {o.paymentMethod})</td>
+                        <td className="p-3 text-center">1</td>
+                        <td className="p-3 text-right">₹{o.tax.toFixed(2)}</td>
+                        <td className="p-3 text-right">₹{o.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+
+                {/* Banquets */}
+                {invoice.banquets.length > 0 && (
+                  <>
+                    <tr className="bg-zinc-50/50">
+                      <td colSpan={4} className="px-3 py-1.5 font-bold text-zinc-500 text-[10px] uppercase tracking-wider">
+                        Banquets
+                      </td>
+                    </tr>
+                    {invoice.banquets.map((b: any, idx: number) => (
+                      <tr key={idx}>
+                        <td className="p-3 pl-6 text-zinc-600">{b.hallName} event ({formatDate(b.eventDate)})</td>
+                        <td className="p-3 text-center">1</td>
+                        <td className="p-3 text-right">₹{(b.totalPrice - (b.totalPrice / 1.18)).toFixed(2)}</td>
+                        <td className="p-3 text-right">₹{b.totalPrice.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+
+                {/* Valet */}
+                {invoice.valet.length > 0 && (
+                  <>
+                    <tr className="bg-zinc-50/50">
+                      <td colSpan={4} className="px-3 py-1.5 font-bold text-zinc-500 text-[10px] uppercase tracking-wider">
+                        Valet Services
+                      </td>
+                    </tr>
+                    {invoice.valet.map((v: any, idx: number) => (
+                      <tr key={idx}>
+                        <td className="p-3 pl-6 text-zinc-500">Vehicle: {v.brand} {v.model} ({v.carNumber})</td>
+                        <td className="p-3 text-center">-</td>
+                        <td className="p-3 text-right">₹0.00</td>
+                        <td className="p-3 text-right text-green-600 font-bold uppercase text-[10px]">FREE</td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pricing breakdown */}
+          <div className="flex flex-col md:flex-row md:justify-between items-start gap-4 pt-2 border-t">
+            <div className="text-xs text-zinc-500 space-y-1">
+              <p>Base Subtotal: ₹{invoice.pricing.subtotal.toFixed(2)}</p>
+              <p>Taxes (GST): ₹{invoice.pricing.taxTotal.toFixed(2)}</p>
+              {invoice.pricing.serviceChargeTotal > 0 && (
+                <p>Service Charges: ₹{invoice.pricing.serviceChargeTotal.toFixed(2)}</p>
+              )}
+            </div>
+
+            <div className="text-right space-y-1.5 self-end">
+              <p className="text-xs font-semibold">Grand Total: ₹{invoice.pricing.grandTotal.toFixed(2)}</p>
+              <p className="text-xs font-bold text-green-600">Already Paid: ₹{invoice.pricing.alreadyPaidTotal.toFixed(2)}</p>
+              <p className="text-sm font-extrabold text-red-600">Balance Due: ₹{invoice.pricing.balanceDue.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 justify-end border-t pt-4">
+            <Button variant="outline" size="sm" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-1.5" /> Print
+            </Button>
+            <Button size="sm" onClick={handleDownload}>
+              <Download className="h-4 w-4 mr-1.5" /> Download PDF
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
+    </Dialog>
   );
 }

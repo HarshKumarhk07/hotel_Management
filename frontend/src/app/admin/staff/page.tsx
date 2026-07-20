@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Link from 'next/link';
 import {
   Plus,
   Shield,
@@ -14,6 +15,7 @@ import {
   Check,
   UserCheck,
   UserX,
+  Car,
 } from 'lucide-react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
@@ -190,6 +192,22 @@ export default function StaffManagementPage() {
   return (
     <AdminShell>
       <div className="space-y-6">
+        {/* Valet Redirection Banner */}
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-xs text-amber-800 flex items-center justify-between flex-wrap gap-3 font-sans shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <Car className="h-5 w-5 shrink-0 text-amber-600 animate-pulse" />
+            <span className="leading-relaxed">
+              <strong>Looking to manage valet accounts?</strong> Valet managers are system roles managed separately. Add or configure valet accounts inside the Valet Parking panel.
+            </span>
+          </div>
+          <Link
+            href="/admin/valet"
+            className="inline-flex items-center rounded-lg border border-amber-300 bg-white px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider text-amber-900 shadow-sm hover:bg-amber-100 transition-colors"
+          >
+            Go to Valet Panel
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>

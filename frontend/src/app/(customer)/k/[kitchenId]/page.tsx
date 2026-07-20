@@ -132,6 +132,27 @@ export default function KitchenMenuPage() {
         </div>
       </header>
 
+      {roomNumber && roomId && (
+        <div className="lg:hidden bg-brand/5 border-b px-4 py-2.5 flex justify-between items-center text-xs">
+          <span className="font-semibold text-brand">Room {roomNumber} Services:</span>
+          <div className="flex gap-3">
+            <Link
+              href={`/services?room=${roomId}&rno=${encodeURIComponent(roomNumber)}`}
+              className="font-bold text-brand hover:underline"
+            >
+              Service Desk
+            </Link>
+            <span className="text-zinc-300">|</span>
+            <Link
+              href={`/feedback?room=${encodeURIComponent(roomNumber)}`}
+              className="font-bold text-zinc-700 hover:underline"
+            >
+              Give Feedback
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Layout Grid */}
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Menu list */}
@@ -309,7 +330,28 @@ export default function KitchenMenuPage() {
     </div>
 
         {/* Right Column: Sticky Cart Sidebar for Desktop */}
-        <aside className="hidden lg:block lg:col-span-4">
+        <aside className="hidden lg:block lg:col-span-4 space-y-4">
+          {roomId && (
+            <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Room Services</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href={`/services?room=${roomId}&rno=${encodeURIComponent(roomNumber || '')}`}
+                  className="flex flex-col items-center justify-center rounded-xl bg-brand/5 hover:bg-brand/10 border border-brand/10 p-3 text-center transition-all cursor-pointer"
+                >
+                  <span className="text-xs font-bold text-brand">Service Desk</span>
+                  <span className="text-[9px] text-zinc-500 mt-0.5">Raise request</span>
+                </Link>
+                <Link
+                  href={`/feedback?room=${encodeURIComponent(roomNumber || '')}`}
+                  className="flex flex-col items-center justify-center rounded-xl bg-zinc-50 hover:bg-zinc-100 border p-3 text-center transition-all cursor-pointer"
+                >
+                  <span className="text-xs font-bold text-zinc-700">Feedback</span>
+                  <span className="text-[9px] text-zinc-500 mt-0.5">Rate stay</span>
+                </Link>
+              </div>
+            </div>
+          )}
           <div className="sticky top-[88px] rounded-2xl border bg-white p-5 shadow-sm">
             <h2 className="text-sm font-bold text-zinc-900 border-b pb-3 mb-4">Your order</h2>
             

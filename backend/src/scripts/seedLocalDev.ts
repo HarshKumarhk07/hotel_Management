@@ -74,24 +74,101 @@ async function seedLocalDev(): Promise<void> {
     await kitchen.save();
   }
 
-  // 4. Seed Rooms (101 - 105)
-  const roomNumbers = ['101', '102', '103', '104', '105'];
-  for (const rNum of roomNumbers) {
-    let room = await Room.findOne({ roomNumber: rNum });
+  // 4. Seed Rooms (101 - 105) with detailed types, pricing, and sizes
+  const roomsData = [
+    {
+      roomNumber: '101',
+      roomType: 'STANDARD' as const,
+      pricePerNight: 4000,
+      capacity: 2,
+      bedType: 'QUEEN' as const,
+      roomSizeSqFt: 300,
+      amenities: ['Free Wi-Fi', 'Smart TV', 'Air Conditioning', 'Mini Bar', 'Coffee Maker'],
+      rules: ['No smoking inside the room.', 'Quiet hours: 10 PM - 8 AM.'],
+      images: ['/hotel1.png'],
+    },
+    {
+      roomNumber: '102',
+      roomType: 'DELUXE' as const,
+      pricePerNight: 5500,
+      capacity: 2,
+      bedType: 'KING' as const,
+      roomSizeSqFt: 420,
+      amenities: ['Free Wi-Fi', 'Smart TV', 'Air Conditioning', 'Mini Bar', 'Coffee Maker', 'Bath Tub', 'Balcony View'],
+      rules: ['No smoking inside the room.', 'Quiet hours: 10 PM - 8 AM.'],
+      images: ['/hotel1.png'],
+    },
+    {
+      roomNumber: '103',
+      roomType: 'EXECUTIVE' as const,
+      pricePerNight: 7500,
+      capacity: 3,
+      bedType: 'KING' as const,
+      roomSizeSqFt: 550,
+      amenities: ['Free Wi-Fi', '4K Smart TV', 'Air Conditioning', 'Premium Mini Bar', 'Nespresso Machine', 'Bath Tub', 'Ocean/City View', 'Lounge Access'],
+      rules: ['No smoking inside the room.', 'Quiet hours: 10 PM - 8 AM.'],
+      images: ['/hotel1.png'],
+    },
+    {
+      roomNumber: '104',
+      roomType: 'SUITE' as const,
+      pricePerNight: 12000,
+      capacity: 4,
+      bedType: 'KING' as const,
+      roomSizeSqFt: 800,
+      amenities: ['Free Wi-Fi', 'Two 4K Smart TVs', 'Centralized AC', 'Premium Mini Bar', 'Nespresso Machine', 'Jacuzzi Bath', 'Balcony View', 'Lounge Access', 'Kitchenette'],
+      rules: ['No smoking inside the room.', 'Quiet hours: 10 PM - 8 AM.'],
+      images: ['/hotel1.png'],
+    },
+    {
+      roomNumber: '105',
+      roomType: 'PRESIDENTIAL' as const,
+      pricePerNight: 25000,
+      capacity: 4,
+      bedType: 'KING' as const,
+      roomSizeSqFt: 1400,
+      amenities: ['Free Wi-Fi', 'Home Theater TV System', 'Centralized AC', 'Premium Stocked Bar', 'Nespresso Machine', 'Steam Room & Jacuzzi', 'Panaromic Penthouse View', 'Private Butler Service', 'Full Dining Room'],
+      rules: ['No smoking inside the room.', 'No parties allowed without prior admin approval.'],
+      images: ['/hotel1.png'],
+    },
+  ];
+
+  for (const rData of roomsData) {
+    let room = await Room.findOne({ roomNumber: rData.roomNumber });
     if (!room) {
       room = await Room.create({
-        roomNumber: rNum,
-        floor: parseInt(rNum[0], 10),
+        roomNumber: rData.roomNumber,
+        floor: parseInt(rData.roomNumber[0], 10),
         kitchen: kitchen._id,
         isActive: true,
+        status: 'AVAILABLE',
+        roomType: rData.roomType,
+        pricePerNight: rData.pricePerNight,
+        capacity: rData.capacity,
+        bedType: rData.bedType,
+        roomSizeSqFt: rData.roomSizeSqFt,
+        amenities: rData.amenities,
+        rules: rData.rules,
+        images: rData.images,
         qr: {
-          token: `qr-token-room-${rNum}-dynamic-xyz`,
+          token: `qr-token-room-${rData.roomNumber}-dynamic-xyz`,
           isActive: true,
           version: 1,
           generatedAt: new Date(),
         },
       });
-      logger.info(`✅ Created Room: ${rNum}`);
+      logger.info(`✅ Created Room: ${rData.roomNumber}`);
+    } else {
+      room.roomType = rData.roomType;
+      room.pricePerNight = rData.pricePerNight;
+      room.capacity = rData.capacity;
+      room.bedType = rData.bedType;
+      room.roomSizeSqFt = rData.roomSizeSqFt;
+      room.amenities = rData.amenities;
+      room.rules = rData.rules;
+      room.images = rData.images;
+      await room.save();
+      logger.info(`✅ Updated Room Details: ${rData.roomNumber}`);
     }
   }
 
@@ -119,6 +196,7 @@ async function seedLocalDev(): Promise<void> {
       taxPercent: 5,
       prepTimeMinutes: 15,
       foodLabel: 'VEG',
+      image: { url: '/food/burger.png', publicId: 'burger' },
     },
     {
       name: 'Fresh Garden Pizza',
@@ -127,6 +205,7 @@ async function seedLocalDev(): Promise<void> {
       taxPercent: 5,
       prepTimeMinutes: 20,
       foodLabel: 'VEG',
+      image: { url: '/food/pizza.png', publicId: 'pizza' },
     },
     {
       name: 'Belgian Chocolate Waffles',
@@ -135,6 +214,7 @@ async function seedLocalDev(): Promise<void> {
       taxPercent: 5,
       prepTimeMinutes: 12,
       foodLabel: 'VEG',
+      image: { url: '/food/waffles.png', publicId: 'waffles' },
     },
   ];
 
@@ -150,6 +230,7 @@ async function seedLocalDev(): Promise<void> {
         taxPercent: it.taxPercent,
         prepTimeMinutes: it.prepTimeMinutes,
         foodLabel: it.foodLabel,
+        image: it.image,
         inStock: true,
         stockQuantity: 100,
         isActive: true,
@@ -163,6 +244,10 @@ async function seedLocalDev(): Promise<void> {
         },
       });
       logger.info(`✅ Seeded Menu Item: ${it.name}`);
+    } else {
+      exists.image = it.image;
+      await exists.save();
+      logger.info(`✅ Updated Menu Item image: ${it.name}`);
     }
   }
 

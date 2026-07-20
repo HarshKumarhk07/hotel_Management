@@ -16,6 +16,7 @@ import {
   createBookingSchema,
   updateBookingStatusSchema,
   setRoomStatusSchema,
+  searchRoomsSchema,
 } from './room.validation';
 
 const router = Router();
@@ -42,9 +43,17 @@ const router = Router();
 router.get('/resolve/:token', validate({ params: scanTokenParam }), ctrl.resolve);
 
 // Public Room Bookings
-router.get('/search', bookingCtrl.searchRooms);
+router.get('/search', validate({ query: searchRoomsSchema }), bookingCtrl.searchRooms);
 router.post('/bookings', validate({ body: createBookingSchema }), bookingCtrl.createBooking);
 router.get('/bookings/my-bookings', bookingCtrl.getGuestBookings);
+router.get('/bookings/:id', bookingCtrl.getBookingById);
+router.post('/bookings/:id/razorpay', bookingCtrl.createRazorpayOrder);
+router.post('/bookings/:id/verify', bookingCtrl.verifyPayment);
+router.get('/:id', validate({ params: roomIdParam }), ctrl.getOne);
+
+// Booking Invoices — view requires auth, download is public (ID is the credential)
+router.get('/bookings/:id/invoice', authenticate, bookingCtrl.getBookingInvoice);
+router.get('/bookings/:id/invoice/download', bookingCtrl.downloadBookingInvoice);
 
 // ── Everything below is Super-Admin only ──
 router.use(authenticate, authorize(ROLES.SUPER_ADMIN));
@@ -77,7 +86,6 @@ router
  */
 router
   .route('/:id')
-  .get(validate({ params: roomIdParam }), ctrl.getOne)
   .patch(validate({ params: roomIdParam, body: updateRoomSchema }), ctrl.update)
   .delete(validate({ params: roomIdParam }), ctrl.remove);
 
@@ -119,5 +127,11 @@ router.post(
 router.get('/admin/bookings', bookingCtrl.listBookings);
 router.patch('/bookings/:id/status', validate({ body: updateBookingStatusSchema }), bookingCtrl.updateBookingStatus);
 router.patch('/:id/status', validate({ body: setRoomStatusSchema }), bookingCtrl.setRoomStatus);
+
+router.post('/bookings/:id/checkin', bookingCtrl.checkIn);
+router.post('/bookings/:id/checkout', bookingCtrl.checkOut);
+router.post('/bookings/:id/upgrade', bookingCtrl.upgradeRoom);
+router.post('/bookings/:id/transfer', bookingCtrl.transferRoom);
+router.get('/admin/reports', bookingCtrl.getReports);
 
 export default router;

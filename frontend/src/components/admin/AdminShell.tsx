@@ -25,6 +25,9 @@ import {
   Users,
   Image as ImageIcon,
   Landmark,
+  Heart,
+  LifeBuoy,
+  Globe,
 } from 'lucide-react';
 import { AdminGate } from './AdminGate';
 import { useAuth } from '@/hooks/useAuth';
@@ -40,98 +43,109 @@ interface NavItem {
   ready?: boolean;
 }
 
-interface ValetNotification {
+interface Notif {
   id: string;
-  carNumber: string;
-  message: string;
+  type: 'valet' | 'ticket' | 'order';
+  title: string;
+  body: string;
   time: Date;
   read: boolean;
+  href: string;
 }
 
-/** Bell + dropdown for valet vehicle request notifications */
-function ValetBell({ role }: { role: string }) {
-  const [notifications, setNotifications] = useState<ValetNotification[]>([]);
+const TYPE_STYLES: Record<Notif['type'], { bg: string; icon: string; color: string }> = {
+  valet:  { bg: 'bg-amber-100',   color: 'text-amber-600',  icon: '🚗' },
+  ticket: { bg: 'bg-red-100',     color: 'text-red-600',    icon: '🎫' },
+  order:  { bg: 'bg-emerald-100', color: 'text-emerald-600', icon: '🍽️' },
+};
+
+/** Unified notification bell for valet, service-tickets, and new orders */
+function NotificationBell({ role, align = 'right' }: { role: string; align?: 'right' | 'left-flyout' }) {
+  const [notifications, setNotifications] = useState<Notif[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const status = useAuthStore((s) => s.status);
 
   const unread = notifications.filter((n) => !n.read).length;
 
+  const addNotif = (notif: Omit<Notif, 'id' | 'time' | 'read'>) => {
+    const n: Notif = { ...notif, id: `${Date.now()}-${Math.random()}`, time: new Date(), read: false };
+    setNotifications((prev) => [n, ...prev].slice(0, 30));
+    playNewOrderChime();
+
+    // Pop a toast for 4s
+    const toast = document.createElement('div');
+    toast.className = [
+      'fixed bottom-6 right-6 z-[9999] flex items-start gap-3 max-w-xs',
+      'rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-xl',
+      'animate-in slide-in-from-bottom-4 fade-in duration-300',
+    ].join(' ');
+    toast.innerHTML = `
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${TYPE_STYLES[notif.type].bg} text-lg">${TYPE_STYLES[notif.type].icon}</div>
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-zinc-900 truncate">${n.title}</p>
+        <p class="text-xs text-zinc-500 truncate">${n.body}</p>
+      </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  };
+
   useEffect(() => {
-    if (role !== 'SUPER_ADMIN' || status !== 'authenticated') return;
+    if (status !== 'authenticated') return;
     const socket = getSocket();
 
-    const handleValetNew = (payload: { vehicle?: { carNumber?: string }; carNumber?: string }) => {
-      const carNumber = payload?.vehicle?.carNumber ?? payload?.carNumber ?? 'Unknown';
-      const notif: ValetNotification = {
-        id: `${Date.now()}-${carNumber}`,
-        carNumber,
-        message: `Guest requested vehicle ${carNumber}`,
-        time: new Date(),
-        read: false,
-      };
-      setNotifications((prev) => [notif, ...prev].slice(0, 20));
-      playNewOrderChime();
+    // Valet vehicle requested
+    socket.on('valet:new', (p: { vehicle?: { carNumber?: string }; carNumber?: string }) => {
+      const car = p?.vehicle?.carNumber ?? p?.carNumber ?? 'Unknown';
+      addNotif({ type: 'valet', title: 'Vehicle Requested', body: `Guest waiting for ${car}`, href: '/admin/valet' });
+    });
 
-      // Auto-show toast for 4 seconds
-      const toastId = `valet-toast-${notif.id}`;
-      const toast = document.createElement('div');
-      toast.id = toastId;
-      toast.className = [
-        'fixed bottom-6 right-6 z-[9999] flex items-start gap-3',
-        'rounded-xl border border-amber-200 bg-white px-4 py-3 shadow-xl',
-        'animate-in slide-in-from-bottom-4 fade-in duration-300',
-      ].join(' ');
-      toast.innerHTML = `
-        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2Z"/><path d="M7 17v2"/><path d="M17 17v2"/></svg>
-        </div>
-        <div>
-          <p class="text-sm font-semibold text-zinc-900">🚗 Vehicle Requested</p>
-          <p class="text-xs text-zinc-500">Guest is waiting for <strong>${carNumber}</strong></p>
-        </div>
-      `;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
-    };
+    // New service desk ticket (emitted by complaint controller)
+    socket.on('complaint:new', (p: { room?: { roomNumber?: string }; guestName?: string; category?: string }) => {
+      const room = p?.room?.roomNumber ?? '?';
+      const guest = p?.guestName ?? 'Guest';
+      const cat = p?.category ?? 'Request';
+      addNotif({ type: 'ticket', title: 'New Service Ticket', body: `${cat} from ${guest} · Room ${room}`, href: '/admin/complaints' });
+    });
 
-    socket.on('valet:new', handleValetNew);
+    // New food order placed (emitted by order service)
+    socket.on('order:new', (p: { orderNumber?: string; roomSnapshot?: { number?: string } }) => {
+      const num = p?.orderNumber ?? '';
+      addNotif({ type: 'order', title: 'New Order', body: `Order ${num} placed`, href: '/admin/orders' });
+    });
+
     return () => {
-      socket.off('valet:new', handleValetNew);
+      socket.off('valet:new');
+      socket.off('complaint:new');
+      socket.off('order:new');
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, status]);
 
-  // Close dropdown on outside click
+  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     if (open) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  if (role !== 'SUPER_ADMIN') return null;
-
   return (
     <div ref={ref} className="relative">
       <button
-        id="valet-bell-btn"
+        id="notification-bell-btn"
         onClick={() => {
           setOpen((o) => !o);
-          if (!open) markAllRead();
+          if (!open) setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
         }}
         className="relative flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition-colors"
-        aria-label="Valet notifications"
+        aria-label="Notifications"
       >
         <Bell className="h-5 w-5" />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -139,53 +153,62 @@ function ValetBell({ role }: { role: string }) {
 
       {open && (
         <div
-          id="valet-notifications-dropdown"
-          className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-200 bg-white shadow-xl overflow-hidden"
+          id="notifications-dropdown"
+          className={cn(
+            "absolute z-50 w-80 rounded-xl border border-zinc-200 bg-white shadow-xl overflow-hidden",
+            align === 'left-flyout' ? "left-full top-0 ml-2" : "right-0 top-full mt-2"
+          )}
         >
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <p className="text-sm font-bold text-zinc-900">Valet Requests</p>
+          <div className="flex items-center justify-between border-b px-4 py-3 bg-zinc-50">
+            <p className="text-sm font-bold text-zinc-900">Notifications</p>
             {notifications.length > 0 && (
-              <button
-                onClick={() => setNotifications([])}
-                className="text-xs text-zinc-400 hover:text-zinc-600"
-              >
+              <button onClick={() => setNotifications([])} className="text-xs text-zinc-400 hover:text-zinc-600">
                 Clear all
               </button>
             )}
           </div>
           <div className="max-h-80 overflow-y-auto divide-y divide-zinc-50">
             {notifications.length === 0 ? (
-              <p className="py-8 text-center text-sm text-zinc-400">No valet requests yet</p>
+              <div className="py-10 text-center">
+                <Bell className="mx-auto h-7 w-7 text-zinc-200 mb-2" />
+                <p className="text-sm text-zinc-400">No notifications yet</p>
+              </div>
             ) : (
               notifications.map((n) => (
-                <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-zinc-50">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100">
-                    <Car className="h-4 w-4 text-amber-600" />
+                <Link
+                  key={n.id}
+                  href={n.href}
+                  onClick={() => setOpen(false)}
+                  className={`flex items-start gap-3 px-4 py-3 hover:bg-zinc-50 transition-colors ${!n.read ? 'bg-zinc-50/80' : ''}`}
+                >
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base ${TYPE_STYLES[n.type].bg}`}>
+                    {TYPE_STYLES[n.type].icon}
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-zinc-900 truncate">{n.message}</p>
-                    <p className="text-xs text-zinc-400">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-zinc-900">{n.title}</p>
+                    <p className="text-[11px] text-zinc-500 truncate">{n.body}</p>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">
                       {n.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
-                </div>
+                  {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand" />}
+                </Link>
               ))
             )}
           </div>
-          <div className="border-t px-4 py-2.5">
-            <Link
-              href="/admin/valet"
-              onClick={() => setOpen(false)}
-              className="block text-center text-xs font-medium text-brand hover:underline"
-            >
-              View Valet Management →
-            </Link>
+          <div className="border-t px-4 py-2.5 flex gap-3 bg-zinc-50">
+            <Link href="/admin/valet" onClick={() => setOpen(false)} className="flex-1 text-center text-[11px] font-medium text-zinc-500 hover:text-zinc-800">Valet</Link>
+            <span className="text-zinc-200">|</span>
+            <Link href="/admin/complaints" onClick={() => setOpen(false)} className="flex-1 text-center text-[11px] font-medium text-zinc-500 hover:text-zinc-800">Tickets</Link>
+            <span className="text-zinc-200">|</span>
+            <Link href="/admin/orders" onClick={() => setOpen(false)} className="flex-1 text-center text-[11px] font-medium text-zinc-500 hover:text-zinc-800">Orders</Link>
           </div>
         </div>
       )}
     </div>
   );
 }
+
 
 function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -195,13 +218,17 @@ function Shell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const NAV: NavItem[] = [
+    { href: '/', label: 'Go to Website', icon: <Globe className="h-4 w-4" />, ready: true },
     { href: '/admin', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" />, ready: true },
     ...(user?.role === 'SUPER_ADMIN' ? [
       { href: '/admin/kitchens', label: 'Kitchens', icon: <ChefHat className="h-4 w-4" />, ready: true },
       { href: '/admin/rooms', label: 'Rooms & QR', icon: <DoorOpen className="h-4 w-4" />, ready: true },
+      { href: '/admin/housekeeping', label: 'Housekeeping', icon: <Boxes className="h-4 w-4" />, ready: true },
       { href: '/admin/valet', label: 'Valet Parking', icon: <Car className="h-4 w-4" />, ready: true },
       { href: '/admin/restaurant', label: 'Restaurant', icon: <UtensilsCrossed className="h-4 w-4" />, ready: true },
+      { href: '/admin/complaints', label: 'Service Tickets', icon: <LifeBuoy className="h-4 w-4" />, ready: true },
       { href: '/admin/guests', label: 'Guests', icon: <Users className="h-4 w-4" />, ready: true },
+      { href: '/admin/feedback', label: 'Guest Feedback', icon: <Heart className="h-4 w-4" />, ready: true },
     ] : []),
     { href: '/admin/menu', label: 'Menu', icon: <UtensilsCrossed className="h-4 w-4" />, ready: true },
     ...(user?.role === 'KITCHEN_OWNER' ? [
@@ -242,7 +269,7 @@ function Shell({ children }: { children: ReactNode }) {
           <span className="font-bold text-zinc-900 text-sm">The Page</span>
         </div>
         <div className="flex items-center gap-2">
-          <ValetBell role={user?.role ?? ''} />
+          <NotificationBell role={user?.role ?? ''} />
           <button
             onClick={() => setMenuOpen(true)}
             className="rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100"
@@ -324,7 +351,7 @@ function Shell({ children }: { children: ReactNode }) {
             </div>
             <span className="font-bold text-zinc-900">The Page</span>
           </div>
-          <ValetBell role={user?.role ?? ''} />
+          <NotificationBell role={user?.role ?? ''} align="left-flyout" />
         </div>
         <nav className="flex-1 space-y-1 px-3 py-2">
           {NAV.map((item) => {

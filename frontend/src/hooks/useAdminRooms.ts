@@ -11,11 +11,12 @@ export interface AdminRoom {
   status: 'AVAILABLE' | 'OCCUPIED' | 'CLEANING' | 'MAINTENANCE';
   kitchen?: { _id: string; name: string } | string;
   qr: { token: string; isActive: boolean; version: number };
+  roomType?: string;
 }
 
 export interface RoomBookingInfo {
   _id: string;
-  room: { _id: string; roomNumber: string; floor: number };
+  room: { _id: string; roomNumber: string; floor: number; roomType?: string };
   guestName: string;
   phone: string;
   email: string;
@@ -96,5 +97,11 @@ export function useBookingMutations() {
     onSuccess: invalidate,
   });
 
-  return { updateStatus };
+  const transfer = useMutation({
+    mutationFn: ({ id, newRoomId }: { id: string; newRoomId: string }) =>
+      api.post(`/rooms/bookings/${id}/transfer`, { newRoomId }),
+    onSuccess: invalidate,
+  });
+
+  return { updateStatus, transfer };
 }

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useAuthStore } from '@/stores/auth';
 import { LogIn, UtensilsCrossed } from 'lucide-react';
 
 /** The hotel's public website. */
@@ -9,6 +10,9 @@ export const MAIN_SITE = 'https://thepagerohtak.com';
 
 /** Top navigation for the public landing page. */
 export function SiteNav({ fullMenuHref }: { fullMenuHref: string }) {
+  const status = useAuthStore((s) => s.status);
+  const user = useAuthStore((s) => s.user);
+
   return (
     <header className="sticky top-0 z-30 border-b border-[#ECECEC]/60 bg-white/80 backdrop-blur-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -38,14 +42,22 @@ export function SiteNav({ fullMenuHref }: { fullMenuHref: string }) {
             <span className="hidden sm:inline">Full Menu</span>
             <span className="sm:hidden">Menu</span>
           </Link>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 rounded-2xl bg-[#111111] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#222222] hover:shadow-lg"
-          >
-            <LogIn className="h-3.5 w-3.5 opacity-80" aria-hidden="true" />
-            <span className="hidden sm:inline">Login</span>
-            <span className="sm:hidden">Login</span>
-          </Link>
+          {status === 'authenticated' ? (
+            <Link
+              href={user?.role === 'VALET_MANAGER' ? '/valet/dashboard' : '/admin'}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#D4AF37] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#c49e27] hover:shadow-lg"
+            >
+              <span>Dashboard</span>
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#111111] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#222222] hover:shadow-lg"
+            >
+              <LogIn className="h-3.5 w-3.5 opacity-80" aria-hidden="true" />
+              <span>Login</span>
+            </Link>
+          )}
         </nav>
       </div>
     </header>

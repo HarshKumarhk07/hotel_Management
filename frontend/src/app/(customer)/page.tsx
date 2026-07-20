@@ -1,15 +1,40 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, Image as ImageIcon, Loader2, AlertCircle, UtensilsCrossed, Star, Car, QrCode, Bell, Sparkles, Shield, Zap, Clock, User, ChevronDown } from 'lucide-react';
+import {
+  Camera,
+  Image as ImageIcon,
+  Loader2,
+  AlertCircle,
+  UtensilsCrossed,
+  Star,
+  Car,
+  QrCode,
+  Bell,
+  Sparkles,
+  Shield,
+  Zap,
+  Clock,
+  User,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  X,
+  Compass,
+  Award,
+  MapPin,
+  Phone,
+  Mail,
+  ArrowRight,
+} from 'lucide-react';
 import jsQR from 'jsqr';
 import { QrScanner } from '@/components/qr/QrScanner';
-import { SiteNav } from '@/components/site/SiteNav';
-import { SiteFooter } from '@/components/site/SiteFooter';
+import { Dialog } from '@/components/ui/dialog';
 import { FoodLabel } from '@/components/ui/primitives';
 import { ProductCardSkeleton, ProductError, ProductEmptyState } from '@/components/ui/ProductSkeleton';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,16 +48,33 @@ interface PublicKitchen {
   slug: string;
 }
 
-/** Landing screen shown when the app is opened without a scanned QR. */
 export default function HomePage() {
   const router = useRouter();
+
+  const HERO_IMAGES = [
+    { url: '/hotel1.png', tag: 'EXPERIENCE GRAND LUXURY', title: 'THE PAGE', subtitle: 'Heritage Splendor · Curated Dining · Royal Comfort' },
+    { url: '/dining-banner.png', tag: 'CULINARY ARTISTRY', title: 'FINE DINING', subtitle: 'Authentic Flavors and Exquisite Gastronomy' },
+    { url: '/bnk2.png', tag: 'MAJESTIC CELEBRATIONS', title: 'ROYAL BANQUETS', subtitle: 'Crafting Weddings and Events of Distinction' },
+    { url: '/abt2.png', tag: 'A HAVEN OF SPLENDOR', title: 'SUITES & CHAMBERS', subtitle: 'Unrivaled Comfort and Timeless Hospitality' }
+  ];
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Auto slide-show rotation
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % HERO_IMAGES.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Showcase the kitchen's featured dishes on the landing page.
+  // Load kitchens & featured menu for the dining overlay
   const {
     data: kitchens,
     isLoading: isLoadingKitchens,
@@ -60,7 +102,6 @@ export default function HomePage() {
     .slice(0, 8);
   const fullMenuHref = featuredKitchen ? `/k/${featuredKitchen.id}` : '/';
 
-  /** Extract the room token from a decoded QR (handles full /r/<token> URLs). */
   const processDecoded = useCallback(
     (data: string) => {
       let token = data.trim();
@@ -128,748 +169,859 @@ export default function HomePage() {
       setProcessing(false);
     };
     reader.readAsDataURL(file);
-    // Allow re-selecting the same file later.
     e.target.value = '';
   };
 
+  const handleScrollToSection = (id: string) => {
+    setMobileMenuOpen(false);
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#FAF9F6]">
-      <SiteNav fullMenuHref={fullMenuHref} />
+    <div className="flex min-h-screen flex-col bg-[#FAF9F6] text-zinc-800 font-sans selection:bg-[#D4AF37]/20 selection:text-[#AE963C]">
+      {/* Import Premium Serif Font */}
+      <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet"
+      />
 
+      {/* ── Navbar Layout ── */}
+      <header className="absolute top-0 left-0 right-0 z-50 bg-black/10 backdrop-blur-[2px] border-b border-white/10">
+        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
+          {/* Left Navigation links */}
+          <nav className="hidden lg:flex items-center gap-8 text-[11px] font-extrabold uppercase tracking-[0.2em] text-white">
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-[#D4AF37] transition-colors border-b-2 border-[#D4AF37] pb-1">
+              Home
+            </button>
+            <button onClick={() => router.push('/rooms')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+              Rooms
+            </button>
+            <button onClick={() => handleScrollToSection('banquet')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+              Banquet
+            </button>
+            <button onClick={() => handleScrollToSection('dining')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+              Restaurant
+            </button>
+          </nav>
+
+          {/* Center Brand Title */}
+          <div className="flex flex-col items-center justify-center text-center">
+            <span className="text-xl md:text-2xl font-bold tracking-[0.25em] text-[#D4AF37] font-serif uppercase">
+              THE PAGE
+            </span>
+            <span className="text-[8px] font-semibold tracking-[0.3em] text-white/70 uppercase -mt-0.5">
+              EST. 2016
+            </span>
+          </div>
+
+          {/* Right Navigation links */}
+          <nav className="hidden lg:flex items-center gap-8 text-[11px] font-extrabold uppercase tracking-[0.2em] text-white">
+            <button onClick={() => handleScrollToSection('amenities')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+              Amenities
+            </button>
+            <button onClick={() => handleScrollToSection('about')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+              About
+            </button>
+            <button onClick={() => setScannerOpen(true)} className="hover:text-[#D4AF37] transition-colors text-[#D4AF37] border border-[#D4AF37] px-3.5 py-1.5 rounded-full hover:bg-[#D4AF37]/10 transition-all">
+              Scan QR
+            </button>
+            <Link href="/login" className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+              Login
+            </Link>
+          </nav>
+
+          {/* Mobile Menu Action */}
+          <div className="lg:hidden flex items-center gap-4">
+            <button
+              onClick={() => setScannerOpen(true)}
+              className="text-[#D4AF37] border border-[#D4AF37] text-[10px] font-extrabold tracking-wider uppercase px-3 py-1.5 rounded-full"
+            >
+              Scan QR
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="text-white hover:text-[#D4AF37] transition-colors p-1"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation Drawer */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="lg:hidden bg-zinc-950 border-b border-white/10 px-6 py-6 space-y-4 flex flex-col text-[11px] font-extrabold uppercase tracking-[0.2em]"
+            >
+              <button onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
+                Home
+              </button>
+              <button onClick={() => { router.push('/rooms'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
+                Rooms
+              </button>
+              <button onClick={() => handleScrollToSection('banquet')} className="text-white hover:text-[#D4AF37] text-left">
+                Banquet
+              </button>
+              <button onClick={() => handleScrollToSection('dining')} className="text-white hover:text-[#D4AF37] text-left">
+                Restaurant
+              </button>
+              <button onClick={() => handleScrollToSection('amenities')} className="text-white hover:text-[#D4AF37] text-left">
+                Amenities
+              </button>
+              <button onClick={() => handleScrollToSection('about')} className="text-white hover:text-[#D4AF37] text-left">
+                About
+              </button>
+              <Link href="/login" className="text-white hover:text-[#D4AF37] text-left">
+                Login
+              </Link>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      {/* ── Main Layout Sections ── */}
       <main className="flex-1">
-        {/* ═══════════════════════════════════════════════════════════════════
-            HERO SECTION (MAJOR REDESIGN) — TWO COLUMN LUXURY LAYOUT
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="relative overflow-hidden bg-white">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_0%_50%,#FAF8F0_0%,transparent_60%)] pointer-events-none" />
-          <div className="absolute -right-20 top-20 h-[500px] w-[500px] rounded-full bg-[#D4AF37]/[0.04] blur-3xl pointer-events-none" />
+        <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentSlide}
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2 }}
+              className="absolute inset-0 w-full h-full"
+            >
+              <NextImage
+                src={HERO_IMAGES[currentSlide].url}
+                alt={HERO_IMAGES[currentSlide].title}
+                fill
+                priority
+                className="object-cover brightness-[0.5]"
+              />
+            </motion.div>
+          </AnimatePresence>
 
-          <div className="relative mx-auto max-w-7xl px-8 py-10 sm:py-16">
-            <div className="grid gap-16 lg:grid-cols-2 lg:items-center">
-              {/* LEFT SIDE */}
-              <motion.div
-                initial={{ opacity: 0, x: -40 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.7 }}
-                className="space-y-8 text-left"
-              >
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#FAF8F0] px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] text-[#D4AF37] ring-1 ring-[#D4AF37]/20 shadow-sm">
-                  <span className="flex h-2 w-2 rounded-full bg-[#D4AF37] animate-pulse" />
-                  Premium Hotel Valet
-                </div>
-                <h1 className="text-5xl font-bold tracking-tight text-[#111111] sm:text-6xl lg:text-[64px] lg:leading-[1.1]">
-                  Effortless Parking,<br />
-                  <span className="text-[#D4AF37]">Just a Tap Away.</span>
-                </h1>
-                <p className="max-w-lg text-lg leading-relaxed text-[#666666]">
-                  Experience ultimate convenience with our digital valet service. No phone calls, paper slips, or waiting at the lobby desk. Request your vehicle instantly from your room.
-                </p>
-                <div className="flex flex-col gap-4 sm:flex-row">
-                  <Link href="/valet-tracking">
-                    <button
-                      type="button"
-                      className="group w-full sm:w-auto flex items-center justify-center gap-2.5 rounded-2xl bg-[#D4AF37] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#AE963C] hover:shadow-xl active:scale-[0.98] focus:outline-none"
-                    >
-                      <Car className="h-5 w-5 transition-transform duration-300 group-hover:-translate-x-0.5" />
-                      Track & Request Vehicle
-                    </button>
-                  </Link>
-                  <Link href="/valet/login">
-                    <button
-                      type="button"
-                      className="w-full sm:w-auto flex items-center justify-center gap-2.5 rounded-2xl border-2 border-[#ECECEC] bg-white px-8 py-4 text-sm font-semibold text-[#111111] transition-all duration-300 hover:border-[#D4AF37] hover:shadow-md"
-                    >
-                      Valet Staff Login
-                    </button>
-                  </Link>
-                </div>
-              </motion.div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/50 pointer-events-none" />
 
-              {/* RIGHT SIDE */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.7, delay: 0.15 }}
-                className="relative"
+          {/* Left & Right Interactive Arrows */}
+          <button
+            onClick={() => setCurrentSlide((prev) => (prev - 1 + HERO_IMAGES.length) % HERO_IMAGES.length)}
+            className="absolute left-6 z-20 flex h-12 w-12 items-center justify-center border border-white/20 bg-black/30 hover:bg-[#D4AF37] hover:border-[#D4AF37] text-white backdrop-blur-md transition-all duration-300 active:scale-95"
+            aria-label="Previous Slide"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+          <button
+            onClick={() => setCurrentSlide((prev) => (prev + 1) % HERO_IMAGES.length)}
+            className="absolute right-6 z-20 flex h-12 w-12 items-center justify-center border border-white/20 bg-black/30 hover:bg-[#D4AF37] hover:border-[#D4AF37] text-white backdrop-blur-md transition-all duration-300 active:scale-95"
+            aria-label="Next Slide"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+
+          {/* Hero Content Overlay */}
+          <div className="relative z-10 max-w-4xl px-6 text-center space-y-6 text-white mt-12">
+            <motion.span
+              key={`tag-${currentSlide}`}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="inline-block text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-[#D4AF37] border-b border-[#D4AF37]/30 pb-2"
+            >
+              {HERO_IMAGES[currentSlide].tag}
+            </motion.span>
+            <motion.h1
+              key={`title-${currentSlide}`}
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="text-5xl md:text-8xl font-serif tracking-[0.05em] leading-tight uppercase font-medium text-white"
+            >
+              {HERO_IMAGES[currentSlide].title}
+            </motion.h1>
+            <motion.p
+              key={`sub-${currentSlide}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="max-w-xl mx-auto text-xs md:text-sm font-light tracking-[0.2em] uppercase text-zinc-300"
+            >
+              {HERO_IMAGES[currentSlide].subtitle}
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="pt-4"
+            >
+              <button
+                onClick={() => handleScrollToSection('about')}
+                className="border border-[#D4AF37]/50 bg-black/40 hover:bg-[#D4AF37]/10 backdrop-blur-sm px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-[#D4AF37] transition-all hover:scale-105 active:scale-95 shadow-lg"
               >
-                {/* Decorative gold glow behind image */}
-                <div className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-[#D4AF37]/10 via-transparent to-[#D4AF37]/5 blur-2xl pointer-events-none" />
-                <div className="relative overflow-hidden rounded-3xl border border-[#ECECEC] bg-white p-2 shadow-2xl">
-                  <div className="relative aspect-square w-full overflow-hidden rounded-[20px]">
+                Discover the Legacy
+              </button>
+            </motion.div>
+          </div>
+
+          {/* Indicator Dot Navigation */}
+          <div className="absolute bottom-24 left-0 right-0 z-20 flex justify-center gap-2">
+            {HERO_IMAGES.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                className={`h-2 transition-all duration-300 ${currentSlide === idx ? 'w-8 bg-[#D4AF37]' : 'w-2 bg-white/40'}`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+
+          {/* Luxury Floating Concierge Link */}
+          <div className="absolute bottom-8 left-0 right-0 z-10 flex flex-col items-center justify-center text-center text-white/90">
+            <span className="text-[9px] font-extrabold tracking-[0.3em] uppercase mb-1 animate-bounce">
+              Scroll Down to Explore
+            </span>
+            <div className="h-6 w-[1px] bg-white/20" />
+          </div>
+        </section>
+
+        {/* Section 2: Heritage Introduction Banner */}
+        <section id="about" className="bg-[#FAF9F6] py-20 px-6 border-b border-zinc-200">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={{
+              hidden: { opacity: 0, y: 30 },
+              visible: {
+                opacity: 1,
+                y: 0,
+                transition: { duration: 0.8, ease: "easeOut", staggerChildren: 0.15 }
+              }
+            }}
+            className="max-w-4xl mx-auto text-center space-y-6"
+          >
+            <motion.div variants={{ hidden: { scale: 0.8, opacity: 0 }, visible: { scale: 1, opacity: 1 } }} className="flex justify-center mb-2">
+              <motion.span
+                animate={{ y: [0, -6, 0] }}
+                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                className="p-3.5 rounded-full border border-[#D4AF37]/30 bg-white shadow-md inline-block cursor-pointer"
+              >
+                <Sparkles className="h-6 w-6 text-[#D4AF37]" />
+              </motion.span>
+            </motion.div>
+
+            <motion.span variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="block text-[10px] md:text-xs font-bold text-[#D4AF37] uppercase tracking-[0.25em]">
+              DELHI NCR&apos;S CROWN JEWEL OF HOSPITALITY
+            </motion.span>
+
+            <motion.h2 variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="text-4xl md:text-6xl font-serif text-[#111111] leading-tight">
+              A Symphony of Regal Grandeur<br />
+              <span className="font-serif italic text-[#D4AF37]">&amp; Timeless Elegance</span>
+            </motion.h2>
+
+            <motion.p variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="max-w-2xl mx-auto text-sm md:text-base leading-relaxed text-[#666666] font-light">
+              Welcome to The Page — a world where regal grandeur, timeless elegance, and warm Indian hospitality converge to create an experience beyond imagination. Nestled in the heart of heritage, our palace stands as a magnificent testament to royal architecture, cultural richness, and the art of refined living.
+            </motion.p>
+
+            <motion.p variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="max-w-2xl mx-auto text-xs md:text-sm text-[#666666]/80 font-medium">
+              Every corridor whispers tales of kings and queens. Every courtyard celebrates art and tradition. Every chamber embodies grace, glory, and the promise of memories that last a lifetime.
+            </motion.p>
+
+            <motion.div variants={{ hidden: { opacity: 0, y: 25 }, visible: { opacity: 1, y: 0 } }} className="pt-6 flex flex-col sm:flex-row justify-center items-center gap-4">
+              <button
+                onClick={() => router.push('/rooms')}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg hover:bg-[#AE963C] transition-all hover:scale-[1.03] active:scale-[0.98]"
+              >
+                Reserve Your Royal Suite <ArrowRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => handleScrollToSection('rooms')}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-[#D4AF37] bg-white px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-[#D4AF37] hover:bg-[#FAF8F0] transition-all hover:scale-[1.03] active:scale-[0.98]"
+              >
+                Discover Our Legacy
+              </button>
+            </motion.div>
+          </motion.div>
+        </section>
+
+        {/* Section 3: Signature Experiences */}
+        <section id="rooms" className="bg-white py-24 px-6 border-b border-zinc-200">
+          <div className="max-w-7xl mx-auto space-y-16">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={{
+                hidden: { opacity: 0, y: 30 },
+                visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
+              }}
+              className="text-center space-y-3"
+            >
+              <span className="text-[10px] md:text-xs font-bold text-[#D4AF37] uppercase tracking-[0.25em]">
+                CURATED FOR ROYALTY
+              </span>
+              <h2 className="text-3xl md:text-5xl font-serif text-[#111111]">
+                Signature Experiences
+              </h2>
+              <p className="max-w-lg mx-auto text-xs md:text-sm text-[#666666] font-light">
+                Immerse yourself in a world where every detail is crafted to perfection, every moment designed to create lasting memories of unparalleled luxury.
+              </p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                {
+                  id: 1,
+                  tag: "ACCOMMODATION",
+                  title: "Royal Suites & Chambers",
+                  desc: "From intimate heritage rooms to sprawling royal suites, each space tells a story of tradition, craftsmanship, and uncompromising comfort.",
+                  img: "/abt1.png",
+                  actionText: "View Chambers →",
+                  onClick: () => router.push('/rooms')
+                },
+                {
+                  id: 2,
+                  tag: "WEDDINGS & EVENTS",
+                  title: "Majestic Celebrations",
+                  desc: "Choose from grand ballrooms, heritage courtyards, and palace gardens. Each venue transforms your special moments into legendary celebrations.",
+                  img: "/bnk2.png",
+                  actionText: "Explore Venues →",
+                  onClick: () => handleScrollToSection('banquet')
+                },
+                {
+                  id: 3,
+                  tag: "FINE DINING",
+                  title: "Culinary Excellence",
+                  desc: "Our master chefs present a symphony of flavors—from royal Awadhi cuisine to contemporary international gastronomy.",
+                  img: "/dining-banner.png",
+                  actionText: "Reserve Table →",
+                  onClick: () => handleScrollToSection('dining')
+                }
+              ].map((card, idx) => (
+                <motion.div
+                  key={card.id}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, margin: "-50px" }}
+                  custom={idx}
+                  variants={{
+                    hidden: { opacity: 0, y: 40 },
+                    visible: (customIndex: number) => ({
+                      opacity: 1,
+                      y: 0,
+                      transition: { delay: customIndex * 0.15, duration: 0.8, ease: "easeOut" }
+                    })
+                  }}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-100 bg-[#FAF9F6] shadow-sm hover:shadow-xl transition-all duration-300"
+                >
+                  <div className="relative aspect-[4/3] w-full overflow-hidden">
                     <NextImage
-                      src="/hotel1.png"
-                      alt="Premium Valet Parking Service"
+                      src={card.img}
+                      alt={card.title}
                       fill
-                      className="object-cover transition-transform duration-700 hover:scale-105"
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                      priority
+                      className="object-cover group-hover:scale-110 transition-transform duration-700 brightness-[0.9]"
                     />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute bottom-4 left-5 text-left">
+                      <span className="text-[9px] font-bold text-[#D4AF37] uppercase tracking-[0.25em]">
+                        {card.tag}
+                      </span>
+                      <h3 className="text-lg font-serif text-white font-semibold">
+                        {card.title}
+                      </h3>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
+                  <div className="p-6 flex-1 flex flex-col justify-between text-left space-y-4">
+                    <p className="text-xs md:text-sm text-[#666666] font-light leading-relaxed">
+                      {card.desc}
+                    </p>
+                    <button
+                      onClick={card.onClick}
+                      className="text-xs font-bold text-[#D4AF37] hover:text-[#AE963C] flex items-center gap-1 group-hover:translate-x-1.5 transition-transform self-start"
+                    >
+                      {card.actionText}
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            IN-ROOM DINING QR SCAN SECTION
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="relative overflow-hidden border-t border-[#ECECEC] bg-[#FAF9F6] py-16 sm:py-24">
-          <div className="relative mx-auto flex max-w-7xl flex-col items-center gap-12 px-8 text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-[#ECECEC]"
-            >
-              <NextImage
-                src="/logo.png"
-                alt="In-Room Dining logo"
-                width={64}
-                height={64}
-                className="h-16 w-16 object-contain"
-              />
-            </motion.div>
+        {/* Section 4: Palace Amenities */}
+        <section id="amenities" className="relative py-28 px-6 overflow-hidden bg-zinc-950 text-white border-t border-b border-white/5">
+          {/* Subtle Background Parallax Image with Dark Overlay */}
+          <div className="absolute inset-0 z-0">
+            <NextImage
+              src="/abt2.png"
+              alt="Amenities background pool"
+              fill
+              className="object-cover brightness-[0.22] scale-105"
+            />
+            {/* Top and Bottom Vignette to blend the white ceiling of the photo into the dark background */}
+            <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-zinc-950/40 to-zinc-950" />
+          </div>
 
+          <div className="relative z-10 max-w-7xl mx-auto space-y-16">
+            {/* Title Section */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="max-w-lg space-y-4"
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={{
+                hidden: { opacity: 0, y: 25 },
+                visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
+              }}
+              className="text-center space-y-3"
             >
-              <h2 className="text-4xl font-bold tracking-tight text-[#111111] sm:text-5xl">
-                In-Room Dining
+              <span className="text-[10px] md:text-xs font-bold text-[#D4AF37] uppercase tracking-[0.25em]">
+                WORLD-CLASS OFFERINGS
+              </span>
+              <h2 className="text-3xl md:text-5xl font-serif text-white">
+                Palace Amenities
               </h2>
-              <p className="mx-auto max-w-md text-sm text-[#666666]">
-                Scan the QR code in your room to browse our digital menu and order fresh food directly to your door.
+              <p className="max-w-lg mx-auto text-xs md:text-sm text-zinc-400 font-light leading-relaxed">
+                Indulge in an extraordinary range of premium services and facilities, crafted to ensure your stay exceeds imperial expectations.
               </p>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="w-full max-w-sm space-y-5 rounded-3xl border border-[#ECECEC] bg-white p-8 shadow-lg"
-            >
-              <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-[#D4AF37]">
-                Scan Room QR
-              </h3>
+            {/* Grid of Amenities */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                {
+                  title: "Royal Wellness Spa",
+                  desc: "Rejuvenate your body and mind with authentic Ayurvedic therapies, steam rooms, and restorative body treatments.",
+                  icon: <Sparkles className="h-5 w-5 text-[#D4AF37]" />,
+                  badge: "SPA & SALON"
+                },
+                {
+                  title: "Azure Pool Cabanas",
+                  desc: "Relax by our temperature-controlled pool, complete with private luxury cabanas and poolside refreshments.",
+                  icon: <Compass className="h-5 w-5 text-[#D4AF37]" />,
+                  badge: "RECREATION"
+                },
+                {
+                  title: "Imperial Boardrooms",
+                  desc: "Conduct distinguished business meetings in high-tech corporate spaces with private butler services.",
+                  icon: <Award className="h-5 w-5 text-[#D4AF37]" />,
+                  badge: "CONFERENCES"
+                },
+                {
+                  title: "Secure Valet & Guard",
+                  desc: "Enjoy complete peace of mind with 24/7 security surveillance and round-the-clock secure valet parking.",
+                  icon: <Shield className="h-5 w-5 text-[#D4AF37]" />,
+                  badge: "SERVICES"
+                }
+              ].map((amenity, idx) => (
+                <motion.div
+                  key={amenity.title}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, margin: "-50px" }}
+                  custom={idx}
+                  variants={{
+                    hidden: { opacity: 0, y: 30 },
+                    visible: (customIndex: number) => ({
+                      opacity: 1,
+                      y: 0,
+                      transition: { delay: customIndex * 0.1, duration: 0.7, ease: "easeOut" }
+                    })
+                  }}
+                  className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-6 space-y-4 hover:border-[#D4AF37]/30 hover:bg-zinc-900/60 hover:-translate-y-1 transition-all duration-300 text-left"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/40 border border-white/10 group-hover:border-[#D4AF37]/30 transition-colors">
+                        {amenity.icon}
+                      </div>
+                      <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest bg-black/20 border border-white/5 px-2 py-0.5 rounded-full">
+                        {amenity.badge}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <h3 className="text-base font-serif font-semibold text-white tracking-wide group-hover:text-[#D4AF37] transition-colors">
+                        {amenity.title}
+                      </h3>
+                      <p className="text-xs leading-relaxed text-zinc-400 font-light">
+                        {amenity.desc}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pt-2 text-[10px] font-bold tracking-wider text-[#D4AF37]/60 group-hover:text-[#D4AF37] uppercase flex items-center gap-1 cursor-pointer transition-colors">
+                    Learn More ✦
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
 
-              {/* Primary action — open the live camera scanner. */}
+        {/* Section 5: Grand Banqueting Section */}
+        <section id="banquet" className="relative py-32 px-6 overflow-hidden flex items-center">
+          <NextImage
+            src="/bnk2.png"
+            alt="Grand Banqueting ballroom"
+            fill
+            className="object-cover brightness-[0.75]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent pointer-events-none" />
+
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="relative z-10 max-w-xl text-left space-y-6 text-white pl-4 md:pl-16"
+          >
+            <span className="p-3 border border-[#D4AF37]/50 rounded-full bg-black/40 inline-block">
+              <Award className="h-6 w-6 text-[#D4AF37]" />
+            </span>
+            <span className="block text-[10px] md:text-xs font-bold text-[#D4AF37] uppercase tracking-[0.25em]">
+              CELEBRATIONS FIT FOR ROYALTY
+            </span>
+            <h2 className="text-4xl md:text-6xl font-serif text-white leading-tight">
+              Grand Banqueting<br />
+              <span className="font-serif italic text-[#D4AF37]">&amp; Majestic Events</span>
+            </h2>
+            <p className="text-xs md:text-sm leading-relaxed text-zinc-300 font-light">
+              Choose from majestic courtyards, grand ballrooms, and heritage-inspired banquet halls. Each space is designed with regal architecture, intricate detailing, and luxurious interiors that echo the splendor of a bygone era.
+            </p>
+            <div className="pt-4 flex flex-wrap gap-4">
               <button
-                type="button"
-                onClick={() => {
-                  setError(null);
-                  setScannerOpen(true);
-                }}
-                className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#111111] px-5 py-4 text-base font-semibold text-white shadow-md transition-all duration-300 hover:bg-[#222222] hover:shadow-xl active:scale-[0.98] focus:outline-none"
+                onClick={() => router.push('/banquets')}
+                className="flex items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg hover:bg-[#AE963C] transition-all hover:scale-[1.03] active:scale-[0.98]"
               >
-                <Camera className="h-5 w-5" aria-hidden="true" />
-                Scan QR Code
+                Explore Venues
               </button>
+              <button
+                onClick={() => router.push('/banquets')}
+                className="flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-black/20 backdrop-blur-sm px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/10 transition-all hover:scale-[1.03] active:scale-[0.98]"
+              >
+                Plan Your Event
+              </button>
+            </div>
+          </motion.div>
+        </section>
 
-              <div className="relative flex items-center justify-center py-1">
-                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                  <span className="w-full border-t border-[#ECECEC]" />
+        {/* Section 6: Digital Dining Showcase */}
+        <section id="dining" className="bg-[#FAF9F6] py-24 px-6 border-t border-zinc-200">
+          <div className="max-w-7xl mx-auto space-y-16">
+            <div className="text-center space-y-3">
+              <span className="text-[10px] md:text-xs font-bold text-[#D4AF37] uppercase tracking-[0.25em]">
+                ROYAL DINING AT ROOMS
+              </span>
+              <h2 className="text-3xl md:text-5xl font-serif text-[#111111]">
+                Chef&apos;s Recommendations
+              </h2>
+              <p className="max-w-lg mx-auto text-xs md:text-sm text-[#666666] font-light">
+                Browse our featured gourmet recipes curated by award-winning palace chefs, ready to be delivered straight to your suite or table.
+              </p>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {isLoadingKitchens || (featuredKitchen && isLoadingMenu) ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4"
+                >
+                  {Array.from({ length: 4 }).map((_, idx) => (
+                    <ProductCardSkeleton key={idx} />
+                  ))}
+                </motion.div>
+              ) : isErrorKitchens || isErrorMenu ? (
+                <motion.div key="error" className="py-8">
+                  <ProductError
+                    onRetry={() => {
+                      if (isErrorKitchens) void refetchKitchens();
+                      else void refetchMenu();
+                    }}
+                  />
+                </motion.div>
+              ) : featured.length === 0 ? (
+                <motion.div key="empty" className="py-8">
+                  <ProductEmptyState
+                    title="No recommendations currently"
+                    description="This kitchen has no featured recommendations logged."
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="products"
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, margin: "-50px" }}
+                  variants={{
+                    hidden: { opacity: 0 },
+                    visible: {
+                      opacity: 1,
+                      transition: { staggerChildren: 0.1 }
+                    }
+                  }}
+                  className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4"
+                >
+                  {featured.map((item) => (
+                    <motion.div
+                      key={item.id}
+                      onClick={() => {
+                        if (featuredKitchen) {
+                          router.push(`/k/${featuredKitchen.id}`);
+                        } else {
+                          setScannerOpen(true);
+                        }
+                      }}
+                      variants={{
+                        hidden: { opacity: 0, y: 25 },
+                        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+                      }}
+                      className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white text-left shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                    >
+                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#FAF9F6]">
+                        {item.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-[#ECECEC]">
+                            <UtensilsCrossed className="h-10 w-10" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-1 flex-col p-4">
+                        <div className="flex items-center gap-2">
+                          <FoodLabel label={item.foodLabel} />
+                          <span className="line-clamp-1 text-sm font-semibold text-zinc-900">
+                            {item.name}
+                          </span>
+                        </div>
+                        <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-[#666666]">
+                          {item.description ?? ''}
+                        </p>
+                        <span className="mt-auto pt-3 text-sm font-bold text-[#D4AF37]">
+                          {formatINR(item.price)}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {featuredKitchen && featured.length > 0 && (
+              <div className="text-center space-y-4 pt-4">
+                <button
+                  onClick={() => router.push(`/k/${featuredKitchen.id}`)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[#D4AF37] bg-white px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-[#D4AF37] hover:bg-[#D4AF37] hover:text-white transition-all"
+                >
+                  <UtensilsCrossed className="h-4 w-4" /> Browse Menu Catalog
+                </button>
+                <p className="text-[10px] text-[#666666]">
+                  * Requires in-room or table QR scan.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Section 7: Quick Concierge Digital Services (Valet retrieval integration) */}
+        <section className="bg-zinc-900 py-24 px-6 text-white border-t border-zinc-800">
+          <div className="max-w-5xl mx-auto text-center space-y-12">
+            <div className="space-y-4">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] border border-[#D4AF37]/30">
+                Instant retrieval &amp; requests
+              </span>
+              <h2 className="text-3xl md:text-5xl font-serif text-white">
+                Digital Guest Concierge
+              </h2>
+              <p className="max-w-md mx-auto text-xs md:text-sm text-zinc-400 font-light">
+                Request room check-in validation, order gourmet food delivery, or request your valet vehicle retrieval with one touch.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
+              <div
+                onClick={() => setScannerOpen(true)}
+                className="p-8 border border-white/5 hover:border-[#D4AF37]/50 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer space-y-4"
+              >
+                <div className="h-10 w-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
+                  <QrCode className="h-5 w-5 text-[#D4AF37]" />
                 </div>
-                <span className="relative bg-white px-3 text-xs uppercase tracking-wider text-[#666666]">or</span>
+                <h3 className="font-semibold text-sm">Verify Stay QR</h3>
+                <p className="text-xs text-zinc-400 font-light leading-relaxed">
+                  Scan the dynamic code placed inside your suite or table to authenticate and start room billing.
+                </p>
               </div>
 
-              {/* Secondary action — upload a QR image from the gallery. */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={processing}
-                className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-[#ECECEC] bg-[#FAF9F6] px-5 py-3.5 text-sm font-semibold text-[#111111] transition-all duration-300 hover:bg-white hover:shadow-md active:scale-[0.98] disabled:opacity-60 focus:outline-none"
+              <div
+                onClick={() => router.push('/valet-tracking')}
+                className="p-8 border border-white/5 hover:border-[#D4AF37]/50 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer space-y-4"
               >
-                {processing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin text-[#666666]" aria-hidden="true" />
-                    Reading image…
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="h-4 w-4 text-[#666666]" aria-hidden="true" />
-                    Upload QR Image
-                  </>
-                )}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                aria-label="Upload a QR code image"
-                onChange={handleFileChange}
-                disabled={processing}
-              />
-            </motion.div>
+                <div className="h-10 w-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
+                  <Car className="h-5 w-5 text-[#D4AF37]" />
+                </div>
+                <h3 className="font-semibold text-sm">Valet Car Request</h3>
+                <p className="text-xs text-zinc-400 font-light leading-relaxed">
+                  Provide your vehicle parking token code to request instant retrieval by our valet staff.
+                </p>
+              </div>
+
+              <div
+                onClick={() => router.push('/services')}
+                className="p-8 border border-white/5 hover:border-[#D4AF37]/50 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer space-y-4"
+              >
+                <div className="h-10 w-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
+                  <Bell className="h-5 w-5 text-[#D4AF37]" />
+                </div>
+                <h3 className="font-semibold text-sm">Staff Assistance</h3>
+                <p className="text-xs text-zinc-400 font-light leading-relaxed">
+                  Call room maintenance, report issues, or demand towels/room cleaning quickly via our ticket panel.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer className="bg-zinc-950 text-white py-16 px-6 border-t border-white/5 font-sans">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 text-left">
+          <div className="space-y-4">
+            <h3 className="text-lg font-serif font-semibold tracking-wider text-[#D4AF37] uppercase">THE PAGE</h3>
+            <p className="text-xs text-zinc-400 font-light leading-relaxed">
+              Experience the pinnacle of hospitality, heritage grandeur, and Awadhi culinary elegance in the Delhi NCR region.
+            </p>
+            <div className="flex gap-4 text-[#D4AF37]">
+              <span className="text-sm">✦</span>
+              <span className="text-sm">✦</span>
+              <span className="text-sm">✦</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Quick Links</h4>
+            <div className="flex flex-col gap-2.5 text-xs text-zinc-400 font-light">
+              <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-white transition-colors text-left">Home</button>
+              <button onClick={() => handleScrollToSection('rooms')} className="hover:text-white transition-colors text-left">Accommodation</button>
+              <button onClick={() => handleScrollToSection('banquet')} className="hover:text-white transition-colors text-left">Banquets</button>
+              <button onClick={() => handleScrollToSection('dining')} className="hover:text-white transition-colors text-left">Dining</button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Palace Address</h4>
+            <div className="space-y-3 text-xs text-zinc-400 font-light">
+              <p className="flex items-start gap-2"><MapPin className="h-4 w-4 shrink-0 text-[#D4AF37]" /> Delhi NCR Road, Sector 15, Near Crown Landmark, India</p>
+              <p className="flex items-center gap-2"><Phone className="h-4 w-4 shrink-0 text-[#D4AF37]" /> +91 98765 43210</p>
+              <p className="flex items-center gap-2"><Mail className="h-4 w-4 shrink-0 text-[#D4AF37]" /> contact@thepagerohtak.com</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Check-In / Access</h4>
+            <p className="text-xs text-zinc-400 font-light leading-relaxed">
+              Guests can scan their in-room QR codes to directly access dining ordering and tickets tracking without login.
+            </p>
+            <button
+              onClick={() => setScannerOpen(true)}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#D4AF37] py-3 text-xs font-bold uppercase tracking-wider text-white shadow hover:bg-[#AE963C] transition-all"
+            >
+              Open Scan Utility
+            </button>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto border-t border-white/5 mt-12 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-zinc-500 font-light">
+          <p>© {new Date().getFullYear()} The Page. All Rights Reserved.</p>
+          <div className="flex gap-4 mt-4 md:mt-0">
+            <Link href="/login?next=/valet" className="hover:text-white transition-colors">Staff Access</Link>
+            <span className="text-zinc-700">|</span>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+          </div>
+        </div>
+      </footer>
+
+      {/* ── Luxury QR Scan Modal / Dialog ── */}
+      {scannerOpen && (
+        <Dialog open onClose={() => setScannerOpen(false)} title="Palace Digital Access Desk" widthClass="max-w-md">
+          <div className="space-y-5 text-center font-sans">
+            <p className="text-xs text-zinc-500 font-light leading-relaxed">
+              Scan the dynamic QR code in your room or table to authenticate, browse the food menu, request valet service, or report housekeeping logs.
+            </p>
+
+            {/* Live Camera Scanner Option */}
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setScannerOpen(true);
+              }}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-950 px-5 py-4 text-xs font-bold uppercase tracking-wider text-white shadow transition-all focus:outline-none"
+            >
+              <Camera className="h-5 w-5 text-[#D4AF37]" />
+              Start Live Camera Scan
+            </button>
+
+            <div className="relative flex items-center justify-center py-1">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-zinc-200" />
+              </div>
+              <span className="relative bg-white px-3 text-[10px] uppercase tracking-widest text-zinc-400">or</span>
+            </div>
+
+            {/* Upload QR Image Option */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={processing}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-zinc-800 transition-all hover:bg-zinc-100 disabled:opacity-60 focus:outline-none"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                  Reading code...
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="h-4 w-4 text-zinc-500" />
+                  Upload Image from Device
+                </>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={processing}
+            />
 
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                role="alert"
-                className="flex max-w-sm items-center gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-left text-sm text-red-600"
+                className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 p-3.5 text-xs text-red-700 text-left"
               >
-                <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <AlertCircle className="h-4.5 w-4.5 shrink-0" />
                 <span>{error}</span>
               </motion.div>
             )}
           </div>
-        </section>
+        </Dialog>
+      )}
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            FEATURED MENU SECTION
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section aria-labelledby="featured-heading" className="mx-auto max-w-7xl px-6 pb-12 pt-16">
-          <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-            <h2
-              id="featured-heading"
-              className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-[#D4AF37]"
-            >
-              <Star className="h-4 w-4" />
-              Featured{featuredKitchen ? ` at ${featuredKitchen.name}` : ' Items'}
-            </h2>
-            {featuredKitchen && (
-              <Link href={fullMenuHref} className="text-sm font-semibold text-[#D4AF37] transition-colors hover:text-[#AE963C]">
-                View full menu →
-              </Link>
-            )}
-          </div>
-
-          <AnimatePresence mode="wait">
-            {isLoadingKitchens || (featuredKitchen && isLoadingMenu) ? (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4"
-              >
-                {Array.from({ length: 4 }).map((_, idx) => (
-                  <ProductCardSkeleton key={idx} />
-                ))}
-              </motion.div>
-            ) : isErrorKitchens || isErrorMenu ? (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="py-8"
-              >
-                <ProductError
-                  onRetry={() => {
-                    if (isErrorKitchens) void refetchKitchens();
-                    else void refetchMenu();
-                  }}
-                />
-              </motion.div>
-            ) : featured.length === 0 ? (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="py-8"
-              >
-                <ProductEmptyState
-                  title="No featured items found"
-                  description="This kitchen currently has no featured recommendations."
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="products"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4"
-              >
-                {featured.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={fullMenuHref}
-                    className="group flex flex-col overflow-hidden rounded-3xl border border-[#ECECEC] bg-white text-left shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
-                  >
-                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#FAF9F6]">
-                      {item.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[#ECECEC]">
-                          <UtensilsCrossed className="h-10 w-10" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-1 flex-col p-4">
-                      <div className="flex items-center gap-2">
-                        <FoodLabel label={item.foodLabel} />
-                        <span className="line-clamp-1 text-sm font-semibold text-[#111111]">
-                          {item.name}
-                        </span>
-                      </div>
-                      <p className="mt-1.5 line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-[#666666]">
-                        {item.description ?? ''}
-                      </p>
-                      <span className="mt-auto pt-3 text-lg font-bold text-[#111111]">
-                        {formatINR(item.price)}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {featuredKitchen && featured.length > 0 && (
-            <>
-              <div className="mt-10 flex justify-center">
-                <Link href={fullMenuHref}>
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-2.5 rounded-2xl border-2 border-[#D4AF37] bg-white px-8 py-3.5 text-sm font-semibold text-[#D4AF37] transition-all duration-300 hover:bg-[#D4AF37] hover:text-white focus:outline-none"
-                  >
-                    <UtensilsCrossed className="h-4 w-4" aria-hidden="true" />
-                    View Full Menu
-                  </button>
-                </Link>
-              </div>
-              <p className="mt-4 text-center text-xs text-[#666666]">
-                Scan your room QR to place an order.
-              </p>
-            </>
-          )}
-        </section>
-
-        <p className="pb-16 text-center text-sm text-[#666666]">
-          Already have an account?{' '}
-          <Link href="/login" className="font-semibold text-[#D4AF37] transition-colors hover:text-[#AE963C]">
-            Sign in
-          </Link>
-        </p>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            FEATURE HIGHLIGHTS
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="bg-[#FAF9F6] py-16 border-t border-[#ECECEC]">
-          <div className="mx-auto max-w-7xl px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="grid grid-cols-2 gap-5 md:grid-cols-4"
-            >
-              {[
-                {
-                  title: 'Secure & Insured',
-                  desc: 'Your vehicle is in safe hands with 24/7 security',
-                  icon: <Shield className="h-5 w-5 text-[#D4AF37]" />,
-                },
-                {
-                  title: 'Real-time Updates',
-                  desc: 'Live status notifications at every step',
-                  icon: <Zap className="h-5 w-5 text-[#D4AF37]" />,
-                },
-                {
-                  title: 'Photo Verified',
-                  desc: '5-angle inspection on every check-in',
-                  icon: <ImageIcon className="h-5 w-5 text-[#D4AF37]" />,
-                },
-                {
-                  title: 'Fast Retrieval',
-                  desc: 'Vehicle ready in minutes, not hours',
-                  icon: <Clock className="h-5 w-5 text-[#D4AF37]" />,
-                },
-              ].map((item, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.1, duration: 0.5 }}
-                  className="group flex flex-col items-center gap-4 rounded-3xl border border-[#ECECEC] bg-white p-8 text-center shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
-                >
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FAF8F0] ring-1 ring-[#D4AF37]/20 transition-all duration-300 group-hover:bg-[#D4AF37] group-hover:ring-transparent group-hover:shadow-lg">
-                    <div className="transition-colors duration-300 group-hover:[&>svg]:text-white">
-                      {item.icon}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <h4 className="text-sm font-bold text-[#111111]">{item.title}</h4>
-                    <p className="text-xs leading-relaxed text-[#666666]">{item.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            HOW IT WORKS SECTION
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="bg-white py-20 sm:py-28 border-y border-[#ECECEC]">
-          <div className="mx-auto max-w-7xl px-8 text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="space-y-4"
-            >
-              <span className="inline-flex items-center gap-2 rounded-full bg-[#FAF8F0] px-5 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] ring-1 ring-[#D4AF37]/20 shadow-sm">
-                Simple, Smart & Secure
-              </span>
-              <h3 className="mt-6 text-4xl font-bold tracking-tight text-[#111111] sm:text-5xl">
-                How Our Digital Valet Works
-              </h3>
-
-              {/* Decorative divider */}
-              <div className="flex items-center justify-center gap-4 py-2">
-                <span className="h-px w-16 bg-[#D4AF37]/30" />
-                <span className="text-[#D4AF37] text-sm">✦</span>
-                <span className="h-px w-16 bg-[#D4AF37]/30" />
-              </div>
-
-              <p className="mx-auto max-w-xl text-base leading-relaxed text-[#666666]">
-                A seamless, photo-inspected check-in and instantaneous real-time request process designed for modern hotels.
-              </p>
-            </motion.div>
-
-            {/* Step Cards */}
-            <div className="mt-20 grid gap-8 sm:grid-cols-2 md:grid-cols-3">
-              {[
-                {
-                  num: '1',
-                  title: 'Guest Arrives',
-                  desc: 'Hand over keys at the entrance. Our valet manager starts the digital parking file.',
-                  icon: <Car className="h-6 w-6 text-[#D4AF37]" />,
-                  time: '< 30 sec',
-                },
-                {
-                  num: '2',
-                  title: 'Register Guest',
-                  desc: 'Valet manager manually inputs guest details (name, room, phone, and email) to initiate registration.',
-                  icon: <User className="h-6 w-6 text-[#D4AF37]" />,
-                  time: '< 15 sec',
-                },
-                {
-                  num: '3',
-                  title: 'Vehicle Inspection',
-                  desc: 'We capture 5 mandatory photos and log pre-existing damages to ensure complete liability coverage.',
-                  icon: <Camera className="h-6 w-6 text-[#D4AF37]" />,
-                  time: '< 1 min',
-                },
-                {
-                  num: '4',
-                  title: 'Parked Securely',
-                  desc: 'System maps your vehicle to a free slot. You get a confirmation email with a secure tracking link.',
-                  icon: <span className="font-extrabold text-lg text-[#D4AF37] font-mono">P</span>,
-                  time: 'Instant',
-                },
-                {
-                  num: '5',
-                  title: 'One-Click Request',
-                  desc: 'Request your vehicle retrieval via the secure link. The valet team is alerted in real time.',
-                  icon: <Bell className="h-6 w-6 text-[#D4AF37]" />,
-                  time: 'Instant',
-                },
-                {
-                  num: '6',
-                  title: 'Delivery & Handover',
-                  desc: 'We bring your car to the lobby and hand over the keys, freeing up the parking slot automatically.',
-                  icon: <Sparkles className="h-6 w-6 text-[#D4AF37]" />,
-                  time: '2-5 mins',
-                },
-              ].map((step) => (
-                <motion.div
-                  key={step.num}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: Number(step.num) * 0.08, duration: 0.5 }}
-                  className="group relative flex min-h-[280px] flex-col items-center justify-between rounded-3xl border border-[#ECECEC] bg-white p-8 pt-14 text-center shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-2"
-                >
-                  {/* Step number badge */}
-                  <div className="absolute -top-4 left-6 flex h-8 w-8 items-center justify-center rounded-full bg-[#FAF8F0] text-xs font-bold text-[#D4AF37] ring-1 ring-[#D4AF37]/20 shadow-sm">
-                    {step.num}
-                  </div>
-
-                  {/* Floating circular icon */}
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex h-16 w-16 items-center justify-center rounded-full bg-[#111111] shadow-xl ring-2 ring-[#D4AF37]/30 transition-all duration-300 group-hover:ring-[#D4AF37] group-hover:shadow-2xl">
-                    {step.icon}
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    <h4 className="text-lg font-bold text-[#111111]">{step.title}</h4>
-                    <p className="mx-auto max-w-[240px] text-sm leading-relaxed text-[#666666]">
-                      {step.desc}
-                    </p>
-                  </div>
-
-                  {/* Time badge */}
-                  <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#FAF8F0] px-4 py-1.5 text-xs font-bold text-[#D4AF37] ring-1 ring-[#D4AF37]/10 shadow-sm">
-                    <Clock className="h-3 w-3" />
-                    {step.time}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            TRACKING PREVIEW SECTION
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="bg-[#FAF9F6] py-20 sm:py-28">
-          <div className="mx-auto max-w-7xl px-8">
-            <div className="grid gap-10 lg:grid-cols-2">
-              {/* Vehicle Tracking Preview */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-                className="flex flex-col justify-between rounded-3xl border border-[#ECECEC] bg-white p-10 shadow-lg transition-all duration-300 hover:shadow-xl"
-              >
-                <div className="space-y-5">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-2xl bg-[#111111] px-4 py-1.5 text-[10px] font-bold text-white uppercase tracking-[0.15em]">
-                      Preview Board
-                    </span>
-                    <h4 className="text-xl font-bold text-[#111111]">Vehicle Tracking Screen</h4>
-                  </div>
-                  <p className="text-sm leading-relaxed text-[#666666]">
-                    See exactly how guests monitor their vehicle. A live view detailing car registration, key information, and parking assignments.
-                  </p>
-
-                  {/* Mockup Card */}
-                  <div className="rounded-2xl border border-[#ECECEC] bg-[#FAF9F6] p-6 space-y-5 text-left">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#666666]">Car Plate</span>
-                        <div className="text-xl font-bold text-[#111111]">KA-03-MR-9821</div>
-                        <div className="text-sm text-[#666666]">Mercedes-Benz C-Class (Silver)</div>
-                      </div>
-                      <div className="rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-semibold text-emerald-600 ring-1 ring-emerald-100 flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        Parked
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-5 border-t border-[#ECECEC] pt-4">
-                      <div>
-                        <span className="text-[#666666] block uppercase tracking-[0.15em] text-[9px] font-bold">Key Tag</span>
-                        <span className="font-semibold text-[#111111]">#K-104</span>
-                      </div>
-                      <div>
-                        <span className="text-[#666666] block uppercase tracking-[0.15em] text-[9px] font-bold">Assigned Slot</span>
-                        <span className="font-semibold text-[#111111]">P-24</span>
-                      </div>
-                      <div>
-                        <span className="text-[#666666] block uppercase tracking-[0.15em] text-[9px] font-bold">Check-In</span>
-                        <span className="font-semibold text-[#111111]">10:45 AM (Today)</span>
-                      </div>
-                      <div>
-                        <span className="text-[#666666] block uppercase tracking-[0.15em] text-[9px] font-bold">Fuel Level</span>
-                        <span className="font-semibold text-[#111111]">Half Tank</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 pt-5 border-t border-[#ECECEC]">
-                  <span className="text-sm text-[#666666] italic">Guests can view this interface securely by searching their plate number.</span>
-                </div>
-              </motion.div>
-
-              {/* Request Vehicle Preview */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.15 }}
-                className="flex flex-col justify-between rounded-3xl border border-[#ECECEC] bg-white p-10 shadow-lg transition-all duration-300 hover:shadow-xl"
-              >
-                <div className="space-y-5">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-2xl bg-[#D4AF37] px-4 py-1.5 text-[10px] font-bold text-white uppercase tracking-[0.15em]">
-                      Request flow
-                    </span>
-                    <h4 className="text-xl font-bold text-[#111111]">Real-Time Stepper Progress</h4>
-                  </div>
-                  <p className="text-sm leading-relaxed text-[#666666]">
-                    {"Watch the vehicle status progress live on the guest's tracking screen as the valet team retrieves and delivers the car."}
-                  </p>
-
-                  {/* Live Stepper Mockup */}
-                  <div className="rounded-2xl border border-[#ECECEC] bg-[#FAF9F6] p-6 space-y-4 text-left">
-                    <div className="space-y-4">
-                      {[
-                        { label: 'Vehicle Requested', active: true, time: '11:10 AM' },
-                        { label: 'Valet Assigned (Rohan M.)', active: true, time: '11:11 AM' },
-                        { label: 'Vehicle Being Brought', active: true, time: '11:12 AM' },
-                        { label: 'Ready Outside (Lobby Entrance)', active: false, time: '--' },
-                        { label: 'Delivered', active: false, time: '--' },
-                      ].map((step, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-3">
-                            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${
-                              step.active
-                                ? 'bg-[#D4AF37] text-white shadow-md'
-                                : 'border-2 border-[#ECECEC] bg-white text-[#666666]'
-                            }`}>
-                              {idx + 1}
-                            </div>
-                            <span className={step.active ? 'font-semibold text-[#111111]' : 'text-[#666666]'}>
-                              {step.label}
-                            </span>
-                          </div>
-                          <span className="text-xs text-[#666666] font-mono">{step.time}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 pt-5 border-t border-[#ECECEC]">
-                  <span className="text-sm text-[#666666] italic">Driven dynamically by WebSocket events (Socket.io) with zero polling delay.</span>
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            FAQ SECTION
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="bg-white py-20 sm:py-28 border-t border-[#ECECEC]">
-          <div className="mx-auto max-w-3xl px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="text-center mb-16 space-y-3"
-            >
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4AF37]">FAQ</span>
-              <h3 className="text-4xl font-bold tracking-tight text-[#111111]">
-                Frequently Asked Questions
-              </h3>
-              <div className="flex items-center justify-center gap-4 pt-1">
-                <span className="h-px w-16 bg-[#D4AF37]/30" />
-                <span className="text-[#D4AF37] text-sm">✦</span>
-                <span className="h-px w-16 bg-[#D4AF37]/30" />
-              </div>
-            </motion.div>
-
-            <div className="space-y-4">
-              {[
-                {
-                  q: 'Is my vehicle safe in the valet parking lot?',
-                  a: 'Absolutely. The valet parking facility is under 24/7 security surveillance and gated protection. Our valet managers perform full vehicle condition photo inspections during check-in to log pre-existing conditions and ensure total security.',
-                },
-                {
-                  q: 'How long does it take to retrieve my car?',
-                  a: 'Typically, it takes between 5 to 8 minutes from the moment you click "Request Vehicle" in the app until the car is parked ready outside the main entrance. You can track this process step-by-step.',
-                },
-                {
-                  q: 'Do I need a paper ticket or slip?',
-                  a: 'No. Our valet parking system is 100% digital. We log your vehicle plate number, room number, and key tag electronically. You only need to input your car plate number in the app to track or request your car.',
-                },
-                {
-                  q: 'How do I authenticate as a Valet Manager?',
-                  a: 'Valet Managers receive dedicated staff credentials (email & password) from the hotel administration. You can sign in via the Valet Staff Login link to access the queue board and scan guest codes.',
-                },
-              ].map((faq, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.05, duration: 0.4 }}
-                  className="rounded-3xl border border-[#ECECEC] bg-white shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                    className="flex w-full items-center justify-between px-8 py-6 text-left transition-colors hover:bg-[#FAF9F6]"
-                  >
-                    <h4 className="text-base font-semibold text-[#111111] pr-4">{faq.q}</h4>
-                    <ChevronDown
-                      className={`h-5 w-5 shrink-0 text-[#D4AF37] transition-transform duration-300 ${openFaq === idx ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  <AnimatePresence>
-                    {openFaq === idx && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                      >
-                        <p className="px-8 pb-6 text-sm leading-[1.8] text-[#666666]">{faq.a}</p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            FINAL CTA
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="bg-[#FAF9F6] py-20 sm:py-28">
-          <div className="mx-auto max-w-7xl px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="relative overflow-hidden rounded-3xl bg-[#111111] px-10 py-20 text-center text-white shadow-2xl"
-            >
-              {/* Decorative gradient overlays */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#D4AF37_0%,transparent_50%)] opacity-10 pointer-events-none" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,#D4AF37_0%,transparent_40%)] opacity-5 pointer-events-none" />
-
-              <div className="relative mx-auto max-w-xl space-y-8">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#D4AF37] ring-1 ring-[#D4AF37]/30">
-                  Instant Retrieval
-                </span>
-                <h3 className="text-4xl font-bold tracking-tight sm:text-5xl">Ready to depart?</h3>
-                <p className="text-base leading-relaxed text-zinc-300 sm:text-lg">
-                  Request your vehicle from the comfort of your hotel room, and it will be waiting for you outside by the lobby when you arrive.
-                </p>
-                <div className="flex flex-wrap justify-center gap-4 pt-2">
-                  <Link href="/valet-tracking">
-                    <button
-                      type="button"
-                      className="rounded-2xl bg-[#D4AF37] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#AE963C] hover:shadow-xl active:scale-[0.98]"
-                    >
-                      Request Your Car Now
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      </main>
-
-      <SiteFooter />
-
+      {/* Actual QrScanner Trigger Component */}
       {scannerOpen && (
         <QrScanner
           onDetected={processDecoded}

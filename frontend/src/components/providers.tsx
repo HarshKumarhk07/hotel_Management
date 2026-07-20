@@ -4,8 +4,21 @@ import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthBootstrap } from '@/hooks/useAuth';
 
+import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+
 function AuthBootstrap({ children }: { children: ReactNode }) {
   useAuthBootstrap();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (pathname && pathname.startsWith('/valet')) {
+      document.body.classList.remove('sharp-edges');
+    } else {
+      document.body.classList.add('sharp-edges');
+    }
+  }, [pathname]);
+
   return <>{children}</>;
 }
 

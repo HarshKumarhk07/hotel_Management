@@ -2,49 +2,56 @@
 
 import { useState } from 'react';
 import NextImage from 'next/image';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { Calendar, User, Phone, Mail, Sparkles, Shield, Clock, Search, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { SiteNav } from '@/components/site/SiteNav';
+import { useQuery } from '@tanstack/react-query';
+import { Calendar, User, Phone, Mail, Sparkles, Shield, Clock, Search, ArrowRight, CheckCircle2, ChevronRight, Tag } from 'lucide-react';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { Button } from '@/components/ui/button';
 import { Card, CenteredSpinner, EmptyState, Badge } from '@/components/ui/primitives';
-import { Dialog } from '@/components/ui/dialog';
-import { Field, Input, FieldError } from '@/components/ui/input';
-import { api, apiErrorMessage } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { Field, Input } from '@/components/ui/input';
+import { api } from '@/lib/api';
+import { formatDate, formatINR } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 interface AvailableRoom {
   _id: string;
   roomNumber: string;
   floor: number;
   status: string;
-  kitchen?: { name: string };
+  roomType: string;
+  capacity: number;
+  bedType: string;
+  roomSizeSqFt: number;
+  amenities: string[];
+  pricePerNight: number;
+  images: string[];
+  cancellationPolicy: string;
 }
 
 interface CustomerBooking {
   _id: string;
-  room: { roomNumber: string; floor: number };
+  room: { roomNumber: string; floor: number; roomType: string };
   guestName: string;
   checkInDate: string;
   checkOutDate: string;
   totalPrice: number;
   status: string;
   paymentStatus: string;
+  confirmationNumber?: string;
 }
 
 export default function GuestRoomsPage() {
+  const router = useRouter();
+
+  // Search dates and preferences
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
   const [floor, setFloor] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
-  const [bookingRoom, setBookingRoom] = useState<AvailableRoom | null>(null);
+  const [roomType, setRoomType] = useState('');
+  const [guestCount, setGuestCount] = useState('1');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
 
-  // Booking form details
-  const [guestName, setGuestName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [successBooking, setSuccessBooking] = useState<any | null>(null);
+  const hasSearched = !!checkIn && !!checkOut;
 
   // My bookings lookup
   const [lookupValue, setLookupValue] = useState('');
@@ -52,14 +59,18 @@ export default function GuestRoomsPage() {
 
   // Fetch available rooms
   const { data: rooms, isLoading: isSearching, refetch: executeSearch } = useQuery({
-    queryKey: ['available-rooms', checkIn, checkOut, floor],
-    enabled: false,
+    queryKey: ['available-rooms', checkIn, checkOut, floor, roomType, minPrice, maxPrice, guestCount],
+    enabled: !!checkIn && !!checkOut,
     queryFn: async () => {
       const res = await api.get<{ data: { rooms: AvailableRoom[] } }>('/rooms/search', {
         params: {
-          checkInDate: new Date(checkIn).toISOString(),
-          checkOutDate: new Date(checkOut).toISOString(),
+          checkInDate: checkIn ? new Date(checkIn).toISOString() : undefined,
+          checkOutDate: checkOut ? new Date(checkOut).toISOString() : undefined,
           floor: floor ? Number(floor) : undefined,
+          roomType: roomType || undefined,
+          minPrice: minPrice ? Number(minPrice) : undefined,
+          maxPrice: maxPrice ? Number(maxPrice) : undefined,
+          guestCount: guestCount ? Number(guestCount) : undefined,
         },
       });
       return res.data.data.rooms;
@@ -82,7 +93,6 @@ export default function GuestRoomsPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!checkIn || !checkOut) return;
-    setHasSearched(true);
     executeSearch();
   };
 
@@ -93,65 +103,45 @@ export default function GuestRoomsPage() {
     executeLookup();
   };
 
-  // Submit booking mutation
-  const bookMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      const res = await api.post('/rooms/bookings', payload);
-      return res.data.data.booking;
-    },
-    onSuccess: (data) => {
-      setSuccessBooking(data);
-      setBookingRoom(null);
-      setGuestName('');
-      setPhone('');
-      setEmail('');
-      // Invalidate lookup to refresh lists
-      if (lookupValue) executeLookup();
-    },
-    onError: (err) => {
-      setSubmitError(apiErrorMessage(err, 'Could not complete booking reservation.'));
-    },
-  });
+  const handleBookRedirect = (room: AvailableRoom) => {
+    if (!checkIn || !checkOut) {
+      alert('Please fill out check-in and check-out dates to confirm availability.');
+      return;
+    }
+    router.push(
+      `/rooms/book?room=${room._id}&checkIn=${checkIn}&checkOut=${checkOut}&guestCount=${guestCount}`
+    );
+  };
 
-  const handleBookSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bookingRoom || !checkIn || !checkOut) return;
-    setSubmitError(null);
-    bookMutation.mutate({
-      room: bookingRoom._id,
-      guestName,
-      phone,
-      email,
-      checkInDate: new Date(checkIn).toISOString(),
-      checkOutDate: new Date(checkOut).toISOString(),
-    });
+  const handleDetailsRedirect = (room: AvailableRoom) => {
+    router.push(
+      `/rooms/${room._id}?checkInDate=${checkIn}&checkOutDate=${checkOut}&guestCount=${guestCount}`
+    );
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#FAF9F6]">
-      <SiteNav fullMenuHref="/" />
-
+    <div className="flex min-h-screen flex-col bg-[#FAF9F6] font-sans selection:bg-[#D4AF37]/20">
       <main className="flex-1">
         {/* Banner Section */}
-        <section className="relative bg-[#111111] py-20 text-white">
+        <section className="relative bg-[#111111] py-24 text-white overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#D4AF37_0%,transparent_50%)] opacity-20 pointer-events-none" />
           <div className="relative mx-auto max-w-7xl px-8 text-center space-y-4">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#D4AF37] ring-1 ring-[#D4AF37]/30">
               Luxury Stays
             </span>
-            <h1 className="text-4xl font-bold sm:text-6xl tracking-tight">Luxury Room Booking</h1>
-            <p className="mx-auto max-w-xl text-zinc-300 text-sm sm:text-base leading-relaxed">
-              Reserve your premium suite at The Page Hotel. Experience world-class hospitality, in-room dining, and personal valet services.
+            <h1 className="text-4xl font-serif sm:text-6xl tracking-tight uppercase">Luxury Accommodations</h1>
+            <p className="mx-auto max-w-xl text-zinc-300 text-sm leading-relaxed">
+              Reserve your premium suite at The Page Hotel. Experience world-class hospitality, check-in timelines, private valet service, and gourmet in-room dining.
             </p>
           </div>
         </section>
 
         {/* Date search bar */}
-        <section className="mx-auto max-w-5xl px-8 -mt-8 relative z-10">
+        <section className="mx-auto max-w-6xl px-6 -mt-12 relative z-10">
           <Card className="p-6 shadow-xl border-[#ECECEC] bg-white rounded-3xl">
-            <form onSubmit={handleSearch} className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 md:items-end">
-              <Field label="Check-In Date">
-                <div className="relative">
+            <form onSubmit={handleSearch} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 md:items-end">
+                <Field label="Check-In Date">
                   <Input
                     type="date"
                     required
@@ -159,10 +149,8 @@ export default function GuestRoomsPage() {
                     onChange={(e) => setCheckIn(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
                   />
-                </div>
-              </Field>
-              <Field label="Check-Out Date">
-                <div className="relative">
+                </Field>
+                <Field label="Check-Out Date">
                   <Input
                     type="date"
                     required
@@ -170,44 +158,84 @@ export default function GuestRoomsPage() {
                     onChange={(e) => setCheckOut(e.target.value)}
                     min={checkIn || new Date().toISOString().split('T')[0]}
                   />
+                </Field>
+                <Field label="Room Type Class">
+                  <select
+                    value={roomType}
+                    onChange={(e) => setRoomType(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  >
+                    <option value="">Any Room Type</option>
+                    <option value="STANDARD">Standard Class</option>
+                    <option value="DELUXE">Deluxe Class</option>
+                    <option value="EXECUTIVE">Executive Class</option>
+                    <option value="SUITE">Junior Suite</option>
+                    <option value="PRESIDENTIAL">Presidential Penthouse</option>
+                  </select>
+                </Field>
+                <Button type="submit" className="bg-[#D4AF37] hover:bg-[#AE963C] text-white h-11 w-full rounded-xl gap-2 font-bold uppercase tracking-wider text-xs shadow-md">
+                  <Search className="h-4 w-4" /> Check Availability
+                </Button>
+              </div>
+
+              {/* Extra Filters */}
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-4 pt-2 border-t text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">Guest Count</label>
+                  <select
+                    value={guestCount}
+                    onChange={(e) => setGuestCount(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 font-semibold focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  >
+                    <option value="1">1 Guest</option>
+                    <option value="2">2 Guests</option>
+                    <option value="3">3 Guests</option>
+                    <option value="4">4 Guests</option>
+                  </select>
                 </div>
-              </Field>
-              <Field label="Floor Preference">
-                <select
-                  value={floor}
-                  onChange={(e) => setFloor(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
-                >
-                  <option value="">Any Floor</option>
-                  <option value="1">1st Floor</option>
-                  <option value="2">2nd Floor</option>
-                  <option value="3">3rd Floor</option>
-                </select>
-              </Field>
-              <Button type="submit" className="bg-[#D4AF37] hover:bg-[#AE963C] text-white h-11 w-full rounded-xl gap-2 font-semibold">
-                <Search className="h-4 w-4" /> Check Availability
-              </Button>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">Floor level</label>
+                  <select
+                    value={floor}
+                    onChange={(e) => setFloor(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 font-semibold focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  >
+                    <option value="">Any Floor</option>
+                    <option value="1">1st Floor</option>
+                    <option value="2">2nd Floor</option>
+                    <option value="3">3rd Floor</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">Min Price (₹)</label>
+                  <Input type="number" placeholder="0" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">Max Price (₹)</label>
+                  <Input type="number" placeholder="30000" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="h-9" />
+                </div>
+              </div>
             </form>
           </Card>
         </section>
 
         {/* Available Rooms Grid */}
-        <section className="mx-auto max-w-7xl px-8 py-16">
+        <section className="mx-auto max-w-7xl px-6 py-16">
           {hasSearched && (
             <div className="space-y-6">
-              <h2 className="text-xs font-bold uppercase tracking-[0.15em] text-[#D4AF37]">Available Accommodations</h2>
+              <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-[#D4AF37] border-b pb-2">Available Accommodations</h2>
               {isSearching ? (
                 <CenteredSpinner />
               ) : !rooms || rooms.length === 0 ? (
-                <EmptyState title="No rooms available" description="All rooms are booked for the selected dates. Try adjusting your dates." />
+                <EmptyState title="No rooms available" description="All suites of this class are occupied. Try modifying your dates or price filters." />
               ) : (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {rooms.map((room) => (
                     <Card key={room._id} className="overflow-hidden bg-white border border-[#ECECEC] rounded-3xl flex flex-col justify-between group shadow-sm transition-all duration-300 hover:shadow-xl">
-                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100">
+                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100 cursor-pointer" onClick={() => handleDetailsRedirect(room)}>
                         <NextImage
-                          src="/hotel1.png"
-                          alt="Luxury suite"
+                          src={room.images?.[0] || '/hotel1.png'}
+                          alt={room.roomType}
                           fill
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                           sizes="(max-width: 768px) 100vw, 30vw"
@@ -215,27 +243,40 @@ export default function GuestRoomsPage() {
                         <div className="absolute top-4 left-4 rounded-xl bg-black/60 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white">
                           Floor {room.floor}
                         </div>
+                        <div className="absolute top-4 right-4 rounded-xl bg-[#D4AF37]/90 backdrop-blur-md px-3 py-1 text-xs font-bold text-white uppercase tracking-wider">
+                          {room.roomType}
+                        </div>
                       </div>
                       <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                        <div className="space-y-2">
-                          <h3 className="text-xl font-bold text-[#111111]">Premium Luxury Room {room.roomNumber}</h3>
-                          <p className="text-xs text-zinc-500">Includes secure QR ordering, direct in-room KDS delivery service, and smart valet support.</p>
+                        <div className="space-y-2 cursor-pointer" onClick={() => handleDetailsRedirect(room)}>
+                          <h3 className="text-xl font-serif text-zinc-950 font-semibold group-hover:text-[#D4AF37] transition-colors">{room.roomType} Room {room.roomNumber}</h3>
+                          <p className="text-xs text-zinc-500 line-clamp-2">Capacity: {room.capacity} Adults | Bed: {room.bedType} Size | Area: {room.roomSizeSqFt} sqft</p>
                           <div className="flex items-center gap-4 text-xs text-zinc-400 font-semibold pt-1">
                             <span className="flex items-center gap-1"><Shield className="h-3.5 w-3.5 text-[#D4AF37]" /> Fully Insured</span>
-                            <span className="flex items-center gap-1"><Sparkles className="h-3.5 w-3.5 text-[#D4AF37]" /> Luxury Linens</span>
+                            <span className="flex items-center gap-1"><Sparkles className="h-3.5 w-3.5 text-[#D4AF37]" /> Luxury Amenities</span>
                           </div>
                         </div>
                         <div className="pt-4 border-t border-[#ECECEC] flex items-center justify-between">
                           <div>
                             <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Per Night</span>
-                            <span className="text-xl font-bold text-[#111111]">₹5,000</span>
+                            <span className="text-xl font-bold text-zinc-900">{formatINR(room.pricePerNight)}</span>
                           </div>
-                          <Button
-                            onClick={() => setBookingRoom(room)}
-                            className="bg-[#111111] hover:bg-[#222222] text-white rounded-xl font-semibold gap-1.5"
-                          >
-                            Book Room <ArrowRight className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDetailsRedirect(room)}
+                              className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold"
+                            >
+                              Details
+                            </Button>
+                            <Button
+                              onClick={() => handleBookRedirect(room)}
+                              className="bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-1 shadow"
+                            >
+                              Book <ArrowRight className="h-3.5 w-3.5 text-[#D4AF37]" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </Card>
@@ -251,8 +292,8 @@ export default function GuestRoomsPage() {
           <div className="mx-auto max-w-3xl px-8 space-y-8">
             <div className="text-center space-y-2">
               <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4AF37]">Lookup Reservation</span>
-              <h2 className="text-3xl font-bold tracking-tight text-zinc-900">Manage Your Booking</h2>
-              <p className="text-sm text-zinc-500">Enter your email address or phone number to check reservation status or retrieve checkout codes.</p>
+              <h2 className="text-3xl font-serif tracking-tight text-zinc-900 uppercase font-semibold">Manage Your Booking</h2>
+              <p className="text-sm text-zinc-500">Enter your email address or phone number to check reservation status or retrieve check-in tickets.</p>
             </div>
 
             <Card className="p-5 border-[#ECECEC] bg-[#FAF9F6] rounded-3xl">
@@ -265,7 +306,7 @@ export default function GuestRoomsPage() {
                   onChange={(e) => setLookupValue(e.target.value)}
                   className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
                 />
-                <Button type="submit" className="bg-[#111111] hover:bg-[#222222] text-white rounded-xl px-6 h-11 font-semibold">
+                <Button type="submit" className="bg-[#111111] hover:bg-[#222222] text-white rounded-xl px-6 h-11 font-bold text-xs uppercase tracking-wider shadow">
                   Search Bookings
                 </Button>
               </form>
@@ -279,15 +320,18 @@ export default function GuestRoomsPage() {
                   <p className="text-center text-sm text-zinc-500">No active bookings found matching your request details.</p>
                 ) : (
                   myBookings.map((b) => (
-                    <Card key={b._id} className="p-5 border-[#ECECEC] bg-white rounded-2xl flex justify-between items-center">
+                    <Card key={b._id} className="p-5 border-[#ECECEC] bg-white rounded-2xl flex justify-between items-center shadow-sm">
                       <div className="space-y-1">
-                        <p className="font-bold text-zinc-900 text-lg">Room {b.room?.roomNumber || 'Unknown'}</p>
-                        <p className="text-xs text-zinc-500">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-zinc-900 text-lg">Room {b.room?.roomNumber || 'Unknown'}</p>
+                          <Badge className="bg-zinc-100 text-zinc-600 font-mono text-[9px]">{b.confirmationNumber || 'CONF-XYZ'}</Badge>
+                        </div>
+                        <p className="text-xs text-zinc-500 font-semibold">
                           Check-in: {formatDate(b.checkInDate)} | Check-out: {formatDate(b.checkOutDate)}
                         </p>
-                        <p className="text-xs font-semibold text-zinc-700">Guest: {b.guestName} | Total Price: ₹{b.totalPrice}</p>
+                        <p className="text-xs font-semibold text-zinc-700">Guest: {b.guestName} | Total Price: {formatINR(b.totalPrice)}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-1.5">
+                      <div className="flex flex-col items-end gap-2">
                         <Badge className={`
                           ${b.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' : ''}
                           ${b.status === 'CONFIRMED' ? 'bg-blue-50 text-blue-700' : ''}
@@ -297,6 +341,12 @@ export default function GuestRoomsPage() {
                         `}>
                           {b.status}
                         </Badge>
+                        <button
+                          onClick={() => router.push(`/rooms/confirm/${b._id}`)}
+                          className="text-[10px] font-bold text-[#D4AF37] hover:underline flex items-center gap-0.5"
+                        >
+                          View Ticket <ChevronRight className="h-3 w-3" />
+                        </button>
                       </div>
                     </Card>
                   ))
@@ -305,63 +355,6 @@ export default function GuestRoomsPage() {
             )}
           </div>
         </section>
-
-        {/* Success Modal */}
-        {successBooking && (
-          <Dialog open onClose={() => setSuccessBooking(null)} title="Booking Submitted Successfully">
-            <div className="text-center space-y-4 py-4">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-bold text-lg text-zinc-900">Your reservation has been received!</h4>
-                <p className="text-xs text-zinc-500">Room booking is currently in pending state. Hotel administration will review and confirm shortly.</p>
-              </div>
-              <div className="rounded-xl border bg-zinc-50 p-4 text-left text-xs space-y-1.5">
-                <p><span className="font-bold text-zinc-500">Booking ID:</span> {successBooking._id}</p>
-                <p><span className="font-bold text-zinc-500">Guest Name:</span> {successBooking.guestName}</p>
-                <p><span className="font-bold text-zinc-500">Check-in:</span> {formatDate(successBooking.checkInDate)}</p>
-                <p><span className="font-bold text-zinc-500">Check-out:</span> {formatDate(successBooking.checkOutDate)}</p>
-                <p><span className="font-bold text-zinc-500">Total Nights Price:</span> ₹{successBooking.totalPrice}</p>
-              </div>
-              <Button onClick={() => setSuccessBooking(null)} className="w-full bg-[#111111] hover:bg-[#222222] text-white rounded-xl">
-                Close
-              </Button>
-            </div>
-          </Dialog>
-        )}
-
-        {/* Booking Creation Dialog */}
-        {bookingRoom && (
-          <Dialog open onClose={() => setBookingRoom(null)} title={`Book Room ${bookingRoom.roomNumber}`}>
-            <form onSubmit={handleBookSubmit} className="space-y-4">
-              <div className="rounded-xl border bg-[#FAF9F6] p-3 text-xs flex justify-between">
-                <span>Check-in: <b>{formatDate(checkIn)}</b></span>
-                <span>Check-out: <b>{formatDate(checkOut)}</b></span>
-              </div>
-              <Field label="Guest Full Name">
-                <Input required placeholder="John Doe" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Phone Number">
-                  <Input required placeholder="+91 99999 88888" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </Field>
-                <Field label="Email Address">
-                  <Input required type="email" placeholder="john@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </Field>
-              </div>
-              {submitError && <FieldError message={submitError} />}
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="ghost" onClick={() => setBookingRoom(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={bookMutation.isPending} className="bg-[#D4AF37] hover:bg-[#AE963C] text-white">
-                  {bookMutation.isPending ? 'Submitting Reservation…' : 'Submit Reservation'}
-                </Button>
-              </div>
-            </form>
-          </Dialog>
-        )}
       </main>
 
       <SiteFooter />

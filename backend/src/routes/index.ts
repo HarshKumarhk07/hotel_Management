@@ -16,6 +16,9 @@ import guestRoutes from '@/modules/guest/guest.routes';
 import staffRoutes from '@/modules/staff/staff.routes';
 import bannerRoutes from '@/modules/banner/banner.routes';
 import banquetRoutes from '@/modules/banquet/banquet.routes';
+import complaintRoutes from '@/modules/complaint/complaint.routes';
+import feedbackRoutes from '@/modules/feedback/feedback.routes';
+
 import { ok } from '@/utils/apiResponse';
 import { uploadImage as uploadImageMw } from '@/middleware/upload';
 import { uploadImage } from '@/services/cloudinary.service';
@@ -60,6 +63,9 @@ router.use('/guests', guestRoutes);
 router.use('/staff', staffRoutes);
 router.use('/banners', bannerRoutes);
 router.use('/banquets', banquetRoutes);
+router.use('/complaints', complaintRoutes);
+router.use('/feedback', feedbackRoutes);
+
 
 router.post(
   '/upload',

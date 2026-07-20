@@ -32,11 +32,19 @@ export function uploadImage(buffer: Buffer, folder = 'kds/menu'): Promise<Upload
   ensureConfigured();
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: 'image', transformation: [{ quality: 'auto', fetch_format: 'auto' }] },
+      {
+        folder,
+        resource_type: 'image',
+        quality: 'auto',
+        fetch_format: 'auto',
+      },
       (err, result) => {
         if (err || !result) {
-          logger.error({ err }, 'Cloudinary upload failed');
-          reject(AppError.internal('Image upload failed', 'UPLOAD_FAILED'));
+          logger.error({ err, errDetail: err?.message, errHttp: (err as any)?.http_code }, 'Cloudinary upload failed');
+          reject(AppError.internal(
+            err?.message ?? 'Image upload failed',
+            'UPLOAD_FAILED',
+          ));
           return;
         }
         resolve({ url: result.secure_url, publicId: result.public_id });

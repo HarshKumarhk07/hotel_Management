@@ -35,3 +35,8 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Sharp corners style requested by user, applied outside valet portal */
+.sharp-edges, .sharp-edges * {
+  border-radius: 0px !important;
+}

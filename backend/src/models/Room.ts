@@ -23,8 +23,19 @@ export interface IRoom extends Document {
   /** Which kitchen serves this room (single- or multi-kitchen hotels). */
   kitchen?: Types.ObjectId;
   isActive: boolean;
-  status: 'AVAILABLE' | 'OCCUPIED' | 'CLEANING' | 'MAINTENANCE';
+  status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'CLEANING' | 'MAINTENANCE' | 'BLOCKED' | 'OUT_OF_SERVICE' | 'VIP_RESERVED';
   qr: IRoomQr;
+  roomType: 'STANDARD' | 'DELUXE' | 'EXECUTIVE' | 'SUITE' | 'PRESIDENTIAL';
+  capacity: number;
+  bedType: 'SINGLE' | 'DOUBLE' | 'QUEEN' | 'KING';
+  roomSizeSqFt: number;
+  amenities: string[];
+  pricePerNight: number;
+  images: string[];
+  cancellationPolicy: string;
+  rules: string[];
+  checkInTime: string;
+  checkOutTime: string;
   /** Internal-only note, never exposed on customer-facing APIs. */
   internalNote?: string;
   createdAt: Date;
@@ -39,10 +50,30 @@ const roomSchema = new Schema<IRoom>(
     isActive: { type: Boolean, default: true, index: true },
     status: {
       type: String,
-      enum: ['AVAILABLE', 'OCCUPIED', 'CLEANING', 'MAINTENANCE'],
+      enum: ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'CLEANING', 'MAINTENANCE', 'BLOCKED', 'OUT_OF_SERVICE', 'VIP_RESERVED'],
       default: 'AVAILABLE',
       index: true,
     },
+    roomType: {
+      type: String,
+      enum: ['STANDARD', 'DELUXE', 'EXECUTIVE', 'SUITE', 'PRESIDENTIAL'],
+      default: 'STANDARD',
+      index: true,
+    },
+    capacity: { type: Number, default: 2 },
+    bedType: {
+      type: String,
+      enum: ['SINGLE', 'DOUBLE', 'QUEEN', 'KING'],
+      default: 'KING',
+    },
+    roomSizeSqFt: { type: Number, default: 350 },
+    amenities: { type: [String], default: [] },
+    pricePerNight: { type: Number, default: 5000 },
+    images: { type: [String], default: [] },
+    cancellationPolicy: { type: String, default: 'Free cancellation 24 hours prior to check-in.' },
+    rules: { type: [String], default: [] },
+    checkInTime: { type: String, default: '14:00' },
+    checkOutTime: { type: String, default: '12:00' },
     qr: {
       token: { type: String, required: true, unique: true, index: true },
       isActive: { type: Boolean, default: true },

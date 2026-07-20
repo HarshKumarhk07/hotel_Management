@@ -1,4 +1,4 @@
-﻿import type { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { asyncHandler } from '@/utils/asyncHandler';
 import { ok } from '@/utils/apiResponse';
 import { validate } from '@/middleware/validate';
@@ -65,7 +65,7 @@ export const seatTableHandler = [
 ];
 
 export const requestBillHandler = asyncHandler(async (req: Request, res: Response) => {
-  const table = await svc.requestBill(req.params.id, userId(req));
+  const table = await svc.requestBill(req.params.id, req.body.billAmount, userId(req));
   ok(res, table);
 });
 

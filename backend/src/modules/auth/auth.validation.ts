@@ -12,7 +12,7 @@ export const registerSchema = z.object({
   name: z.string().trim().min(2, 'Name is too short').max(120),
   email,
   password,
-  phone: z.string().trim().min(6).max(20).optional(),
+  phone: z.string().trim().min(6).max(20).optional().or(z.literal('')),
 });
 
 export const loginSchema = z.object({

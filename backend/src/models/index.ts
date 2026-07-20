@@ -49,8 +49,14 @@ export { BanquetBooking, type IBanquetBooking } from './BanquetBooking';
 
 // Room Booking Module Models
 export { RoomBooking, type IRoomBooking } from './RoomBooking';
+export { BookingInvoice, type IBookingInvoice } from './BookingInvoice';
 
 // Restaurant Waitlist Module Models
 export { Waitlist, type IWaitlist } from './Waitlist';
+
+// Complaint and Feedback Models
+export { Complaint, type IComplaint } from './Complaint';
+export { Feedback, type IFeedback } from './Feedback';
+
 
 

@@ -10,6 +10,8 @@ import {
   valetReadyTemplate,
   valetDeliveredTemplate,
   valetWelcomeTemplate,
+  roomBookingConfirmationTemplate,
+  roomBookingPendingTemplate,
   type EmailContent,
   type SecurityAlertData,
 } from './templates';
@@ -78,5 +80,49 @@ export const emailService = {
   },
   sendValetWelcome(to: string, name: string, tempPassword: string) {
     return send(to, valetWelcomeTemplate(name, to, tempPassword));
+  },
+  sendRoomBookingConfirmation(
+    to: string,
+    name: string,
+    roomNumber: string,
+    checkInDate: string,
+    checkOutDate: string,
+    confirmationNumber: string,
+    amountPaid: number
+  ) {
+    return send(
+      to,
+      roomBookingConfirmationTemplate(
+        name,
+        roomNumber,
+        checkInDate,
+        checkOutDate,
+        confirmationNumber,
+        amountPaid
+      )
+    );
+  },
+  sendRoomBookingPending(
+    to: string,
+    name: string,
+    roomNumber: string,
+    checkInDate: string,
+    checkOutDate: string,
+    confirmationNumber: string,
+    totalAmount: number,
+    payAtHotel: boolean
+  ) {
+    return send(
+      to,
+      roomBookingPendingTemplate(
+        name,
+        roomNumber,
+        checkInDate,
+        checkOutDate,
+        confirmationNumber,
+        totalAmount,
+        payAtHotel
+      )
+    );
   },
 };

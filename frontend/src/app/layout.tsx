@@ -5,8 +5,21 @@ import { Providers } from '@/components/providers';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
+if (typeof window !== 'undefined') {
+  const originalPlay = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function play() {
+    return originalPlay.apply(this, arguments as any).catch((error: any) => {
+      if (error && error.name === 'AbortError') {
+        // Suppress "The play() request was interrupted because the media was removed from the document"
+        return;
+      }
+      throw error;
+    });
+  };
+}
+
 export const metadata: Metadata = {
-  title: 'Room Service',
+  title: 'The Page - Luxury Hotel & Banquets',
   description: 'Scan, browse the kitchen menu, and order food straight to your room.',
 };
 

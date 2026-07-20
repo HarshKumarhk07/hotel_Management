@@ -123,9 +123,11 @@ export default function ValetDashboardPage() {
   // Protect route
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.replace('/login');
+      router.replace('/login?next=/valet');
+    } else if (status === 'authenticated' && user && user.role !== 'VALET_MANAGER' && user.role !== 'SUPER_ADMIN') {
+      router.replace('/');
     }
-  }, [status, router]);
+  }, [status, user, router]);
 
   // Fetch active queue vehicles
   const {

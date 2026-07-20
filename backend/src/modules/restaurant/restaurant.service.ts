@@ -184,14 +184,17 @@ export async function seatTable(
   return table;
 }
 
-export async function requestBill(id: string, actorId: string) {
+export async function requestBill(id: string, billAmount: number | undefined, actorId: string) {
   const table = await RestaurantTable.findById(id);
   if (!table) throw AppError.notFound('Table not found');
   assertTransition(table.status, TABLE_STATUS.BILLING);
   table.status = TABLE_STATUS.BILLING;
+  if (table.currentSession) {
+    table.currentSession.billAmount = billAmount;
+  }
   await table.save();
   emitToAdmins(SOCKET_EVENTS.TABLE_STATUS_CHANGED, { tableId: id, status: TABLE_STATUS.BILLING, number: table.number });
-  void recordAudit({ action: AUDIT_ACTIONS.TABLE_UPDATED, actor: actorId, metadata: { tableId: id, billRequested: true } });
+  void recordAudit({ action: AUDIT_ACTIONS.TABLE_UPDATED, actor: actorId, metadata: { tableId: id, billRequested: true, billAmount } });
   return table;
 }
 
@@ -226,6 +229,10 @@ export async function closeTable(id: string, actorId: string) {
     );
   }
 
+  if (table.currentSession?.reservationId) {
+    await TableReservation.findByIdAndUpdate(table.currentSession.reservationId, { status: RESERVATION_STATUS.COMPLETED });
+  }
+
   table.status = TABLE_STATUS.AVAILABLE;
   table.currentSession = undefined;
   await table.save();
@@ -247,7 +254,10 @@ export async function getTableBill(id: string) {
     createdAt: { $gte: table.currentSession.seatedAt },
   }).select('orderNumber status items pricing payment createdAt');
 
-  const grandTotal = orders.reduce((sum, o) => sum + o.pricing.total, 0);
+  let grandTotal = orders.reduce((sum, o) => sum + o.pricing.total, 0);
+  if (grandTotal === 0 && table.currentSession.billAmount !== undefined) {
+    grandTotal = table.currentSession.billAmount;
+  }
   return { table, orders, grandTotal };
 }
 
