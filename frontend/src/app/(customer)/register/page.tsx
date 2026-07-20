@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MailCheck } from 'lucide-react';
+import { MailCheck, Eye, EyeOff } from 'lucide-react';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/button';
 import { Field, Input, FieldError } from '@/components/ui/input';
@@ -26,6 +26,7 @@ type Form = z.infer<typeof schema>;
 export default function RegisterPage() {
   const { register: signup } = useAuth();
   const [done, setDone] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -76,7 +77,22 @@ export default function RegisterPage() {
           <Input type="tel" autoComplete="tel" placeholder="+91…" {...register('phone')} />
         </Field>
         <Field label="Password" error={errors.password?.message}>
-          <Input type="password" autoComplete="new-password" placeholder="••••••••" {...register('password')} />
+          <div className="relative">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              placeholder="••••••••"
+              className="pr-10"
+              {...register('password')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 focus:outline-none"
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
         </Field>
 
         {serverError ? <FieldError message={serverError} /> : null}

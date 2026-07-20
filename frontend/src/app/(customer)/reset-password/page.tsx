@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AuthShell } from '@/components/auth/AuthShell';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field, Input, FieldError } from '@/components/ui/input';
 import { api, apiErrorMessage } from '@/lib/api';
@@ -22,6 +23,7 @@ type Form = z.infer<typeof schema>;
 function ResetInner() {
   const token = useSearchParams().get('token') ?? '';
   const [done, setDone] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -53,7 +55,22 @@ function ResetInner() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Field label="New password" error={errors.password?.message}>
-        <Input type="password" autoComplete="new-password" placeholder="••••••••" {...register('password')} />
+        <div className="relative">
+          <Input
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="••••••••"
+            className="pr-10"
+            {...register('password')}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((prev) => !prev)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 focus:outline-none"
+          >
+            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </button>
+        </div>
       </Field>
       {serverError ? <FieldError message={serverError} /> : null}
       <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || !token}>

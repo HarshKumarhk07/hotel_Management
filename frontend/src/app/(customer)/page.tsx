@@ -42,6 +42,8 @@ import { api } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
 import type { PublicMenu } from '@/lib/types';
 
+import { useAuthStore } from '@/stores/auth';
+
 interface PublicKitchen {
   id: string;
   name: string;
@@ -50,6 +52,8 @@ interface PublicKitchen {
 
 export default function HomePage() {
   const router = useRouter();
+  const status = useAuthStore((s) => s.status);
+  const user = useAuthStore((s) => s.user);
 
   const HERO_IMAGES = [
     { url: '/hotel1.png', tag: 'EXPERIENCE GRAND LUXURY', title: 'THE PAGE', subtitle: 'Heritage Splendor · Curated Dining · Royal Comfort' },
@@ -249,9 +253,18 @@ export default function HomePage() {
             <button onClick={() => setScannerOpen(true)} className="hover:text-[#D4AF37] transition-colors text-[#D4AF37] border border-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37]/15 transition-all">
               Scan QR
             </button>
-            <Link href="/login" className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
-              Login
-            </Link>
+            {status === 'authenticated' ? (
+              <Link
+                href={user?.role === 'VALET_MANAGER' ? '/valet/dashboard' : '/admin'}
+                className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <Link href="/login" className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
+                Login
+              </Link>
+            )}
           </nav>
 
           {/* Mobile Menu Action */}
@@ -298,9 +311,19 @@ export default function HomePage() {
               <button onClick={() => { router.push('/about'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
                 About
               </button>
-              <Link href="/login" className="text-white hover:text-[#D4AF37] text-left">
-                Login
-              </Link>
+              {status === 'authenticated' ? (
+                <Link
+                  href={user?.role === 'VALET_MANAGER' ? '/valet/dashboard' : '/admin'}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-white hover:text-[#D4AF37] text-left"
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="text-white hover:text-[#D4AF37] text-left">
+                  Login
+                </Link>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

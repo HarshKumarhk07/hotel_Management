@@ -16,6 +16,8 @@ import {
   UserCheck,
   UserX,
   Car,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
@@ -113,6 +115,7 @@ export default function StaffManagementPage() {
   const [activeTab, setActiveTab] = useState<'staff' | 'roles'>('staff');
   const [showCreateRole, setShowCreateRole] = useState(false);
   const [showCreateStaff, setShowCreateStaff] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [editStaffTarget, setEditStaffTarget] = useState<StaffMember | null>(null);
   const [kitchenIdFilter, setKitchenIdFilter] = useState('');
   const [error, setError] = useState('');
@@ -445,7 +448,21 @@ export default function StaffManagementPage() {
                 <FieldError message={staffErrors.email?.message} />
               </Field>
               <Field label="Password *">
-                <Input type="password" {...regStaff('password')} placeholder="••••••••" />
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    {...regStaff('password')}
+                    placeholder="••••••••"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
                 <FieldError message={staffErrors.password?.message} />
               </Field>
             </div>
