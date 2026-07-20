@@ -33,14 +33,14 @@ function OrdersInner() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="truncate text-sm font-semibold text-zinc-900">{o.orderNumber}</p>
-                  <Badge className={STATUS_BADGE[o.status]}>{STATUS_LABEL[o.status] ?? o.status}</Badge>
+                  <Badge className={STATUS_BADGE[o.status] ?? ''}>{STATUS_LABEL[o.status] ?? o.status}</Badge>
                 </div>
                 <p className="text-xs text-zinc-500">
-                  {o.items.length} item{o.items.length > 1 ? 's' : ''} ·{' '}
-                  {new Date(o.createdAt).toLocaleString()}
+                  {o.items?.length ?? 0} item{(o.items?.length ?? 0) !== 1 ? 's' : ''} ·{' '}
+                  {o.createdAt ? new Date(o.createdAt).toLocaleString() : ''}
                 </p>
               </div>
-              <span className="text-sm font-semibold text-zinc-900">{formatINR(o.pricing.total)}</span>
+              <span className="text-sm font-semibold text-zinc-900">{formatINR(o.pricing?.total ?? 0)}</span>
               <ChevronRight className="h-4 w-4 text-zinc-400" />
             </Card>
           </Link>
