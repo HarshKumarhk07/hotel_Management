@@ -120,7 +120,7 @@ export default function RevenueDashboardPage() {
                       <XAxis dataKey="period" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis tickFormatter={(val) => `₹${(val / 1000)}k`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                       <Tooltip 
-                        formatter={(value: number) => formatINR(value)}
+                        formatter={(value: any) => formatINR(value)}
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                       />
                       <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fillOpacity={1} fill="url(#colorRevenue)" />
@@ -149,7 +149,7 @@ export default function RevenueDashboardPage() {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value: number) => formatINR(value)} />
+                        <Tooltip formatter={(value: any) => formatINR(value)} />
                         <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '11px' }} />
                       </PieChart>
                     </ResponsiveContainer>
