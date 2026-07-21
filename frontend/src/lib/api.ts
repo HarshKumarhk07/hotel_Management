@@ -1,7 +1,8 @@
 import axios, { AxiosError, type AxiosInstance } from 'axios';
 import { useAuthStore } from '@/stores/auth';
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+const envApiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+const baseURL = envApiUrl.endsWith('/api/v1') ? envApiUrl : `${envApiUrl.replace(/\/$/, '')}/api/v1`;
 
 /**
  * Axios instance for the KDS API.
