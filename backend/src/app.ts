@@ -63,7 +63,7 @@ export function createApp(): Express {
   // ── HTTP Request & Response Logger Middleware ──
   app.use((req, res, next) => {
     const startTime = Date.now();
-    const safeBody = req.body ? { ...req.body } : {};
+    const safeBody = req.body ? structuredClone(req.body) : {};
     const sensitiveKeys = ['password', 'token', 'refreshToken', 'accessToken', 'secret', 'cookie', 'authorization'];
     const redact = (obj: any) => {
       if (!obj || typeof obj !== 'object') return;
