@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useAuthStore } from '@/stores/auth';
+import { useAuth } from '@/hooks/useAuth';
 import { useQrStore } from '@/stores/qr';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,8 +14,7 @@ import jsQR from 'jsqr';
 export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const status = useAuthStore((s) => s.status);
-  const user = useAuthStore((s) => s.user);
+  const { user, status, logout } = useAuth();
   
   const scannerOpen = useQrStore((s) => s.isOpen);
   const openScanner = useQrStore((s) => s.openScanner);
@@ -54,12 +53,26 @@ export function Navbar() {
     if (mobileMenuOpen) {
       document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
     };
   }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -218,18 +231,26 @@ export function Navbar() {
               Scan QR
             </button>
             {status === 'authenticated' ? (
-              <Link
-                href={
-                  user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
-                    ? '/admin'
-                    : user?.role === 'VALET_MANAGER'
-                    ? '/valet/dashboard'
-                    : '/orders'
-                }
-                className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
-              >
-                Dashboard
-              </Link>
+              <>
+                <Link
+                  href={
+                    user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
+                      ? '/admin'
+                      : user?.role === 'VALET_MANAGER'
+                      ? '/valet/dashboard'
+                      : '/orders'
+                  }
+                  className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
+                >
+                  Dashboard
+                </Link>
+                <button
+                  onClick={() => { void logout(); }}
+                  className="hover:text-red-400 text-white/70 transition-colors pb-1 border-b-2 border-transparent hover:border-red-400"
+                >
+                  Logout
+                </button>
+              </>
             ) : (
               <Link
                 href="/login"
@@ -301,19 +322,30 @@ export function Navbar() {
                 About
               </button>
               {status === 'authenticated' ? (
-                <Link
-                  href={
-                    user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
-                      ? '/admin'
-                      : user?.role === 'VALET_MANAGER'
-                      ? '/valet/dashboard'
-                      : '/orders'
-                  }
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-white hover:text-[#D4AF37] text-left mt-2"
-                >
-                  Dashboard
-                </Link>
+                <>
+                  <Link
+                    href={
+                      user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
+                        ? '/admin'
+                        : user?.role === 'VALET_MANAGER'
+                        ? '/valet/dashboard'
+                        : '/orders'
+                    }
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-white hover:text-[#D4AF37] text-left mt-2"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      void logout();
+                    }}
+                    className="text-white/70 hover:text-red-400 text-left mt-2"
+                  >
+                    Logout
+                  </button>
+                </>
               ) : (
                 <Link
                   href="/login"

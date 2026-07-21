@@ -85,9 +85,9 @@ function KitchenMenuInner() {
   }, [visibleCategories, dietaryFilter]);
 
   return (
-    <div className="relative min-h-screen pb-24 lg:pb-12 bg-zinc-50/50">
+    <div className="relative min-h-screen pb-24 lg:pb-12 pt-20 lg:pt-24 bg-zinc-50/50">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur shadow-sm">
+      <header className="sticky top-[72px] lg:top-[88px] z-30 border-b bg-white/95 backdrop-blur shadow-sm">
         <div className="mx-auto max-w-7xl px-4 py-3 md:px-6 lg:px-8 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold text-zinc-900">{menu ? menu.kitchen.name : 'Loading...'}</h1>

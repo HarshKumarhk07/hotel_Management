@@ -59,7 +59,7 @@ function DashboardInner() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl w-full p-4 sm:p-6 space-y-6">
+    <div className="mx-auto max-w-4xl w-full p-4 sm:p-6 pt-24 lg:pt-32 space-y-6">
       
       {/* VIP Guest Profile Banner */}
       <div className="relative overflow-hidden rounded-3xl border border-[#D4AF37]/35 bg-gradient-to-br from-zinc-950 to-zinc-900 text-white p-6 sm:p-8 shadow-xl">
