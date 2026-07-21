@@ -181,7 +181,7 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
 
   void recordAudit({
     action: AUDIT_ACTIONS.BANQUET_BOOKING_CREATED,
-    actor: req.auth?._id, // User who created it, if any
+    actor: req.auth?.userId, // User who created it, if any
     metadata: { bookingId: booking._id, hallId, guestName }
   });
 
@@ -205,7 +205,7 @@ export const updateBooking = asyncHandler(async (req: Request, res: Response) =>
   
   void recordAudit({
     action: AUDIT_ACTIONS.BANQUET_BOOKING_UPDATED,
-    actor: req.auth?._id,
+    actor: req.auth?.userId,
     metadata: { bookingId: booking._id, status: booking.status, paymentStatus: booking.paymentStatus }
   });
 

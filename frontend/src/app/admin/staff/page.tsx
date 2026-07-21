@@ -487,7 +487,7 @@ export default function StaffManagementPage() {
               </select>
               {roles.length === 0 && (
                 <p className="mt-1 text-xs text-amber-600 font-sans">
-                  No roles exist. Create a role in the "Custom Roles" tab first.
+                  No roles exist. Create a role in the &quot;Custom Roles&quot; tab first.
                 </p>
               )}
               <FieldError message={staffErrors.roleId?.message} />
