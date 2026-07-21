@@ -27,7 +27,7 @@ describe('Kitchens — CRUD (Super Admin)', () => {
       .set('Authorization', bearer)
       .send({
         name: 'Rooftop Grill',
-        owner: { name: 'Owner', email: 'owner@example.com', password: 'Str0ng!Pass' },
+        owner: { name: 'Owner One', email: 'owner1@example.com', password: 'Str0ng!Pass' },
       })
       .expect(201);
 
