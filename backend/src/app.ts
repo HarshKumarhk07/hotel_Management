@@ -91,7 +91,7 @@ export function createApp(): Express {
     );
 
     const originalSend = res.send;
-    res.send = function (...args: any[]) {
+    res.send = function (body?: any) {
       const duration = Date.now() - startTime;
       logger.info(
         {
@@ -103,7 +103,7 @@ export function createApp(): Express {
         },
         `Response Sent: ${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`
       );
-      return originalSend.apply(res, args);
+      return originalSend.call(res, body);
     };
 
     next();
