@@ -11,7 +11,14 @@ import { Dialog } from '@/components/ui/dialog';
 import { useGuestWaitlistStatus, useWaitlistMutations } from '@/hooks/useWaitlist';
 import { apiErrorMessage } from '@/lib/api';
 
+import { useAuthStore } from '@/stores/auth';
+import { useRouter } from 'next/navigation';
+
 export default function GuestWaitlistPage() {
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const authStatus = useAuthStore((s) => s.status);
+  
   const { join } = useWaitlistMutations();
   
   // Join Waitlist Form States
@@ -31,6 +38,25 @@ export default function GuestWaitlistPage() {
     lookupValue,
     searchEnabled
   );
+
+  // Enforce login and prefill details
+  useEffect(() => {
+    if (authStatus !== 'loading') {
+      if (!user) {
+        alert('We are directing you to the sign-in page for further booking.');
+        const redirectUrl = encodeURIComponent(window.location.pathname);
+        router.replace(`/login?next=${redirectUrl}`);
+      } else {
+        if (!guestName) setGuestName(user.name);
+        if (!email) setEmail(user.email);
+        if (!phone && (user as any).phone) setPhone((user as any).phone);
+        if (!lookupValue) {
+            setLookupValue(user.email);
+            setSearchEnabled(true);
+        }
+      }
+    }
+  }, [authStatus, user, router, guestName, email, phone, lookupValue]);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();

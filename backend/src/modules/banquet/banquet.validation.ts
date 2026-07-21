@@ -9,6 +9,10 @@ export const createHallSchema = z.object({
   pricePerPlate: z.number().min(0, 'Price per plate must be non-negative').optional(),
   isActive: z.boolean().optional(),
   kitchenId: objectId.optional(),
+  description: z.string().trim().max(500).optional(),
+  area: z.string().trim().max(50).optional(),
+  eventTypes: z.array(z.string().trim()).optional(),
+  image: z.string().trim().optional(),
 });
 
 export const updateHallSchema = createHallSchema.partial();

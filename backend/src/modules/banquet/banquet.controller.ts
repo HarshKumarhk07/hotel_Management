@@ -6,6 +6,8 @@ import { BanquetHall, BanquetBooking } from '@/models';
 import { ROLES } from '@/constants';
 import * as pdfService from './pdf.service';
 import { logger } from '@/config/logger';
+import { recordAudit } from '@/services/audit.service';
+import { AUDIT_ACTIONS } from '@/constants';
 
 // ── Halls CRUD ──
 
@@ -28,7 +30,7 @@ export const createHall = asyncHandler(async (req: Request, res: Response) => {
   const isSuper = req.auth!.role === ROLES.SUPER_ADMIN;
   const kitchenId = isSuper ? req.body.kitchenId : req.auth!.kitchenId;
 
-  if (!kitchenId) throw AppError.badRequest('kitchenId is required');
+  if (!isSuper && !kitchenId) throw AppError.badRequest('kitchenId is required');
 
   const hall = await BanquetHall.create({
     name: req.body.name,
@@ -36,7 +38,11 @@ export const createHall = asyncHandler(async (req: Request, res: Response) => {
     pricePerHour: req.body.pricePerHour,
     pricePerPlate: req.body.pricePerPlate || 0,
     isActive: req.body.isActive !== undefined ? req.body.isActive : true,
-    kitchen: kitchenId,
+    kitchen: kitchenId || undefined,
+    description: req.body.description,
+    area: req.body.area,
+    eventTypes: req.body.eventTypes,
+    image: req.body.image,
   });
 
   return created(res, { hall });
@@ -173,6 +179,12 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
     bookingId: booking._id,
   }, 'Banquet booking created successfully');
 
+  void recordAudit({
+    action: AUDIT_ACTIONS.BANQUET_BOOKING_CREATED,
+    actor: req.auth?._id, // User who created it, if any
+    metadata: { bookingId: booking._id, hallId, guestName }
+  });
+
   const populated = await BanquetBooking.findById(booking._id).populate('hall', 'name capacity');
   return created(res, { booking: populated });
 });
@@ -190,6 +202,13 @@ export const updateBooking = asyncHandler(async (req: Request, res: Response) =>
   if (req.body.paymentStatus) booking.paymentStatus = req.body.paymentStatus;
 
   await booking.save();
+  
+  void recordAudit({
+    action: AUDIT_ACTIONS.BANQUET_BOOKING_UPDATED,
+    actor: req.auth?._id,
+    metadata: { bookingId: booking._id, status: booking.status, paymentStatus: booking.paymentStatus }
+  });
+
   return ok(res, { booking });
 });
 

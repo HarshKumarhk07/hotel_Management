@@ -12,6 +12,7 @@ import { SiteFooter } from '@/components/site/SiteFooter';
 import { api, apiErrorMessage } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
 import { loadRazorpay, openRazorpay, type RazorpayResponse } from '@/lib/razorpay';
+import { useAuthStore } from '@/stores/auth';
 
 interface RoomDetail {
   _id: string;
@@ -38,6 +39,9 @@ function BookRoomInner() {
   const guestCount = Number(searchParams.get('guestCount') || '1');
 
   // Guest Details
+  const user = useAuthStore((s) => s.user);
+  const authStatus = useAuthStore((s) => s.status);
+
   const [guestName, setGuestName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -45,6 +49,21 @@ function BookRoomInner() {
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('India');
   const [governmentId, setGovernmentId] = useState('');
+
+  // Enforce login and prefill details
+  useEffect(() => {
+    if (authStatus !== 'loading') {
+      if (!user) {
+        alert('We are directing you to the sign-in page for further booking.');
+        const redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        router.replace(`/login?next=${redirectUrl}`);
+      } else {
+        if (!guestName) setGuestName(user.name);
+        if (!email) setEmail(user.email);
+        if (!phone && (user as any).phone) setPhone((user as any).phone);
+      }
+    }
+  }, [authStatus, user, router, guestName, email, phone]);
 
   // Special Requests
   const [lateCheckIn, setLateCheckIn] = useState(false);

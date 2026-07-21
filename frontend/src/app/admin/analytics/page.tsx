@@ -21,6 +21,11 @@ interface Dashboard {
     cancelledOrders: number;
     avgOrderValue: number;
     refundedAmount: number;
+    revenueBreakdown?: {
+      food: number;
+      room: number;
+      banquet: number;
+    };
   };
   revenueTrends: { period: string; revenue: number; orders: number }[];
   topItems: { name: string; quantitySold: number; revenue: number }[];
@@ -124,7 +129,25 @@ function AnalyticsInner() {
         <div className="space-y-6">
           {/* Key Metric cards */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat label="Total Revenue" value={formatINR(data.summary.revenue)} />
+            <div className="flex flex-col gap-2">
+              <Stat label="Total Revenue" value={formatINR(data.summary.revenue)} />
+              {data.summary.revenueBreakdown && (
+                <div className="flex flex-col gap-1 text-[10px] text-zinc-500 bg-white p-2 border border-zinc-100 shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <span>Food:</span>
+                    <span className="font-semibold text-zinc-700">{formatINR(data.summary.revenueBreakdown.food)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Rooms:</span>
+                    <span className="font-semibold text-zinc-700">{formatINR(data.summary.revenueBreakdown.room)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Banquets:</span>
+                    <span className="font-semibold text-zinc-700">{formatINR(data.summary.revenueBreakdown.banquet)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
             <Stat label="Total Orders" value={String(data.summary.totalOrders)} />
             <Stat label="Avg Order Value" value={formatINR(data.summary.avgOrderValue)} />
             <Stat label="Refunded Amount" value={formatINR(data.summary.refundedAmount)} />

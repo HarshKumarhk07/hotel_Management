@@ -52,6 +52,11 @@ interface Summary {
   liveTableBookings?: number;
   activeValetVehicles?: number;
   pendingBanquetEnquiries?: number;
+  revenueBreakdown?: {
+    food: number;
+    room: number;
+    banquet: number;
+  };
 }
 
 interface KitchenDashboard {
@@ -273,12 +278,30 @@ function SuperAdminOverview() {
           <div className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Sales & Revenue Overview</h2>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-              <Stat
-                label="Revenue"
-                value={formatINR(data.revenue)}
-                icon={<IndianRupee className="h-5 w-5 text-green-600" />}
-                accent="bg-green-50"
-              />
+              <div className="flex flex-col gap-2 col-span-1 lg:col-span-1">
+                <Stat
+                  label="Grand Total Revenue"
+                  value={formatINR(data.revenue)}
+                  icon={<IndianRupee className="h-5 w-5 text-green-600" />}
+                  accent="bg-green-50"
+                />
+                {data.revenueBreakdown && (
+                  <div className="flex flex-col gap-1 text-xs text-zinc-500 bg-white p-3 rounded-xl border border-zinc-100 shadow-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1"><UtensilsCrossed className="w-3 h-3 text-orange-500" /> Food & Dining</span>
+                      <span className="font-semibold text-zinc-700">{formatINR(data.revenueBreakdown.food)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1"><DoorOpen className="w-3 h-3 text-blue-500" /> Rooms</span>
+                      <span className="font-semibold text-zinc-700">{formatINR(data.revenueBreakdown.room)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3 text-purple-500" /> Banquets</span>
+                      <span className="font-semibold text-zinc-700">{formatINR(data.revenueBreakdown.banquet)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
               <Stat
                 label="Total orders"
                 value={String(data.totalOrders)}

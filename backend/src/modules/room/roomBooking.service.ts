@@ -7,6 +7,8 @@ import { validateCoupon, reserveCoupon } from '@/modules/coupon/coupon.service';
 import { emailService } from '@/services/email/brevo.service';
 import { logger } from '@/config/logger';
 import { env } from '@/config/env';
+import { recordAudit } from '@/services/audit.service';
+import { AUDIT_ACTIONS } from '@/constants';
 
 export async function searchAvailableRooms(query: {
   checkInDate: string;
@@ -194,6 +196,12 @@ export async function createRoomBooking(input: {
     ],
   });
 
+  void recordAudit({
+    action: AUDIT_ACTIONS.ROOM_BOOKING_CREATED,
+    actor: input.userId,
+    metadata: { bookingId: booking._id, room: room._id, confirmationNumber }
+  });
+
   // Always send a booking notification email immediately upon creation
   try {
     const populated = await booking.populate('room');
@@ -311,6 +319,13 @@ export async function updateBookingStatus(
   }
 
   await booking.save();
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ROOM_BOOKING_UPDATED,
+    actor: updatedBy,
+    metadata: { bookingId: booking._id, status }
+  });
+
   const populated = await booking.populate('room');
 
   if (status === 'CONFIRMED') {

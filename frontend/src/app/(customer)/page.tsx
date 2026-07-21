@@ -301,7 +301,7 @@ export default function HomePage() {
                   desc: "From intimate heritage rooms to sprawling royal suites, each space tells a story of tradition, craftsmanship, and uncompromising comfort.",
                   img: "/abt1.png",
                   actionText: "View Chambers →",
-                  onClick: () => router.push('/rooms')
+                  href: '/rooms'
                 },
                 {
                   id: 2,
@@ -310,7 +310,7 @@ export default function HomePage() {
                   desc: "Choose from grand ballrooms, heritage courtyards, and palace gardens. Each venue transforms your special moments into legendary celebrations.",
                   img: "/bnk2.png",
                   actionText: "Explore Venues →",
-                  onClick: () => router.push('/banquets')
+                  href: '/banquets'
                 },
                 {
                   id: 3,
@@ -319,25 +319,25 @@ export default function HomePage() {
                   desc: "Our master chefs present a symphony of flavors—from royal Awadhi cuisine to contemporary international gastronomy.",
                   img: "/dining-banner.png",
                   actionText: "Reserve Table →",
-                  onClick: () => router.push('/restaurant/waitlist')
+                  href: '/restaurant/waitlist'
                 }
               ].map((card, idx) => (
-                <motion.div
-                  key={card.id}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true, margin: "-50px" }}
-                  custom={idx}
-                  variants={{
-                    hidden: { opacity: 0, y: 40 },
-                    visible: (customIndex: number) => ({
-                      opacity: 1,
-                      y: 0,
-                      transition: { delay: customIndex * 0.15, duration: 0.8, ease: "easeOut" }
-                    })
-                  }}
-                  className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-100 bg-[#FAF9F6] shadow-sm hover:shadow-xl transition-all duration-300"
-                >
+                <Link href={card.href || '#'} key={card.id}>
+                  <motion.div
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-50px" }}
+                    custom={idx}
+                    variants={{
+                      hidden: { opacity: 0, y: 40 },
+                      visible: (customIndex: number) => ({
+                        opacity: 1,
+                        y: 0,
+                        transition: { delay: customIndex * 0.15, duration: 0.8, ease: "easeOut" }
+                      })
+                    }}
+                    className="group flex flex-col h-full overflow-hidden rounded-2xl border border-zinc-100 bg-[#FAF9F6] shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
+                  >
                   <div className="relative aspect-[4/3] w-full overflow-hidden">
                     <NextImage
                       src={card.img}
@@ -359,14 +359,14 @@ export default function HomePage() {
                     <p className="text-xs md:text-sm text-[#666666] font-light leading-relaxed">
                       {card.desc}
                     </p>
-                    <button
-                      onClick={card.onClick}
-                      className="text-xs font-bold text-[#D4AF37] hover:text-[#AE963C] flex items-center gap-1 group-hover:translate-x-1.5 transition-transform self-start"
+                    <div
+                      className="text-xs font-bold text-[#D4AF37] group-hover:text-[#AE963C] flex items-center gap-1 group-hover:translate-x-1.5 transition-transform self-start"
                     >
                       {card.actionText}
-                    </button>
+                    </div>
                   </div>
                 </motion.div>
+                </Link>
               ))}
             </div>
           </div>

@@ -25,6 +25,10 @@ const hallSchema = z.object({
   pricePerPlate: z.number().min(0, 'Per plate rate must be positive').optional(),
   isActive: z.boolean().default(true),
   kitchenId: z.string().optional().or(z.literal('')),
+  description: z.string().optional(),
+  area: z.string().optional(),
+  eventTypes: z.string().optional(),
+  image: z.string().optional(),
 });
 
 const bookingSchema = z.object({
@@ -45,6 +49,10 @@ interface BanquetHall {
   pricePerPlate: number;
   isActive: boolean;
   kitchen: string;
+  description?: string;
+  area?: string;
+  eventTypes?: string[];
+  image?: string;
 }
 
 interface BanquetBooking {
@@ -83,8 +91,35 @@ export default function BanquetManagementPage() {
   const [showCreateHall, setShowCreateHall] = useState(false);
   const [editBookingTarget, setEditBookingTarget] = useState<BanquetBooking | null>(null);
   const [editHallTarget, setEditHallTarget] = useState<BanquetHall | null>(null);
+  const [deleteHallTarget, setDeleteHallTarget] = useState<BanquetHall | null>(null);
   const [kitchenIdFilter, setKitchenIdFilter] = useState('');
   const [error, setError] = useState('');
+  const [uploadSuccessMsg, setUploadSuccessMsg] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (file: File, isEdit: boolean) => {
+    if (!file) return;
+    setUploading(true);
+    setError('');
+    setUploadSuccessMsg('');
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const res = await api.postForm<{ data: { url: string } }>('/upload', formData);
+      const url = res.data.data.url;
+      if (isEdit) {
+        setValueEditHall('image', url);
+      } else {
+        setValueHall('image', url);
+      }
+      setUploadSuccessMsg('Image uploaded successfully! Click Save Changes to apply it to the main page.');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Failed to upload image'));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Fetch kitchens (for selection when creating halls)
   const { data: kitchens } = useAdminKitchens();
@@ -113,20 +148,33 @@ export default function BanquetManagementPage() {
 
   // Mutations
   const createHallMutation = useMutation({
-    mutationFn: (d: HallForm) => api.post('/banquets/halls', { ...d, kitchenId: kitchenIdFilter || undefined }),
+    mutationFn: (d: HallForm) => {
+      const payload = {
+        ...d,
+        eventTypes: d.eventTypes ? d.eventTypes.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+        kitchenId: kitchenIdFilter || undefined
+      };
+      return api.post('/banquets/halls', payload);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['banquet-halls'] }); setShowCreateHall(false); },
     onError: e => setError(apiErrorMessage(e)),
   });
 
   const updateHallMutation = useMutation({
-    mutationFn: ({ id, d }: { id: string; d: Partial<HallForm> }) => api.patch(`/banquets/halls/${id}`, d),
+    mutationFn: ({ id, d }: { id: string; d: Partial<HallForm> }) => {
+      const payload = {
+        ...d,
+        eventTypes: d.eventTypes ? d.eventTypes.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      };
+      return api.patch(`/banquets/halls/${id}`, payload);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['banquet-halls'] }); setEditHallTarget(null); },
     onError: e => setError(apiErrorMessage(e)),
   });
 
   const deleteHallMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/banquets/halls/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['banquet-halls'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['banquet-halls'] }); setDeleteHallTarget(null); },
     onError: e => setError(apiErrorMessage(e)),
   });
 
@@ -137,11 +185,11 @@ export default function BanquetManagementPage() {
   });
 
   // Forms
-  const { register: regHall, handleSubmit: handleHall, formState: { errors: hallErrors }, reset: resetHall } = useForm<HallForm>({
+  const { register: regHall, handleSubmit: handleHall, formState: { errors: hallErrors }, reset: resetHall, setValue: setValueHall, watch: watchHall } = useForm<HallForm>({
     resolver: zodResolver(hallSchema),
   });
 
-  const { register: regEditHall, handleSubmit: handleEditHall, formState: { errors: editHallErrors }, reset: resetEditHall } = useForm<HallForm>({
+  const { register: regEditHall, handleSubmit: handleEditHall, formState: { errors: editHallErrors }, reset: resetEditHall, setValue: setValueEditHall, watch: watchEditHall } = useForm<HallForm>({
     resolver: zodResolver(hallSchema),
   });
 
@@ -340,6 +388,10 @@ export default function BanquetManagementPage() {
                           pricePerHour: hall.pricePerHour,
                           pricePerPlate: hall.pricePerPlate,
                           isActive: hall.isActive,
+                          description: hall.description || '',
+                          area: hall.area || '',
+                          eventTypes: hall.eventTypes ? hall.eventTypes.join(', ') : '',
+                          image: hall.image || '',
                         });
                         setEditHallTarget(hall);
                       }}
@@ -350,11 +402,7 @@ export default function BanquetManagementPage() {
                       variant="outline"
                       size="sm"
                       className="text-red-600 hover:bg-red-50 border-red-200 font-sans"
-                      onClick={() => {
-                        if (confirm(`Delete hall "${hall.name}"?`)) {
-                          deleteHallMutation.mutate(hall._id);
-                        }
-                      }}
+                      onClick={() => setDeleteHallTarget(hall)}
                     >
                       Delete
                     </Button>
@@ -388,6 +436,56 @@ export default function BanquetManagementPage() {
               </Field>
             </div>
 
+            <Field label="Description">
+              <Input {...regHall('description')} placeholder="A luxurious multi-functional space..." />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Area (sq. ft.)">
+                <Input {...regHall('area')} placeholder="6,000 sq. ft." />
+              </Field>
+              <Field label="Suited For (Event Types)">
+                <Input {...regHall('eventTypes')} placeholder="Weddings, Meetings..." />
+              </Field>
+            </div>
+            <Field label="Image">
+                <div className="flex gap-2">
+                  <select
+                    {...regHall('image')}
+                    className="h-10 flex-1 rounded-lg border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] font-sans text-zinc-900"
+                  >
+                    <option value="">Default (Royal Theme)</option>
+                    <option value="/bnk2.png">Royal Ballroom Theme</option>
+                    <option value="/abt1.png">Imperial Banquet Theme</option>
+                    <option value="/hotel1.png">Crystal Palace Theme</option>
+                    <option value="/dining-banner.png">Grand Celebration Theme</option>
+                    <option value="/abt2.png">Heritage Courtyard Theme</option>
+                    {watchHall('image') && !['', '/bnk2.png', '/abt1.png', '/hotel1.png', '/dining-banner.png', '/abt2.png'].includes(watchHall('image') as string) && (
+                      <option value={watchHall('image') as string}>Custom Uploaded</option>
+                    )}
+                  </select>
+                  <label className={`flex h-10 items-center justify-center rounded-lg border px-4 text-xs font-semibold cursor-pointer transition-colors shadow-sm font-sans shrink-0 ${uploading ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed' : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-200'}`}>
+                    {uploading ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-3 w-3 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Uploading...
+                      </span>
+                    ) : 'Upload Image'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, false);
+                      }}
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
+                {uploadSuccessMsg && <p className="mt-2 text-xs font-medium text-green-600">{uploadSuccessMsg}</p>}
+                <p className="mt-1.5 text-[10px] text-zinc-400 font-light">For faster upload speeds, please compress your images to under 1MB before uploading.</p>
+            </Field>
+
             <Button type="submit" className="w-full font-sans" disabled={createHallMutation.isPending}>
               {createHallMutation.isPending ? 'Saving…' : 'Create Banquet Hall'}
             </Button>
@@ -417,6 +515,56 @@ export default function BanquetManagementPage() {
               </Field>
             </div>
 
+            <Field label="Description">
+              <Input {...regEditHall('description')} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Area (sq. ft.)">
+                <Input {...regEditHall('area')} />
+              </Field>
+              <Field label="Suited For (Event Types)">
+                <Input {...regEditHall('eventTypes')} />
+              </Field>
+            </div>
+            <Field label="Image">
+                <div className="flex gap-2">
+                  <select
+                    {...regEditHall('image')}
+                    className="h-10 flex-1 rounded-lg border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] font-sans text-zinc-900"
+                  >
+                    <option value="">Default (Royal Theme)</option>
+                    <option value="/bnk2.png">Royal Ballroom Theme</option>
+                    <option value="/abt1.png">Imperial Banquet Theme</option>
+                    <option value="/hotel1.png">Crystal Palace Theme</option>
+                    <option value="/dining-banner.png">Grand Celebration Theme</option>
+                    <option value="/abt2.png">Heritage Courtyard Theme</option>
+                    {watchEditHall('image') && !['', '/bnk2.png', '/abt1.png', '/hotel1.png', '/dining-banner.png', '/abt2.png'].includes(watchEditHall('image') as string) && (
+                      <option value={watchEditHall('image') as string}>Custom Uploaded</option>
+                    )}
+                  </select>
+                  <label className={`flex h-10 items-center justify-center rounded-lg border px-4 text-xs font-semibold cursor-pointer transition-colors shadow-sm font-sans shrink-0 ${uploading ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed' : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-200'}`}>
+                    {uploading ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-3 w-3 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Uploading...
+                      </span>
+                    ) : 'Upload Image'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, true);
+                      }}
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
+                {uploadSuccessMsg && <p className="mt-2 text-xs font-medium text-green-600">{uploadSuccessMsg}</p>}
+                <p className="mt-1.5 text-[10px] text-zinc-400 font-light">For faster upload speeds, please compress your images to under 1MB before uploading.</p>
+              </Field>
+
             <Field label="Status">
               <select
                 {...regEditHall('isActive')}
@@ -433,6 +581,34 @@ export default function BanquetManagementPage() {
               {updateHallMutation.isPending ? 'Saving…' : 'Save Changes'}
             </Button>
           </form>
+        </Dialog>
+      )}
+
+      {/* Delete Hall Confirm Modal */}
+      {deleteHallTarget && (
+        <Dialog open onClose={() => setDeleteHallTarget(null)} title="Delete Banquet Hall" widthClass="max-w-sm">
+          <div className="space-y-4 font-sans">
+            <p className="text-sm text-zinc-600">
+              Are you sure you want to delete <strong>{deleteHallTarget.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => setDeleteHallTarget(null)}
+                disabled={deleteHallMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white border-transparent"
+                onClick={() => deleteHallMutation.mutate(deleteHallTarget._id)}
+                disabled={deleteHallMutation.isPending}
+              >
+                {deleteHallMutation.isPending ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
         </Dialog>
       )}
 

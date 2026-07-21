@@ -7,6 +7,7 @@ import {
   PAYMENT_STATUS,
   REFUND_STATUS,
   SOCKET_EVENTS,
+  AUDIT_ACTIONS,
   type OrderStatus,
   type PaymentMethod,
 } from '@/constants';
@@ -21,6 +22,7 @@ import {
 } from '@/models';
 import { computePricing, recomputeLine, recomputeOrderTotals } from '@/services/pricing.service';
 import { processRefund } from '@/services/payment.service';
+import { recordAudit } from '@/services/audit.service';
 import { isAvailableNow, isKitchenAvailableNow } from '@/utils/availability';
 import { generateOrderNumber } from '@/utils/orderNumber';
 import { generateSecureToken, hashToken } from '@/utils/crypto';
@@ -190,6 +192,12 @@ export async function checkout(
     }
     throw AppError.internal('Could not place order, please retry', 'ORDER_CREATE_FAILED');
   }
+  
+  void recordAudit({
+    action: AUDIT_ACTIONS.ORDER_PLACED,
+    actor: customerId,
+    metadata: { orderId: order._id, kitchenId: kitchen._id, roomNumber: room.roomNumber }
+  });
 
   // Record the coupon redemption (drives per-user limits).
   if (appliedCoupon) {
@@ -359,6 +367,12 @@ export async function guestCheckout(
     throw AppError.internal('Could not place order, please retry', 'ORDER_CREATE_FAILED');
   }
 
+  void recordAudit({
+    action: AUDIT_ACTIONS.GUEST_ORDER_PLACED,
+    actor: undefined,
+    metadata: { orderId: order._id, kitchenId: kitchen._id, roomNumber: room.roomNumber }
+  });
+
   // Decrement stock for the ordered items.
   for (const ci of input.items) {
     const item = byId.get(ci.menuItem);
@@ -474,6 +488,12 @@ export async function updateStatus(
   }
   order.status = next;
   order.statusHistory.push({ status: next, at: new Date(), by: by as never, note });
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
+    actor: by,
+    metadata: { orderId: order._id, status: next, note }
+  });
 
   // COD/room-billing are settled on delivery.
   if (

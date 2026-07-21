@@ -24,7 +24,7 @@ export interface IStaff extends Document {
 const staffSchema = new Schema<IStaff>(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    kitchen: { type: Schema.Types.ObjectId, ref: 'Kitchen', required: true, index: true },
+    kitchen: { type: Schema.Types.ObjectId, ref: 'Kitchen', index: true },
     role: { type: Schema.Types.ObjectId, ref: 'Role' },
     employeeId: { type: String, trim: true },
     designation: { type: String, trim: true, maxlength: 80 },

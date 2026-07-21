@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/stores/auth';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, FieldError } from '@/components/ui/input';
@@ -167,6 +169,10 @@ interface BanquetHall {
   pricePerHour: number;
   pricePerPlate: number;
   isActive: boolean;
+  description?: string;
+  area?: string;
+  eventTypes?: string[];
+  image?: string;
 }
 
 interface BookingResponse {
@@ -238,6 +244,9 @@ const defaultEnrichment = {
 };
 
 export default function CustomerBanquetsPage() {
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  
   const [selectedHall, setSelectedHall] = useState<BanquetHall | null>(null);
   const [detailsHall, setDetailsHall] = useState<BanquetHall | null>(null);
   const [successBooking, setSuccessBooking] = useState<BookingResponse | null>(null);
@@ -509,7 +518,7 @@ export default function CustomerBanquetsPage() {
                     >
                       <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100">
                         <Image
-                          src={enrichment.image}
+                          src={hall.image || enrichment.image}
                           alt={hall.name}
                           fill
                           className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -529,7 +538,7 @@ export default function CustomerBanquetsPage() {
                         <div className="space-y-3">
                           <h3 className="text-xl font-serif font-semibold text-zinc-900 group-hover:text-[#D4AF37] transition-colors">{hall.name}</h3>
                           <p className="text-xs text-zinc-500 font-light leading-relaxed line-clamp-3">
-                            {enrichment.description}
+                            {hall.description || enrichment.description}
                           </p>
 
                           {/* Quick specs grid */}
@@ -540,7 +549,7 @@ export default function CustomerBanquetsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               <Maximize className="h-4 w-4 text-[#D4AF37] shrink-0" />
-                              <span>Area: <strong>{enrichment.area}</strong></span>
+                              <span>Area: <strong>{hall.area || enrichment.area}</strong></span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-[#D4AF37] shrink-0" />
@@ -556,7 +565,7 @@ export default function CustomerBanquetsPage() {
                           <div className="space-y-1.5">
                             <span className="text-[8px] font-extrabold uppercase tracking-widest text-[#D4AF37]">Suited For</span>
                             <div className="flex flex-wrap gap-1.5">
-                              {enrichment.eventTypes.map((type) => (
+                              {(hall.eventTypes?.length ? hall.eventTypes : enrichment.eventTypes).map((type) => (
                                 <span key={type} className="text-[9px] bg-[#FAF8F0] border border-[#D4AF37]/20 text-[#AE963C] px-2 py-0.5 rounded-full font-medium">
                                   {type}
                                 </span>
@@ -577,6 +586,12 @@ export default function CustomerBanquetsPage() {
                           <Button
                             className="font-sans text-xs bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl"
                             onClick={() => {
+                              if (!user) {
+                                alert('We are directing you to the sign-in page for further booking.');
+                                const redirectUrl = encodeURIComponent(window.location.pathname);
+                                router.push(`/login?next=${redirectUrl}`);
+                                return;
+                              }
                               reset();
                               setSelectedHall(hall);
                             }}
@@ -603,7 +618,7 @@ export default function CustomerBanquetsPage() {
               <div className="space-y-6 text-left font-sans">
                 <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-zinc-100">
                   <Image
-                    src={enrich.image}
+                    src={detailsHall.image || enrich.image}
                     alt={detailsHall.name}
                     fill
                     className="object-cover"
@@ -612,7 +627,7 @@ export default function CustomerBanquetsPage() {
 
                 <div className="space-y-3">
                   <h3 className="text-xl font-serif font-bold text-zinc-900">About the Venue</h3>
-                  <p className="text-xs text-zinc-500 font-light leading-relaxed">{enrich.description}</p>
+                  <p className="text-xs text-zinc-500 font-light leading-relaxed">{detailsHall.description || enrich.description}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 border-y border-zinc-100 py-4 text-xs">
@@ -622,7 +637,7 @@ export default function CustomerBanquetsPage() {
                   </div>
                   <div className="space-y-1">
                     <span className="text-zinc-400 block">Venue Size Area</span>
-                    <span className="font-semibold text-zinc-800">{enrich.area}</span>
+                    <span className="font-semibold text-zinc-800">{detailsHall.area || enrich.area}</span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-zinc-400 block">Hall Rental Tariff</span>
@@ -637,7 +652,7 @@ export default function CustomerBanquetsPage() {
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] block">Hall Specifications &amp; Features</span>
                   <ul className="grid grid-cols-2 gap-2 text-xs text-zinc-600 list-disc pl-4">
-                    {enrich.features.map(feat => (
+                    {(detailsHall.eventTypes?.length ? detailsHall.eventTypes : enrich.features).map(feat => (
                       <li key={feat} className="font-light">{feat}</li>
                     ))}
                   </ul>

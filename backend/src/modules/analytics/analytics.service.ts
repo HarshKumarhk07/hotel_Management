@@ -1,6 +1,6 @@
 import { Types, type PipelineStage } from 'mongoose';
 import { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS } from '@/constants';
-import { Order, Room, RestaurantTable, Vehicle, BanquetBooking, TableReservation } from '@/models';
+import { Order, Room, RestaurantTable, Vehicle, BanquetBooking, TableReservation, RoomBooking, BanquetHall } from '@/models';
 
 export interface AnalyticsScope {
   /** Restrict to one kitchen (kitchen owners are always scoped to theirs). */
@@ -36,6 +36,12 @@ export async function getSummary(scope: AnalyticsScope) {
     filter.kitchen = new Types.ObjectId(scope.kitchenId);
   }
 
+  let banquetHallsFilter: string[] | null = null;
+  if (scope.kitchenId) {
+    const halls = await BanquetHall.find({ kitchen: new Types.ObjectId(scope.kitchenId) }, '_id');
+    banquetHallsFilter = halls.map(h => h._id.toString());
+  }
+
   const [
     agg,
     totalRooms,
@@ -45,6 +51,8 @@ export async function getSummary(scope: AnalyticsScope) {
     liveTableBookings,
     activeValetVehicles,
     pendingBanquetEnquiries,
+    roomRevenueAgg,
+    banquetRevenueAgg,
   ] = await Promise.all([
     Order.aggregate([
       { $match: match },
@@ -84,6 +92,22 @@ export async function getSummary(scope: AnalyticsScope) {
     TableReservation.countDocuments({ ...filter, status: 'CONFIRMED' }),
     Vehicle.countDocuments({ status: { $ne: 'DELIVERED' } }),
     BanquetBooking.countDocuments({ status: 'PENDING' }),
+    // Room Revenue (Not applicable if a specific kitchen is scoped)
+    scope.kitchenId ? Promise.resolve([{ revenue: 0 }]) : RoomBooking.aggregate([
+      { $match: { ...match, status: { $in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] } } },
+      { $group: { _id: null, revenue: { $sum: '$totalPrice' } } },
+    ]),
+    // Banquet Revenue
+    BanquetBooking.aggregate([
+      { 
+        $match: { 
+          ...match, 
+          status: { $in: ['CONFIRMED', 'COMPLETED'] },
+          ...(banquetHallsFilter ? { hall: { $in: banquetHallsFilter.map(id => new Types.ObjectId(id)) } } : {})
+        } 
+      },
+      { $group: { _id: null, revenue: { $sum: '$totalPrice' } } },
+    ]),
   ]);
 
   const base = agg[0] ?? {
@@ -114,6 +138,12 @@ export async function getSummary(scope: AnalyticsScope) {
     liveTableBookings,
     activeValetVehicles,
     pendingBanquetEnquiries,
+    revenue: base.revenue + (roomRevenueAgg[0]?.revenue || 0) + (banquetRevenueAgg[0]?.revenue || 0),
+    revenueBreakdown: {
+      food: base.revenue,
+      room: roomRevenueAgg[0]?.revenue || 0,
+      banquet: banquetRevenueAgg[0]?.revenue || 0,
+    },
   };
 }
 

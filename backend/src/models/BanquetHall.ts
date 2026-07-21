@@ -8,6 +8,10 @@ export interface IBanquetHall extends Document {
   pricePerPlate: number;
   isActive: boolean;
   kitchen: Types.ObjectId;
+  description?: string;
+  area?: string;
+  eventTypes?: string[];
+  image?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,7 +23,11 @@ const banquetHallSchema = new Schema<IBanquetHall>(
     pricePerHour: { type: Number, required: true, min: 0 },
     pricePerPlate: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true, index: true },
-    kitchen: { type: Schema.Types.ObjectId, ref: 'Kitchen', required: true, index: true },
+    kitchen: { type: Schema.Types.ObjectId, ref: 'Kitchen', index: true },
+    description: { type: String, trim: true, maxlength: 500 },
+    area: { type: String, trim: true, maxlength: 50 },
+    eventTypes: [{ type: String, trim: true }],
+    image: { type: String, trim: true },
   },
   { timestamps: true }
 );

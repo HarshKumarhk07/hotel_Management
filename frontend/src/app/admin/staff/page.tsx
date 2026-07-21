@@ -485,6 +485,11 @@ export default function StaffManagementPage() {
                   <option key={r._id} value={r._id}>{r.name}</option>
                 ))}
               </select>
+              {roles.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600 font-sans">
+                  No roles exist. Create a role in the "Custom Roles" tab first.
+                </p>
+              )}
               <FieldError message={staffErrors.roleId?.message} />
             </Field>
 
@@ -494,7 +499,7 @@ export default function StaffManagementPage() {
                   {...regStaff('kitchenId')}
                   className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand font-sans"
                 >
-                  <option value="">Select kitchen…</option>
+                  <option value="">None (Global Hotel Staff)</option>
                   {kitchens?.map(k => (
                     <option key={k._id} value={k._id}>{k.name}</option>
                   ))}

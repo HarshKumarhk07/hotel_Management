@@ -95,7 +95,7 @@ export const createStaff = asyncHandler(async (req: Request, res: Response) => {
   const isSuper = req.auth!.role === ROLES.SUPER_ADMIN;
   const kitchenId = isSuper ? req.body.kitchenId : req.auth!.kitchenId;
 
-  if (!kitchenId) throw AppError.badRequest('kitchenId is required');
+  if (!isSuper && !kitchenId) throw AppError.badRequest('kitchenId is required');
 
   const existingUser = await User.exists({ email: req.body.email });
   if (existingUser) throw AppError.conflict('Email already in use');
@@ -109,7 +109,7 @@ export const createStaff = asyncHandler(async (req: Request, res: Response) => {
       name: req.body.name,
       email: req.body.email,
       role: ROLES.CUSTOMER, // Staff are authenticated as users, custom Role governs access
-      kitchen: kitchenId,
+      kitchen: kitchenId || undefined,
       isEmailVerified: true,
     });
     (user as any).password = req.body.password;
@@ -118,7 +118,7 @@ export const createStaff = asyncHandler(async (req: Request, res: Response) => {
     // 2. Create the staff record
     const staff = await Staff.create([{
       user: user._id,
-      kitchen: kitchenId,
+      kitchen: kitchenId || undefined,
       role: req.body.roleId || undefined,
       employeeId: req.body.employeeId,
       designation: req.body.designation,

@@ -108,9 +108,7 @@ export default function BannerManagementPage() {
     formData.append('image', file);
 
     try {
-      const res = await api.post<{ data: { url: string } }>('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await api.postForm<{ data: { url: string } }>('/upload', formData);
       const url = res.data.data.url;
       if (isEdit) {
         setEditValue('imageUrl', url);

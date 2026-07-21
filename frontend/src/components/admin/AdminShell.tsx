@@ -220,6 +220,7 @@ function Shell({ children }: { children: ReactNode }) {
   const NAV: NavItem[] = [
     { href: '/', label: 'Go to Website', icon: <Globe className="h-4 w-4" />, ready: true },
     { href: '/admin', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" />, ready: true },
+    { href: '/admin/revenue', label: 'Revenue Dashboard', icon: <BarChart3 className="h-4 w-4" />, ready: true },
     ...(user?.role === 'SUPER_ADMIN' ? [
       { href: '/admin/kitchens', label: 'Kitchens', icon: <ChefHat className="h-4 w-4" />, ready: true },
       { href: '/admin/rooms', label: 'Rooms & QR', icon: <DoorOpen className="h-4 w-4" />, ready: true },
