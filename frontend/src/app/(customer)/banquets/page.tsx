@@ -29,6 +29,47 @@ import { Badge, Card, CenteredSpinner } from '@/components/ui/primitives';
 import { api, apiErrorMessage } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
 
+// ── Toast Utility ─────────────────────────────────────────────────────────────
+function showToast(title: string, body: string, type: 'success' | 'error' | 'info' = 'info') {
+  if (typeof window === 'undefined') return;
+  const containerId = 'toast-container';
+  let container = document.getElementById(containerId);
+  if (!container) {
+    container = document.createElement('div');
+    container.id = containerId;
+    container.className = 'fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = [
+    'flex items-start gap-3 w-full rounded-xl border bg-white px-4 py-3 shadow-2xl transition-all duration-300 pointer-events-auto',
+    type === 'success' ? 'border-[#D4AF37] bg-[#FAF8F0]' : type === 'error' ? 'border-red-200 bg-red-50' : 'border-zinc-200 bg-white',
+    'animate-in slide-in-from-bottom-4 fade-in duration-300',
+  ].join(' ');
+  
+  const icon = type === 'success' ? '🏆' : type === 'error' ? '❌' : 'ℹ️';
+  const iconBg = type === 'success' ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : type === 'error' ? 'bg-red-100 text-red-700' : 'bg-zinc-100 text-zinc-700';
+
+  toast.innerHTML = `
+    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${iconBg} text-base">${icon}</div>
+    <div class="min-w-0 flex-1">
+      <p class="text-xs font-semibold text-zinc-900">${title}</p>
+      <p class="text-[10px] text-zinc-500 mt-0.5 leading-normal">${body}</p>
+    </div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('opacity-0', 'translate-y-2');
+    setTimeout(() => {
+      toast.remove();
+      if (container && container.childElementCount === 0) {
+        container.remove();
+      }
+    }, 300);
+  }, 4000);
+}
+
 // ── Validation Schema for Booking ─────────────────────────────────────────────
 
 const bookingSchema = z.object({
@@ -41,6 +82,78 @@ const bookingSchema = z.object({
   guestCount: z.number().min(1, 'Expected guest count must be at least 1'),
   eventType: z.string().trim().min(1, 'Event type is required'),
   menuPreset: z.string().trim().optional(),
+}).superRefine((data, ctx) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const eventDateVal = new Date(data.eventDate);
+  eventDateVal.setHours(0, 0, 0, 0);
+
+  if (eventDateVal < today) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Event date cannot be in the past',
+      path: ['eventDate'],
+    });
+  }
+
+  const startVal = new Date(data.startTime);
+  const endVal = new Date(data.endTime);
+
+  if (isNaN(startVal.getTime())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Start time is invalid',
+      path: ['startTime'],
+    });
+  }
+
+  if (isNaN(endVal.getTime())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'End time is invalid',
+      path: ['endTime'],
+    });
+  }
+
+  if (!isNaN(startVal.getTime()) && !isNaN(endVal.getTime())) {
+    if (startVal.getTime() >= endVal.getTime()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'End time must be after start time',
+        path: ['endTime'],
+      });
+    }
+
+    const startLocalString = data.startTime.split('T')[0];
+    if (startLocalString !== data.eventDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Start time must be on the selected event date',
+        path: ['startTime'],
+      });
+    }
+
+    const endLocalString = data.endTime.split('T')[0];
+    const startDateObj = new Date(startLocalString);
+    const endDateObj = new Date(endLocalString);
+    const diffTime = endDateObj.getTime() - startDateObj.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+    if (diffDays < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'End time cannot be before start time',
+        path: ['endTime'],
+      });
+    } else if (diffDays > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Overnight bookings can only extend to the next day',
+        path: ['endTime'],
+      });
+    }
+  }
 });
 
 type BookingForm = z.infer<typeof bookingSchema>;
@@ -145,17 +258,34 @@ export default function CustomerBanquetsPage() {
 
   // Submit booking request
   const submitBookingMutation = useMutation({
-    mutationFn: (d: any) => api.post('/banquets/bookings', { ...d, hallId: selectedHall?._id }),
+    mutationFn: (payload: any) => api.post('/banquets/bookings', payload),
     onSuccess: (res) => {
       setSuccessBooking(res.data.data.booking);
       setSelectedHall(null);
+      showToast('Enquiry Submitted', 'Your banquet hall reservation request has been received.', 'success');
     },
-    onError: e => setError(apiErrorMessage(e)),
+    onError: (e: any) => {
+      const responseData = e.response?.data;
+      if (responseData && responseData.errors) {
+        Object.entries(responseData.errors).forEach(([field, msg]) => {
+          setFormFieldError(field as any, {
+            type: 'manual',
+            message: Array.isArray(msg) ? msg[0] : (msg as string),
+          });
+        });
+        showToast('Booking Failed', 'Please correct the highlighted errors.', 'error');
+      } else {
+        const msg = apiErrorMessage(e);
+        setError(msg);
+        showToast('Booking Failed', msg, 'error');
+      }
+    },
   });
 
-  const { register, handleSubmit, watch, formState: { errors }, reset } = useForm<BookingForm>({
+  const { register, handleSubmit, watch, formState: { errors, isValid }, reset, setError: setFormFieldError } = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
     defaultValues: { guestCount: 50 },
+    mode: 'onChange',
   });
 
   // Live estimate calculation
@@ -533,66 +663,98 @@ export default function CustomerBanquetsPage() {
 
       {/* Reservation Booking Form Modal */}
       {selectedHall && (
-        <Dialog open onClose={() => setSelectedHall(null)} title={`Book: ${selectedHall.name}`} widthClass="max-w-md">
-          <form onSubmit={handleSubmit(d => submitBookingMutation.mutate(d))} className="space-y-4 text-left">
-            <Field label="Full Name *">
-              <Input {...register('guestName')} placeholder="Elon Musk" />
-              <FieldError message={errors.guestName?.message} />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Email *">
-                <Input {...register('email')} placeholder="elon@spacex.com" />
-                <FieldError message={errors.email?.message} />
-              </Field>
-              <Field label="Phone Number *">
-                <Input {...register('phone')} placeholder="+919999988888" />
-                <FieldError message={errors.phone?.message} />
-              </Field>
-            </div>
-
-            <Field label="Date of Event *">
-              <Input type="date" {...register('eventDate')} />
-              <FieldError message={errors.eventDate?.message} />
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Start Time *">
-                <Input type="datetime-local" {...register('startTime')} />
-                <FieldError message={errors.startTime?.message} />
-              </Field>
-              <Field label="End Time *">
-                <Input type="datetime-local" {...register('endTime')} />
-                <FieldError message={errors.endTime?.message} />
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Expected Guests *">
-                <Input type="number" {...register('guestCount', { valueAsNumber: true })} />
-                <FieldError message={errors.guestCount?.message} />
-              </Field>
-              <Field label="Event Type *">
-                <Input {...register('eventType')} placeholder="Wedding Reception, Corporate..." />
-                <FieldError message={errors.eventType?.message} />
-              </Field>
-            </div>
-
-            <Field label="Catering & Menu Preferences (Optional)">
-              <Input {...register('menuPreset')} placeholder="Vegetarian Buffet Preset, Jain food requested..." />
-            </Field>
-
-            {/* Price Estimator panel */}
-            {estimatedPrice > 0 && (
-              <div className="rounded-xl border border-[#D4AF37]/35 bg-[#FAF8F0] p-3.5 flex items-center justify-between font-sans">
-                <div>
-                  <p className="text-[10px] text-zinc-400 font-bold tracking-wider uppercase">Estimated Invoice</p>
-                  <p className="text-xs text-zinc-500 mt-0.5">Includes rental time + plates count</p>
-                </div>
-                <p className="text-lg font-extrabold text-[#D4AF37]">{formatINR(estimatedPrice)}</p>
-              </div>
+        <Dialog open onClose={() => setSelectedHall(null)} title={`Book: ${selectedHall.name}`} widthClass="max-w-2xl">
+          <form
+            onSubmit={handleSubmit((d) =>
+              submitBookingMutation.mutate({
+                ...d,
+                hallId: selectedHall._id,
+                eventDate: new Date(d.eventDate).toISOString(),
+                startTime: new Date(d.startTime).toISOString(),
+                endTime: new Date(d.endTime).toISOString(),
+              })
             )}
+            className="space-y-6 text-left"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column - Guest Details & Catering */}
+              <div className="space-y-4">
+                <Field label="Full Name *">
+                  <Input {...register('guestName')} placeholder="Elon Musk" />
+                  <FieldError message={errors.guestName?.message} />
+                </Field>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Email *">
+                    <Input {...register('email')} placeholder="elon@spacex.com" />
+                    <FieldError message={errors.email?.message} />
+                  </Field>
+                  <Field label="Phone Number *">
+                    <Input {...register('phone')} placeholder="+919999988888" />
+                    <FieldError message={errors.phone?.message} />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Expected Guests *">
+                    <Input type="number" {...register('guestCount', { valueAsNumber: true })} />
+                    <FieldError message={errors.guestCount?.message} />
+                  </Field>
+                  <Field label="Event Type *">
+                    <Input {...register('eventType')} placeholder="Wedding Reception, Corporate..." />
+                    <FieldError message={errors.eventType?.message} />
+                  </Field>
+                </div>
+                <Field label="Catering & Menu Preferences (Optional)">
+                  <textarea
+                    {...register('menuPreset')}
+                    rows={3}
+                    placeholder="Vegetarian Buffet Preset, Jain food requested, special setup..."
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-400 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/30 disabled:opacity-50 resize-y"
+                  />
+                  <FieldError message={errors.menuPreset?.message} />
+                </Field>
+              </div>
 
-            <Button type="submit" className="w-full bg-[#111111] hover:bg-zinc-800 text-white rounded-xl py-3 font-semibold text-xs flex items-center justify-center gap-1.5" disabled={submitBookingMutation.isPending}>
+              {/* Right Column - Dates, Times, & Est. Billing */}
+              <div className="space-y-4 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <Field label="Date of Event *">
+                    <Input type="date" {...register('eventDate')} />
+                    <FieldError message={errors.eventDate?.message} />
+                  </Field>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Start Time *">
+                      <Input type="datetime-local" {...register('startTime')} />
+                      <FieldError message={errors.startTime?.message} />
+                    </Field>
+                    <Field label="End Time *">
+                      <Input type="datetime-local" {...register('endTime')} />
+                      <FieldError message={errors.endTime?.message} />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Price Estimator panel */}
+                {estimatedPrice > 0 ? (
+                  <div className="rounded-xl border border-[#D4AF37]/35 bg-[#FAF8F0] p-4 flex items-center justify-between font-sans">
+                    <div>
+                      <p className="text-[10px] text-zinc-400 font-bold tracking-wider uppercase">Estimated Invoice</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">Includes rental time + plates count</p>
+                    </div>
+                    <p className="text-xl font-extrabold text-[#D4AF37]">{formatINR(estimatedPrice)}</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-zinc-200 p-4 text-center font-sans text-xs text-zinc-400">
+                    Fill in Date, Start Time, and End Time to view price estimation.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-[#111111] hover:bg-zinc-800 text-white rounded-xl py-3 font-semibold text-xs flex items-center justify-center gap-1.5"
+              disabled={submitBookingMutation.isPending || !isValid}
+            >
               {submitBookingMutation.isPending ? 'Requesting...' : 'Request Reservation'}
             </Button>
           </form>

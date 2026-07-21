@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Outfit, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/providers';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
+const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' });
 
 if (typeof window !== 'undefined') {
   const originalPlay = HTMLMediaElement.prototype.play;
@@ -21,6 +23,9 @@ if (typeof window !== 'undefined') {
 export const metadata: Metadata = {
   title: 'The Page - Luxury Hotel & Banquets',
   description: 'Scan, browse the kitchen menu, and order food straight to your room.',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export const viewport: Viewport = {
@@ -31,7 +36,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${outfit.variable} ${playfair.variable}`}>
       <body className="font-sans">
         <Providers>{children}</Providers>
       </body>

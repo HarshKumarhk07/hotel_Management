@@ -12,6 +12,7 @@ import { globalLimiter } from '@/middleware/rateLimit';
 import { errorHandler, notFound } from '@/middleware/errorHandler';
 import apiRoutes from '@/routes';
 import { AppError } from '@/utils/AppError';
+import { logger } from '@/config/logger';
 
 /**
  * Build and configure the Express application. Kept separate from the server
@@ -58,6 +59,55 @@ export function createApp(): Express {
   // Security stack + per-request context.
   applySecurity(app);
   app.use(requestContext);
+
+  // ── HTTP Request & Response Logger Middleware ──
+  app.use((req, res, next) => {
+    const startTime = Date.now();
+    const safeBody = req.body ? { ...req.body } : {};
+    const sensitiveKeys = ['password', 'token', 'refreshToken', 'accessToken', 'secret', 'cookie', 'authorization'];
+    const redact = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const key of Object.keys(obj)) {
+        if (sensitiveKeys.includes(key.toLowerCase())) {
+          obj[key] = '[REDACTED]';
+        } else if (typeof obj[key] === 'object') {
+          redact(obj[key]);
+        }
+      }
+    };
+    redact(safeBody);
+
+    logger.info(
+      {
+        requestId: req.context?.requestId,
+        method: req.method,
+        url: req.originalUrl,
+        ip: req.context?.ip,
+        device: req.context?.device,
+        query: req.query,
+        body: safeBody,
+      },
+      `Incoming Request: ${req.method} ${req.originalUrl}`
+    );
+
+    const originalSend = res.send;
+    res.send = function (...args: any[]) {
+      const duration = Date.now() - startTime;
+      logger.info(
+        {
+          requestId: req.context?.requestId,
+          method: req.method,
+          url: req.originalUrl,
+          statusCode: res.statusCode,
+          durationMs: duration,
+        },
+        `Response Sent: ${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`
+      );
+      return originalSend.apply(res, args);
+    };
+
+    next();
+  });
   app.use(globalLimiter);
 
   // ── Root liveness route ──

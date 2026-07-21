@@ -32,8 +32,7 @@ import {
   Mail,
   ArrowRight,
 } from 'lucide-react';
-import jsQR from 'jsqr';
-import { QrScanner } from '@/components/qr/QrScanner';
+
 import { Dialog } from '@/components/ui/dialog';
 import { FoodLabel } from '@/components/ui/primitives';
 import { ProductCardSkeleton, ProductError, ProductEmptyState } from '@/components/ui/ProductSkeleton';
@@ -43,6 +42,7 @@ import { formatINR } from '@/lib/utils';
 import type { PublicMenu } from '@/lib/types';
 
 import { useAuthStore } from '@/stores/auth';
+import { useQrStore } from '@/stores/qr';
 
 interface PublicKitchen {
   id: string;
@@ -50,17 +50,25 @@ interface PublicKitchen {
   slug: string;
 }
 
+const HERO_IMAGES = [
+  { url: '/hotel1.png', tag: 'EXPERIENCE GRAND LUXURY', title: 'THE PAGE', subtitle: 'Heritage Splendor · Curated Dining · Royal Comfort' },
+  { url: '/dining-banner.png', tag: 'CULINARY ARTISTRY', title: 'FINE DINING', subtitle: 'Authentic Flavors and Exquisite Gastronomy' },
+  { url: '/bnk2.png', tag: 'MAJESTIC CELEBRATIONS', title: 'ROYAL BANQUETS', subtitle: 'Crafting Weddings and Events of Distinction' },
+  { url: '/abt2.png', tag: 'A HAVEN OF SPLENDOR', title: 'SUITES & CHAMBERS', subtitle: 'Unrivaled Comfort and Timeless Hospitality' }
+];
+
 export default function HomePage() {
   const router = useRouter();
   const status = useAuthStore((s) => s.status);
   const user = useAuthStore((s) => s.user);
+  const openScanner = useQrStore((s) => s.openScanner);
 
-  const HERO_IMAGES = [
-    { url: '/hotel1.png', tag: 'EXPERIENCE GRAND LUXURY', title: 'THE PAGE', subtitle: 'Heritage Splendor · Curated Dining · Royal Comfort' },
-    { url: '/dining-banner.png', tag: 'CULINARY ARTISTRY', title: 'FINE DINING', subtitle: 'Authentic Flavors and Exquisite Gastronomy' },
-    { url: '/bnk2.png', tag: 'MAJESTIC CELEBRATIONS', title: 'ROYAL BANQUETS', subtitle: 'Crafting Weddings and Events of Distinction' },
-    { url: '/abt2.png', tag: 'A HAVEN OF SPLENDOR', title: 'SUITES & CHAMBERS', subtitle: 'Unrivaled Comfort and Timeless Hospitality' }
-  ];
+  const handleScrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -72,21 +80,8 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-open QR scanner if requested in query parameter
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('scan') === 'true') {
-      setScannerOpen(true);
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
-    }
-  }, []);
-
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Load kitchens & featured menu for the dining overlay
   const {
@@ -116,230 +111,11 @@ export default function HomePage() {
     .slice(0, 8);
   const fullMenuHref = featuredKitchen ? `/k/${featuredKitchen.id}` : '/';
 
-  const processDecoded = useCallback(
-    (data: string) => {
-      let token = data.trim();
-      if (token.includes('/r/')) {
-        const parts = token.split('/r/');
-        token = parts[parts.length - 1].split(/[?#]/)[0];
-      }
-      if (!token) {
-        setError('Invalid QR code. Please scan a valid room/table QR code.');
-        setScannerOpen(false);
-        return;
-      }
-      router.push(`/r/${encodeURIComponent(token)}`);
-    },
-    [router],
-  );
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setError(null);
-    setProcessing(true);
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new window.Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          if (!context) {
-            setError('Could not initialize the image reader.');
-            setProcessing(false);
-            return;
-          }
-          canvas.width = img.width;
-          canvas.height = img.height;
-          context.drawImage(img, 0, 0, img.width, img.height);
-
-          const imageData = context.getImageData(0, 0, img.width, img.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'attemptBoth',
-          });
-
-          if (code && code.data) {
-            processDecoded(code.data);
-          } else {
-            setError('No valid QR code found in this image. Please make sure the QR code is clear.');
-            setProcessing(false);
-          }
-        } catch {
-          setError('Failed to process the image. Please try again.');
-          setProcessing(false);
-        }
-      };
-      img.onerror = () => {
-        setError('Failed to load image file.');
-        setProcessing(false);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.onerror = () => {
-      setError('Failed to read file.');
-      setProcessing(false);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
-  const handleScrollToSection = (id: string) => {
-    setMobileMenuOpen(false);
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FAF9F6] text-zinc-800 font-sans selection:bg-[#D4AF37]/20 selection:text-[#AE963C]">
-      {/* Import Premium Serif Font */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Outfit:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet"
-      />
 
-      {/* ── Navbar Layout ── */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-black/40 backdrop-blur-md border-b border-white/10 transition-all duration-300">
-        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          {/* Left Side: Logo and Brand Title */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-white/15 backdrop-blur-sm ring-1 ring-white/20 transition-all duration-300 group-hover:bg-white/25">
-              <NextImage
-                src="/logo.png"
-                alt="The Page Logo"
-                width={40}
-                height={40}
-                className="h-full w-full object-contain p-1.5"
-              />
-            </div>
-            <div className="flex flex-col text-left">
-              <span className="text-sm font-bold tracking-[0.25em] text-[#D4AF37] font-serif uppercase leading-none">
-                THE PAGE
-              </span>
-              <span className="text-[7px] font-semibold tracking-[0.3em] text-white/60 uppercase mt-1">
-                LUXURY HOTEL
-              </span>
-            </div>
-          </Link>
 
-          {/* Center: Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-8 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white">
-            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
-              Home
-            </button>
-            <button onClick={() => router.push('/rooms')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
-              Rooms
-            </button>
-            <button onClick={() => router.push('/banquets')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
-              Banquet
-            </button>
-            <button onClick={() => router.push('/restaurant/waitlist')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
-              Restaurant
-            </button>
-            <button onClick={() => handleScrollToSection('amenities')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
-              Amenities
-            </button>
-            <button onClick={() => router.push('/about')} className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
-              About
-            </button>
-          </nav>
-
-          {/* Right Side: Scan QR & Login */}
-          <nav className="hidden lg:flex items-center gap-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white">
-            <button onClick={() => setScannerOpen(true)} className="hover:text-[#D4AF37] transition-colors text-[#D4AF37] border border-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37]/15 transition-all">
-              Scan QR
-            </button>
-            {status === 'authenticated' ? (
-              <Link
-                href={
-                  user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
-                    ? '/admin'
-                    : user?.role === 'VALET_MANAGER'
-                    ? '/valet/dashboard'
-                    : '/orders'
-                }
-                className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
-              >
-                Dashboard
-              </Link>
-            ) : (
-              <Link href="/login" className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]">
-                Login
-              </Link>
-            )}
-          </nav>
-
-          {/* Mobile Menu Action */}
-          <div className="lg:hidden flex items-center gap-4">
-            <button
-              onClick={() => setScannerOpen(true)}
-              className="text-[#D4AF37] border border-[#D4AF37] text-[10px] font-extrabold tracking-wider uppercase px-3 py-1.5 rounded-full"
-            >
-              Scan QR
-            </button>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-white hover:text-[#D4AF37] transition-colors p-1"
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation Drawer */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden bg-zinc-950 border-b border-white/10 px-6 py-6 space-y-4 flex flex-col text-[11px] font-extrabold uppercase tracking-[0.2em]"
-            >
-              <button onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
-                Home
-              </button>
-              <button onClick={() => { router.push('/rooms'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
-                Rooms
-              </button>
-              <button onClick={() => { router.push('/banquets'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
-                Banquet
-              </button>
-              <button onClick={() => { router.push('/restaurant/waitlist'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
-                Restaurant
-              </button>
-              <button onClick={() => { handleScrollToSection('amenities'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
-                Amenities
-              </button>
-              <button onClick={() => { router.push('/about'); setMobileMenuOpen(false); }} className="text-white hover:text-[#D4AF37] text-left">
-                About
-              </button>
-              {status === 'authenticated' ? (
-                <Link
-                  href={
-                    user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
-                      ? '/admin'
-                      : user?.role === 'VALET_MANAGER'
-                      ? '/valet/dashboard'
-                      : '/orders'
-                  }
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-white hover:text-[#D4AF37] text-left"
-                >
-                  Dashboard
-                </Link>
-              ) : (
-                <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="text-white hover:text-[#D4AF37] text-left">
-                  Login
-                </Link>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
 
       {/* ── Main Layout Sections ── */}
       <main className="flex-1">
@@ -808,7 +584,7 @@ export default function HomePage() {
                         if (featuredKitchen) {
                           router.push(`/k/${featuredKitchen.id}`);
                         } else {
-                          setScannerOpen(true);
+                          openScanner();
                         }
                       }}
                       variants={{
@@ -884,7 +660,7 @@ export default function HomePage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
               <div
-                onClick={() => setScannerOpen(true)}
+                onClick={() => openScanner()}
                 className="p-8 border border-white/5 hover:border-[#D4AF37]/50 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer space-y-4"
               >
                 <div className="h-10 w-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
@@ -966,7 +742,7 @@ export default function HomePage() {
               Guests can scan their in-room QR codes to directly access dining ordering and tickets tracking without login.
             </p>
             <button
-              onClick={() => setScannerOpen(true)}
+              onClick={() => openScanner()}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#D4AF37] py-3 text-xs font-bold uppercase tracking-wider text-white shadow hover:bg-[#AE963C] transition-all"
             >
               Open Scan Utility
@@ -984,87 +760,8 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* ── Luxury QR Scan Modal / Dialog ── */}
-      {scannerOpen && (
-        <Dialog open onClose={() => setScannerOpen(false)} title="Palace Digital Access Desk" widthClass="max-w-md">
-          <div className="space-y-5 text-center font-sans">
-            <p className="text-xs text-zinc-500 font-light leading-relaxed">
-              Scan the dynamic QR code in your room or table to authenticate, browse the food menu, request valet service, or report housekeeping logs.
-            </p>
 
-            {/* Live Camera Scanner Option */}
-            <button
-              type="button"
-              onClick={() => {
-                setError(null);
-                setScannerOpen(true);
-              }}
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-950 px-5 py-4 text-xs font-bold uppercase tracking-wider text-white shadow transition-all focus:outline-none"
-            >
-              <Camera className="h-5 w-5 text-[#D4AF37]" />
-              Start Live Camera Scan
-            </button>
 
-            <div className="relative flex items-center justify-center py-1">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-zinc-200" />
-              </div>
-              <span className="relative bg-white px-3 text-[10px] uppercase tracking-widest text-zinc-400">or</span>
-            </div>
-
-            {/* Upload QR Image Option */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={processing}
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-zinc-800 transition-all hover:bg-zinc-100 disabled:opacity-60 focus:outline-none"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-                  Reading code...
-                </>
-              ) : (
-                <>
-                  <ImageIcon className="h-4 w-4 text-zinc-500" />
-                  Upload Image from Device
-                </>
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={processing}
-            />
-
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 p-3.5 text-xs text-red-700 text-left"
-              >
-                <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                <span>{error}</span>
-              </motion.div>
-            )}
-          </div>
-        </Dialog>
-      )}
-
-      {/* Actual QrScanner Trigger Component */}
-      {scannerOpen && (
-        <QrScanner
-          onDetected={processDecoded}
-          onClose={() => setScannerOpen(false)}
-          onUploadInstead={() => {
-            setScannerOpen(false);
-            fileInputRef.current?.click();
-          }}
-        />
-      )}
     </div>
   );
 }

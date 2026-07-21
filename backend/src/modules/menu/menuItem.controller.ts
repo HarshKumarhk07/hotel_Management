@@ -5,6 +5,7 @@ import { ok, created, noContent } from '@/utils/apiResponse';
 import { auditFromRequest } from '@/services/audit.service';
 import { assertKitchenAccess, resolveKitchenScope } from '@/utils/scope';
 import { AppError } from '@/utils/AppError';
+import { logger } from '@/config/logger';
 import * as service from './menuItem.service';
 
 function actor(req: Request) {
@@ -78,7 +79,11 @@ export const setStock = asyncHandler(async (req: Request, res) => {
 export const uploadImage = asyncHandler(async (req: Request, res) => {
   const existing = await service.getMenuItem(req.params.id);
   assertKitchenAccess(req, existing.kitchen.toString());
-  if (!req.file) throw AppError.badRequest('No image file provided', 'NO_FILE');
+  if (!req.file) {
+    logger.error({ body: req.body, headers: req.headers }, 'Image upload attempt failed: req.file is undefined');
+    throw AppError.badRequest('No image file provided', 'NO_FILE');
+  }
+  logger.info({ id: req.params.id, file: { originalname: req.file.originalname, mimetype: req.file.mimetype, size: req.file.size } }, 'Setting image on menu item');
   const item = await service.setImage(req.params.id, req.file.buffer);
   void auditFromRequest(req, {
     action: AUDIT_ACTIONS.MENU_IMAGE_UPDATED,

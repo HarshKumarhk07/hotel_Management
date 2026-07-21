@@ -76,7 +76,11 @@ api.interceptors.response.use(
 /** Extract a human-friendly message from an API error. */
 export function apiErrorMessage(err: unknown, fallback = 'Something went wrong'): string {
   if (axios.isAxiosError(err)) {
-    return (err.response?.data as { error?: { message?: string } })?.error?.message ?? fallback;
+    const data = err.response?.data as any;
+    if (data) {
+      if (typeof data.message === 'string') return data.message;
+      if (data.error && typeof data.error.message === 'string') return data.error.message;
+    }
   }
   return fallback;
 }

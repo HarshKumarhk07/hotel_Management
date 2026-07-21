@@ -21,7 +21,19 @@ export interface IBanquetBooking extends Document {
 
 const banquetBookingSchema = new Schema<IBanquetBooking>(
   {
-    hall: { type: Schema.Types.ObjectId, ref: 'BanquetHall', required: true, index: true },
+    hall: {
+      type: Schema.Types.ObjectId,
+      ref: 'BanquetHall',
+      required: true,
+      index: true,
+      validate: {
+        validator: async function (v: any) {
+          const exists = await model('BanquetHall').exists({ _id: v });
+          return !!exists;
+        },
+        message: 'Invalid banquet hall reference',
+      },
+    },
     guestName: { type: String, required: true, trim: true, maxlength: 120 },
     phone: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, trim: true },
@@ -47,5 +59,25 @@ const banquetBookingSchema = new Schema<IBanquetBooking>(
   },
   { timestamps: true }
 );
+
+// Pre-save middleware to prevent duplicate/overlapping bookings
+banquetBookingSchema.pre('save', async function (next) {
+  const self = this as any;
+  if (self.status === 'CANCELLED') {
+    return next();
+  }
+  const overlap = await model('BanquetBooking').exists({
+    _id: { $ne: self._id },
+    hall: self.hall,
+    status: { $in: ['PENDING', 'CONFIRMED'] },
+    $or: [
+      { startTime: { $lt: self.endTime }, endTime: { $gt: self.startTime } },
+    ],
+  });
+  if (overlap) {
+    return next(new Error('The hall is already booked or reserved for this time window'));
+  }
+  next();
+});
 
 export const BanquetBooking = model<IBanquetBooking>('BanquetBooking', banquetBookingSchema);

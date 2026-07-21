@@ -5,6 +5,7 @@ import { AppError } from '@/utils/AppError';
 import { BanquetHall, BanquetBooking } from '@/models';
 import { ROLES } from '@/constants';
 import * as pdfService from './pdf.service';
+import { logger } from '@/config/logger';
 
 // ── Halls CRUD ──
 
@@ -100,6 +101,11 @@ export const listBookings = asyncHandler(async (req: Request, res: Response) => 
 export const createBooking = asyncHandler(async (req: Request, res: Response) => {
   const { hallId, guestName, phone, email, eventDate, startTime, endTime, guestCount, eventType, menuPreset, paymentStatus } = req.body;
 
+  logger.info({
+    requestId: req.context?.requestId,
+    hallId,
+  }, 'Finding banquet hall details');
+
   const hall = await BanquetHall.findById(hallId);
   if (!hall) throw AppError.notFound('Banquet hall not found');
   if (!hall.isActive) throw AppError.badRequest('Banquet hall is currently inactive');
@@ -108,6 +114,13 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
   const end = new Date(endTime);
 
   if (start >= end) throw AppError.badRequest('End time must be after start time');
+
+  logger.info({
+    requestId: req.context?.requestId,
+    hallId,
+    startTime: start,
+    endTime: end,
+  }, 'Checking overlap bookings in database');
 
   // Check overlaps
   const overlap = await BanquetBooking.exists({
@@ -119,12 +132,25 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
   });
 
   if (overlap) {
+    logger.warn({
+      requestId: req.context?.requestId,
+      hallId,
+      startTime: start,
+      endTime: end,
+    }, 'Banquet booking conflict detected');
     throw AppError.conflict('The hall is already booked or reserved for this time window');
   }
 
   // Calculate pricing
   const rentalHours = Math.max(1, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
   const totalPrice = (rentalHours * hall.pricePerHour) + (guestCount * (hall.pricePerPlate || 0));
+
+  logger.info({
+    requestId: req.context?.requestId,
+    hallId,
+    guestName,
+    totalPrice,
+  }, 'Creating banquet booking in database');
 
   const booking = await BanquetBooking.create({
     hall: hallId,
@@ -141,6 +167,11 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
     status: 'PENDING',
     paymentStatus: paymentStatus || 'PENDING',
   });
+
+  logger.info({
+    requestId: req.context?.requestId,
+    bookingId: booking._id,
+  }, 'Banquet booking created successfully');
 
   const populated = await BanquetBooking.findById(booking._id).populate('hall', 'name capacity');
   return created(res, { booking: populated });

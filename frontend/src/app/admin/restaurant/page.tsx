@@ -483,7 +483,7 @@ export default function RestaurantPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b pb-3">
                 <div>
-                  <h2 className="font-bold text-lg text-zinc-900">Today's Reservations</h2>
+                  <h2 className="font-bold text-lg text-zinc-900">Today&apos;s Reservations</h2>
                   <p className="text-[11px] text-zinc-400">{todayReservations.length} booked for today</p>
                 </div>
                 <Link href="/admin/restaurant/reservations">
