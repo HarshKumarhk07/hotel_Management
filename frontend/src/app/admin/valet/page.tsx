@@ -28,6 +28,7 @@ import { Badge, Card, CenteredSpinner } from '@/components/ui/primitives';
 import { api, apiErrorMessage } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth';
+import { Trash2 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -296,6 +297,114 @@ function EditManagerModal({ manager, onClose }: { manager: ValetManager; onClose
   );
 }
 
+// ── Manage Slots Modal ──────────────────────────────────────────────────────────
+
+function ManageSlotsModal({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [newSlot, setNewSlot] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const { data: slots, isLoading } = useQuery<{ _id: string; slotNumber: string; isOccupied: boolean }[]>({
+    queryKey: ['admin-valet-slots'],
+    queryFn: async () => {
+      const res = await api.get('/valet/admin/slots'); // Note: we can use the existing /valet/slots or the admin one. Let's use /valet/slots
+      return res.data.data;
+    },
+    refetchInterval: 10_000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (slotNumber: string) => api.post('/valet/admin/slots', { slotNumber }),
+    onSuccess: () => {
+      setNewSlot('');
+      setErrorMsg('');
+      queryClient.invalidateQueries({ queryKey: ['admin-valet-slots'] });
+    },
+    onError: (err) => setErrorMsg(apiErrorMessage(err)),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/valet/admin/slots/${id}`),
+    onSuccess: () => {
+      setErrorMsg('');
+      queryClient.invalidateQueries({ queryKey: ['admin-valet-slots'] });
+    },
+    onError: (err) => setErrorMsg(apiErrorMessage(err)),
+  });
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSlot.trim()) return;
+    createMutation.mutate(newSlot.trim());
+  };
+
+  return (
+    <div className="space-y-4">
+      {errorMsg && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{errorMsg}</div>
+      )}
+      
+      <form onSubmit={handleCreate} className="flex gap-2">
+        <Input 
+          value={newSlot} 
+          onChange={(e) => setNewSlot(e.target.value)} 
+          placeholder="New slot (e.g. P-51)" 
+          className="flex-1"
+        />
+        <Button type="submit" disabled={!newSlot.trim() || createMutation.isPending}>
+          Add
+        </Button>
+      </form>
+
+      <div className="border rounded-lg max-h-80 overflow-y-auto bg-zinc-50">
+        {isLoading ? (
+          <CenteredSpinner />
+        ) : !slots || slots.length === 0 ? (
+          <p className="p-4 text-center text-sm text-zinc-500">No parking slots found.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-100 sticky top-0 border-b">
+              <tr>
+                <th className="px-3 py-2 font-medium text-zinc-600">Slot Number</th>
+                <th className="px-3 py-2 font-medium text-zinc-600 w-24">Status</th>
+                <th className="px-3 py-2 w-16"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {slots.map(s => (
+                <tr key={s._id} className="hover:bg-white transition-colors">
+                  <td className="px-3 py-2 font-semibold text-zinc-800">{s.slotNumber}</td>
+                  <td className="px-3 py-2">
+                    {s.isOccupied ? (
+                      <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Occupied</Badge>
+                    ) : (
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Free</Badge>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      onClick={() => deleteMutation.mutate(s._id)}
+                      disabled={s.isOccupied || deleteMutation.isPending}
+                      className="text-zinc-400 hover:text-red-500 disabled:opacity-50 disabled:hover:text-zinc-400"
+                      title={s.isOccupied ? "Cannot delete occupied slot" : "Delete slot"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      
+      <div className="pt-2 flex justify-end">
+        <Button variant="outline" onClick={onClose}>Done</Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 function ValetManagementContent() {
@@ -305,6 +414,7 @@ function ValetManagementContent() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'disabled'>('all');
   const [createOpen, setCreateOpen] = useState(false);
+  const [slotsOpen, setSlotsOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ValetManager | null>(null);
   const [resetTarget, setResetTarget] = useState<ValetManager | null>(null);
   const [resetConfirmed, setResetConfirmed] = useState(false);
@@ -403,13 +513,22 @@ function ValetManagementContent() {
           <h1 className="text-2xl font-bold text-zinc-900">Valet Parking</h1>
           <p className="text-sm text-zinc-500">Manage valet managers and monitor parking operations</p>
         </div>
-        <Button
-          id="create-valet-manager-btn"
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" /> Add Valet Manager
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setSlotsOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <ParkingCircle className="h-4 w-4" /> Manage Slots
+          </Button>
+          <Button
+            id="create-valet-manager-btn"
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 bg-[#D4AF37] hover:bg-[#AE963C] text-white"
+          >
+            <Plus className="h-4 w-4" /> Add Valet Manager
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -642,6 +761,11 @@ function ValetManagementContent() {
       {/* Create */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Add Valet Manager">
         <CreateManagerModal onClose={() => setCreateOpen(false)} />
+      </Dialog>
+
+      {/* Manage Slots */}
+      <Dialog open={slotsOpen} onClose={() => setSlotsOpen(false)} title="Manage Parking Slots">
+        <ManageSlotsModal onClose={() => setSlotsOpen(false)} />
       </Dialog>
 
       {/* Edit */}

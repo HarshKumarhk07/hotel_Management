@@ -34,3 +34,6 @@ export const couponLimiter = makeLimiter({ windowMs: 15 * 60_000, max: 50 });
 
 /** Guest (un-authenticated) checkout — abuse-resistant but usable per device/IP. */
 export const guestCheckoutLimiter = makeLimiter({ windowMs: 15 * 60_000, max: 20 });
+
+/** Public search endpoints — prevent scraping/abuse. */
+export const searchLimiter = makeLimiter({ windowMs: 15 * 60_000, max: 60 });

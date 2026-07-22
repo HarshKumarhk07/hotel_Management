@@ -20,6 +20,7 @@ import {
   Play,
   CheckCircle2,
   Mail,
+  Download,
 } from 'lucide-react';
 import Link from 'next/link';
 import { AdminShell } from '@/components/admin/AdminShell';
@@ -160,7 +161,7 @@ function TableCard({
         <Button
           variant="ghost"
           size="sm"
-          title="Regenerate table QR code"
+          title="View / Manage QR Code"
           onClick={() => onRegen(table)}
           className="text-zinc-400 hover:text-zinc-600"
         >
@@ -227,6 +228,78 @@ function BillModal({ tableId, onClose }: { tableId: string; onClose: () => void 
   );
 }
 
+// ── QR Modal ───────────────────────────────────────────────────────────────────
+
+function TableQRModal({
+  table,
+  onClose,
+  onRegenerate,
+  isRegenerating
+}: {
+  table: RestaurantTable;
+  onClose: () => void;
+  onRegenerate: () => void;
+  isRegenerating: boolean;
+}) {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+    `${typeof window !== 'undefined' ? window.location.origin : ''}/t/${table.qr.token}`
+  )}`;
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Table-${table.number}-QR.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed', error);
+      alert('Failed to download QR code');
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} title={`Table ${table.number} QR Code`}>
+      <div className="flex flex-col items-center space-y-6 text-center">
+        <div className="space-y-2">
+          <p className="text-sm text-zinc-500">
+            Guests can scan this QR code to view the menu and place orders directly.
+          </p>
+        </div>
+        
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-zinc-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrUrl} alt={`QR Code for Table ${table.number}`} className="w-48 h-48" />
+        </div>
+
+        <div className="flex flex-col w-full gap-2 pt-4 border-t border-zinc-100">
+          <Button onClick={handleDownload} className="w-full bg-[#D4AF37] hover:bg-[#AE963C] text-white">
+            <Download className="h-4 w-4 mr-2" /> Download QR Code
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              if (confirm('Regenerate QR? The old QR code will stop working immediately.')) {
+                onRegenerate();
+              }
+            }} 
+            disabled={isRegenerating}
+            className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} /> 
+            {isRegenerating ? 'Regenerating...' : 'Regenerate QR'}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function RestaurantPage() {
@@ -244,7 +317,7 @@ export default function RestaurantPage() {
   const [requestBillTarget, setRequestBillTarget] = useState<RestaurantTable | null>(null);
   const [billInputAmount, setBillInputAmount] = useState('');
   const [closeTableTarget, setCloseTableTarget] = useState<RestaurantTable | null>(null);
-  const [regenQRTarget, setRegenQRTarget] = useState<RestaurantTable | null>(null);
+  const [qrTarget, setQrTarget] = useState<RestaurantTable | null>(null);
   const [removeGuestTarget, setRemoveGuestTarget] = useState<WaitlistEntry | null>(null);
 
   // Waitlist data queries & mutations
@@ -461,11 +534,7 @@ export default function RestaurantPage() {
                               setCloseTableTarget(tbl);
                             }}
                             onViewBill={(tbl) => setBillTarget(tbl._id)}
-                            onRegen={(tbl) => {
-                              if (confirm('Regenerate QR? The old QR code will stop working.')) {
-                                regenMutation.mutate(tbl._id);
-                              }
-                            }}
+                            onRegen={(tbl) => setQrTarget(tbl)}
                           />
                         ))}
                       </div>
@@ -766,34 +835,18 @@ export default function RestaurantPage() {
         </Dialog>
       )}
 
-      {/* Custom Regenerate QR Dialog */}
-      {regenQRTarget && (
-        <Dialog open onClose={() => setRegenQRTarget(null)} title="Regenerate Table QR">
-          <div className="space-y-4 text-left">
-            <p className="text-sm text-zinc-600">
-              Are you sure you want to regenerate the QR code for **Table {regenQRTarget.number}**?
-            </p>
-            <p className="text-xs text-red-500 font-semibold bg-red-50 p-2.5 rounded-lg">
-              Warning: The old QR code on the table printout will stop working immediately.
-            </p>
-            <div className="flex justify-end gap-3 pt-3 border-t">
-              <Button variant="outline" onClick={() => setRegenQRTarget(null)} className="text-xs">
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  regenMutation.mutate(regenQRTarget._id, {
-                    onSuccess: () => setRegenQRTarget(null)
-                  });
-                }}
-                disabled={regenMutation.isPending}
-                className="bg-[#D4AF37] hover:bg-[#AE963C] text-white text-xs font-bold"
-              >
-                {regenMutation.isPending ? 'Regenerating...' : 'Regenerate QR'}
-              </Button>
-            </div>
-          </div>
-        </Dialog>
+      {/* QR Code Modal */}
+      {qrTarget && (
+        <TableQRModal 
+          table={qrTarget} 
+          onClose={() => setQrTarget(null)} 
+          onRegenerate={() => {
+            regenMutation.mutate(qrTarget._id, {
+              onSuccess: () => setQrTarget(null)
+            });
+          }}
+          isRegenerating={regenMutation.isPending}
+        />
       )}
 
       {/* Custom Remove Waitlist Guest Dialog */}

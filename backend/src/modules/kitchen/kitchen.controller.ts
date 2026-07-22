@@ -6,13 +6,19 @@ import { ok, created } from '@/utils/apiResponse';
 import { auditFromRequest } from '@/services/audit.service';
 import { assertKitchenAccess } from '@/utils/scope';
 import { AppError } from '@/utils/AppError';
+import { isKitchenAvailableNow } from '@/utils/availability';
 import * as service from './kitchen.service';
 
 /** Public: active kitchens (minimal fields) so the landing page can showcase one. */
 export const listPublic = asyncHandler(async (_req: Request, res) => {
-  const kitchens = await Kitchen.find({ isActive: true }).select('name slug').sort({ createdAt: 1 });
+  const kitchens = await Kitchen.find({ isActive: true }).select('name slug temporarilyClosed timings weeklySchedule holidayTimings').sort({ createdAt: 1 });
   return ok(res, {
-    kitchens: kitchens.map((k) => ({ id: k._id.toString(), name: k.name, slug: k.slug })),
+    kitchens: kitchens.map((k) => ({ 
+      id: k._id.toString(), 
+      name: k.name, 
+      slug: k.slug,
+      isOpen: isKitchenAvailableNow(k)
+    })),
   });
 });
 

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '@/middleware/authenticate';
 import { authorize } from '@/middleware/authorize';
 import { validate } from '@/middleware/validate';
+import { searchLimiter } from '@/middleware/rateLimit';
 import { ROLES } from '@/constants';
 import * as ctrl from './room.controller';
 import * as bookingCtrl from './roomBooking.controller';
@@ -17,7 +18,12 @@ import {
   updateBookingStatusSchema,
   setRoomStatusSchema,
   searchRoomsSchema,
+  createCategorySchema,
+  updateCategorySchema,
+  categoryIdParam,
 } from './room.validation';
+import * as categoryCtrl from './category.controller';
+import { uploadDocument, uploadImage as uploadImageMw } from '@/middleware/upload';
 
 const router = Router();
 
@@ -42,8 +48,21 @@ const router = Router();
  */
 router.get('/resolve/:token', validate({ params: scanTokenParam }), ctrl.resolve);
 
+// Admin Category Routes
+router.post('/categories/upload-image', authenticate, authorize(ROLES.SUPER_ADMIN), uploadImageMw, categoryCtrl.uploadCategoryImage);
+
+router.route('/categories')
+  .post(authenticate, authorize(ROLES.SUPER_ADMIN), validate({ body: createCategorySchema }), categoryCtrl.createCategory)
+  .get(categoryCtrl.listCategories); // Get list of categories should probably be public anyway for users to see, but leaving it open
+
+router.route('/categories/:id')
+  .get(validate({ params: categoryIdParam }), categoryCtrl.getCategory)
+  .patch(authenticate, authorize(ROLES.SUPER_ADMIN), validate({ params: categoryIdParam, body: updateCategorySchema }), categoryCtrl.updateCategory)
+  .delete(authenticate, authorize(ROLES.SUPER_ADMIN), validate({ params: categoryIdParam }), categoryCtrl.deleteCategory);
+
 // Public Room Bookings
-router.get('/search', validate({ query: searchRoomsSchema }), bookingCtrl.searchRooms);
+router.get('/search', searchLimiter, validate({ query: searchRoomsSchema }), bookingCtrl.searchRooms);
+router.post('/bookings/upload-id', uploadDocument, bookingCtrl.uploadIdProof);
 router.post('/bookings', validate({ body: createBookingSchema }), bookingCtrl.createBooking);
 router.get('/bookings/my-bookings', bookingCtrl.getGuestBookings);
 router.get('/bookings/:id', bookingCtrl.getBookingById);
@@ -135,3 +154,4 @@ router.post('/bookings/:id/transfer', bookingCtrl.transferRoom);
 router.get('/admin/reports', bookingCtrl.getReports);
 
 export default router;
+

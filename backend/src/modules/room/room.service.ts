@@ -1,5 +1,6 @@
 import { startSession, type FilterQuery } from 'mongoose';
 import { Kitchen, Room, type IRoom } from '@/models';
+import { RoomCategory } from '@/models/RoomCategory';
 import { generateQrToken } from '@/services/qr.service';
 import { getPageParams, pageMeta } from '@/utils/pagination';
 import { AppError } from '@/utils/AppError';
@@ -16,11 +17,23 @@ export async function createRoom(input: CreateRoomInput) {
   const dup = await Room.findOne({ roomNumber: input.roomNumber, floor: input.floor });
   if (dup) throw AppError.conflict('A room with this number already exists on this floor', 'ROOM_EXISTS');
 
+  const category = await RoomCategory.findOne({ roomType: input.roomType || 'STANDARD' });
+  const categoryData = category ? {
+    roomType: category.roomType,
+    capacity: category.capacity,
+    amenities: category.amenities,
+    pricePerNight: category.pricePerNight,
+    images: category.images,
+  } : {
+    roomType: input.roomType || 'STANDARD',
+  };
+
   return Room.create({
     roomNumber: input.roomNumber,
     floor: input.floor,
     kitchen: input.kitchen,
     internalNote: input.internalNote,
+    ...categoryData,
     isActive: true,
     qr: { token: generateQrToken(), isActive: true, version: 1, generatedAt: new Date() },
   });
@@ -76,6 +89,16 @@ export async function updateRoom(id: string, input: UpdateRoomInput) {
     room.kitchen = (input.kitchen ?? undefined) as never;
   }
   if (input.internalNote !== undefined) room.internalNote = input.internalNote;
+  if (input.roomType !== undefined && input.roomType !== room.roomType) {
+    room.roomType = input.roomType as any;
+    const category = await RoomCategory.findOne({ roomType: input.roomType });
+    if (category) {
+      room.capacity = category.capacity;
+      room.amenities = category.amenities;
+      room.pricePerNight = category.pricePerNight;
+      room.images = category.images;
+    }
+  }
 
   await room.save();
   return room;

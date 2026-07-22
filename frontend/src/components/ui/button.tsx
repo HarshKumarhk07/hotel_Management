@@ -24,13 +24,25 @@ const buttonVariants = cva(
   },
 );
 
+import { Loader2 } from 'lucide-react';
+
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  isLoading?: boolean;
+}
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
-    <button ref={ref} className={cn(buttonVariants({ variant, size }), className)} {...props} />
+  ({ className, variant, size, isLoading, children, disabled, ...props }, ref) => (
+    <button 
+      ref={ref} 
+      className={cn(buttonVariants({ variant, size }), className)} 
+      disabled={disabled || isLoading}
+      {...props}
+    >
+      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {children}
+    </button>
   ),
 );
 Button.displayName = 'Button';

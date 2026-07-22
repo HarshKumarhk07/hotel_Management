@@ -28,7 +28,6 @@ export const seatTableSchema = z.object({
 });
 
 export const createReservationSchema = z.object({
-  tableId:     mongoId,
   guestName:   z.string().trim().min(1).max(120),
   phone:       z.string().trim().min(1),
   email:       z.string().trim().email().optional(),

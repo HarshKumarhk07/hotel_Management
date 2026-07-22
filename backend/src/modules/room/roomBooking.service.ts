@@ -77,6 +77,8 @@ export async function createRoomBooking(input: {
   city?: string;
   country?: string;
   governmentId?: string;
+  idProofUrl?: string;
+  idProofType?: string;
   specialRequests?: {
     lateCheckIn?: boolean;
     extraBed?: boolean;
@@ -103,11 +105,17 @@ export async function createRoomBooking(input: {
   }
 
   // Ensure room is not double booked
+  // We consider CONFIRMED/CHECKED_IN as hard conflicts.
+  // PENDING bookings are only considered conflicts if they were created in the last 15 minutes (to allow time for payment checkout).
+  const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
   const conflict = await RoomBooking.findOne({
     room: room._id,
-    status: { $ne: 'CANCELLED' },
     checkInDate: { $lt: checkOut },
     checkOutDate: { $gt: checkIn },
+    $or: [
+      { status: { $in: ['CONFIRMED', 'CHECKED_IN'] } },
+      { status: 'PENDING', createdAt: { $gt: fifteenMinsAgo } }
+    ]
   });
   if (conflict) {
     throw AppError.conflict('Room is already booked during this date range', 'ROOM_BOOKED');
@@ -163,6 +171,8 @@ export async function createRoomBooking(input: {
     city: input.city,
     country: input.country,
     governmentId: input.governmentId,
+    idProofUrl: input.idProofUrl,
+    idProofType: input.idProofType,
     specialRequests: {
       lateCheckIn: !!input.specialRequests?.lateCheckIn,
       extraBed: !!input.specialRequests?.extraBed,

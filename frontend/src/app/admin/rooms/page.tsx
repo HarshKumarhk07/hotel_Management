@@ -23,6 +23,7 @@ const createSchema = z.object({
   roomNumber: z.string().min(1, 'Room number is required'),
   floor: z.coerce.number().int(),
   kitchen: z.string().optional(),
+  roomType: z.string().optional(),
 });
 type CreateForm = z.infer<typeof createSchema>;
 
@@ -33,6 +34,13 @@ function CreateRoomDialog({ open, onClose }: { open: boolean; onClose: () => voi
     queryFn: async () => {
       const res = await api.get<{ data: { kitchens: { id: string; name: string }[] } }>('/kitchens/public');
       return res.data.data.kitchens;
+    },
+  });
+  const { data: categories } = useQuery({
+    queryKey: ['admin-room-categories-list'],
+    queryFn: async () => {
+      const res = await api.get<{ data: { categories: { _id: string; roomType: string; displayName: string }[] } }>('/rooms/categories');
+      return res.data.data.categories;
     },
   });
   const [serverError, setServerError] = useState<string | null>(null);
@@ -50,6 +58,7 @@ function CreateRoomDialog({ open, onClose }: { open: boolean; onClose: () => voi
         roomNumber: values.roomNumber,
         floor: values.floor,
         kitchen: values.kitchen || undefined,
+        roomType: values.roomType,
       });
       reset();
       onClose();
@@ -69,26 +78,41 @@ function CreateRoomDialog({ open, onClose }: { open: boolean; onClose: () => voi
             <Input type="number" placeholder="1" {...register('floor')} />
           </Field>
         </div>
-        <Field label="Serving kitchen">
-          <select
-            className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
-            {...register('kitchen')}
-          >
-            <option value="">— None —</option>
-            {kitchens?.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Room Type">
+            <select
+              className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
+              {...register('roomType')}
+            >
+              <option value="">— Select Category —</option>
+              {categories?.map((c) => (
+                <option key={c.roomType} value={c.roomType}>
+                  {c.displayName}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Serving kitchen">
+            <select
+              className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
+              {...register('kitchen')}
+            >
+              <option value="">— None —</option>
+              {kitchens?.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
         {serverError ? <FieldError message={serverError} /> : null}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create room'}
+          <Button type="submit" disabled={isSubmitting} isLoading={isSubmitting} className="bg-[#D4AF37] hover:bg-[#AE963C] text-white">
+            Create room
           </Button>
         </div>
       </form>
@@ -306,6 +330,14 @@ function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }
                 <p className="flex items-center gap-2 font-semibold text-zinc-900">
                   <DollarSign className="h-4 w-4 text-[#D4AF37]" /> ₹{booking.totalPrice}
                 </p>
+                {booking.idProofUrl && (
+                  <p className="flex items-center gap-2 text-xs">
+                    <FileText className="h-4 w-4 text-zinc-400" /> 
+                    <a href={booking.idProofUrl} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] hover:underline font-bold">
+                      View {booking.idProofType || 'ID Proof'}
+                    </a>
+                  </p>
+                )}
               </div>
               <p className="text-xs text-zinc-400">
                 Check-in: <span className="font-semibold text-zinc-700">{formatDate(booking.checkInDate)}</span> | Check-out: <span className="font-semibold text-zinc-700">{formatDate(booking.checkOutDate)}</span>

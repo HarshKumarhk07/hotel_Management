@@ -58,5 +58,5 @@ export { Waitlist, type IWaitlist } from './Waitlist';
 export { Complaint, type IComplaint } from './Complaint';
 export { Feedback, type IFeedback } from './Feedback';
 
-
-
+// Gallery Model
+export { GalleryImage, type IGalleryImage } from './GalleryImage';

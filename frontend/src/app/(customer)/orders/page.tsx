@@ -218,7 +218,7 @@ function DashboardInner() {
                   You have not placed any room service or kitchen dining orders yet. Enjoy curated, gourmet culinary delights.
                 </p>
                 <Button
-                  onClick={() => router.push('/')}
+                  onClick={() => router.push('/menu')}
                   className="bg-[#111] hover:bg-zinc-800 text-[#D4AF37] text-xs uppercase tracking-wider font-extrabold px-6 py-5 rounded-xl"
                 >
                   Order In-Room Dining

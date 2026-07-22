@@ -200,6 +200,14 @@ export function Navbar() {
               Banquet
             </button>
             <button
+              onClick={() => handleNavClick('/menu')}
+              className={`transition-colors pb-1 border-b-2 ${
+                pathname.startsWith('/menu') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
+              }`}
+            >
+              Menu
+            </button>
+            <button
               onClick={() => handleNavClick('/restaurant/waitlist')}
               className={`transition-colors pb-1 border-b-2 ${
                 pathname.startsWith('/restaurant') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
@@ -214,12 +222,36 @@ export function Navbar() {
               Amenities
             </button>
             <button
+              onClick={() => handleNavClick('/facilities')}
+              className={`transition-colors pb-1 border-b-2 ${
+                pathname.startsWith('/facilities') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
+              }`}
+            >
+              Facilities
+            </button>
+            <button
               onClick={() => handleNavClick('/about')}
               className={`transition-colors pb-1 border-b-2 ${
                 pathname.startsWith('/about') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
               }`}
             >
               About
+            </button>
+            <button
+              onClick={() => handleNavClick('/gallery')}
+              className={`transition-colors pb-1 border-b-2 ${
+                pathname.startsWith('/gallery') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
+              }`}
+            >
+              Gallery
+            </button>
+            <button
+              onClick={() => handleNavClick('/contact')}
+              className={`transition-colors pb-1 border-b-2 ${
+                pathname.startsWith('/contact') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
+              }`}
+            >
+              Contact
             </button>
           </nav>
 
@@ -304,6 +336,12 @@ export function Navbar() {
                 Banquet
               </button>
               <button
+                onClick={() => handleNavClick('/menu')}
+                className={`text-left ${pathname.startsWith('/menu') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
+              >
+                Menu
+              </button>
+              <button
                 onClick={() => handleNavClick('/restaurant/waitlist')}
                 className={`text-left ${pathname.startsWith('/restaurant') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
               >
@@ -316,10 +354,28 @@ export function Navbar() {
                 Amenities
               </button>
               <button
+                onClick={() => handleNavClick('/facilities')}
+                className={`text-left ${pathname.startsWith('/facilities') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
+              >
+                Facilities
+              </button>
+              <button
                 onClick={() => handleNavClick('/about')}
                 className={`text-left ${pathname.startsWith('/about') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
               >
                 About
+              </button>
+              <button
+                onClick={() => handleNavClick('/gallery')}
+                className={`text-left ${pathname.startsWith('/gallery') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
+              >
+                Gallery
+              </button>
+              <button
+                onClick={() => handleNavClick('/contact')}
+                className={`text-left ${pathname.startsWith('/contact') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
+              >
+                Contact
               </button>
               {status === 'authenticated' ? (
                 <>

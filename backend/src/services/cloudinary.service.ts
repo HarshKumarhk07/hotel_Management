@@ -54,6 +54,33 @@ export function uploadImage(buffer: Buffer, folder = 'kds/menu'): Promise<Upload
   });
 }
 
+/**
+ * Upload an arbitrary file (like a PDF) to Cloudinary.
+ */
+export function uploadFile(buffer: Buffer, folder = 'kds/docs'): Promise<UploadedImage> {
+  ensureConfigured();
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'auto',
+      },
+      (err, result) => {
+        if (err || !result) {
+          logger.error({ err, errDetail: err?.message, errHttp: (err as any)?.http_code }, 'Cloudinary upload failed');
+          reject(AppError.internal(
+            err?.message ?? 'File upload failed',
+            'UPLOAD_FAILED',
+          ));
+          return;
+        }
+        resolve({ url: result.secure_url, publicId: result.public_id });
+      },
+    );
+    stream.end(buffer);
+  });
+}
+
 export async function deleteImage(publicId: string): Promise<void> {
   ensureConfigured();
   try {

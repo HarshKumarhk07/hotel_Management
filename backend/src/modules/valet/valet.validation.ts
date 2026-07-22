@@ -2,16 +2,16 @@ import { z } from 'zod';
 
 export const checkInVehicleSchema = z.object({
   carNumber: z.string().trim().min(1, 'Car number is required'),
-  brand: z.string().trim().min(1, 'Brand is required'),
-  model: z.string().trim().min(1, 'Model is required'),
-  color: z.string().trim().min(1, 'Color is required'),
-  parkingSlot: z.string().trim().min(1, 'Parking slot is required'),
+  brand: z.string().trim().optional(),
+  model: z.string().trim().optional(),
+  color: z.string().trim().optional(),
+  parkingSlot: z.string().trim().optional(),
   fuelLevel: z.string().trim().optional(),
   odometer: z.coerce.number().optional(),
-  keyTag: z.string().trim().min(1, 'Key tag is required'),
+  keyTag: z.string().trim().optional(),
   guestInfo: z.object({
     name: z.string().trim().min(1, 'Guest name is required'),
-    roomNumber: z.string().trim().min(1, 'Room number is required'),
+    roomNumber: z.string().trim().optional(),
     phone: z.string().trim().min(1, 'Phone is required'),
     email: z.string().trim().email('Valid email is required'),
   }),
@@ -43,4 +43,8 @@ export const updateValetManagerSchema = z.object({
   phone: z.string().trim().min(1, 'Phone number is required'),
   employeeId: z.string().trim().optional(),
   isActive: z.boolean().optional(),
+});
+
+export const createSlotSchema = z.object({
+  slotNumber: z.string().trim().min(1, 'Slot number is required').max(10),
 });

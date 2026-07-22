@@ -25,7 +25,7 @@ export interface IRoom extends Document {
   isActive: boolean;
   status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'CLEANING' | 'MAINTENANCE' | 'BLOCKED' | 'OUT_OF_SERVICE' | 'VIP_RESERVED';
   qr: IRoomQr;
-  roomType: 'STANDARD' | 'DELUXE' | 'EXECUTIVE' | 'SUITE' | 'PRESIDENTIAL';
+  roomType: string;
   capacity: number;
   bedType: 'SINGLE' | 'DOUBLE' | 'QUEEN' | 'KING';
   roomSizeSqFt: number;
@@ -56,7 +56,6 @@ const roomSchema = new Schema<IRoom>(
     },
     roomType: {
       type: String,
-      enum: ['STANDARD', 'DELUXE', 'EXECUTIVE', 'SUITE', 'PRESIDENTIAL'],
       default: 'STANDARD',
       index: true,
     },

@@ -7,6 +7,7 @@ export const createRoomSchema = z.object({
   roomNumber: z.string().trim().min(1).max(20),
   floor: z.coerce.number().int().min(-5).max(200),
   kitchen: objectId.optional(),
+  roomType: z.string().trim().min(1).max(50).optional(),
   internalNote: z.string().trim().max(500).optional(),
 });
 
@@ -14,6 +15,7 @@ export const updateRoomSchema = z.object({
   roomNumber: z.string().trim().min(1).max(20).optional(),
   floor: z.coerce.number().int().min(-5).max(200).optional(),
   kitchen: objectId.nullable().optional(),
+  roomType: z.string().trim().min(1).max(50).optional(),
   internalNote: z.string().trim().max(500).optional(),
 });
 
@@ -54,7 +56,7 @@ export const searchRoomsSchema = z.object({
   checkInDate: z.string().min(1),
   checkOutDate: z.string().min(1),
   floor: z.coerce.number().int().optional(),
-  roomType: z.enum(['STANDARD', 'DELUXE', 'EXECUTIVE', 'SUITE', 'PRESIDENTIAL']).optional(),
+  roomType: z.string().trim().min(1).max(50).optional(),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
   guestCount: z.coerce.number().int().min(1).optional(),
@@ -71,6 +73,8 @@ export const createBookingSchema = z.object({
   city: z.string().trim().optional(),
   country: z.string().trim().optional(),
   governmentId: z.string().trim().optional(),
+  idProofUrl: z.string().url().optional(),
+  idProofType: z.enum(['Aadhaar', 'Passport', 'Driving License', 'Other']).optional(),
   specialRequests: z
     .object({
       lateCheckIn: z.boolean().default(false),
@@ -100,3 +104,23 @@ export const setRoomStatusSchema = z.object({
   ]),
 });
 
+export const createCategorySchema = z.object({
+  roomType: z.string().trim().min(1).max(50),
+  displayName: z.string().trim().min(1).max(50),
+  description: z.string().trim().max(500).optional(),
+  pricePerNight: z.coerce.number().min(0),
+  capacity: z.coerce.number().int().min(1).optional(),
+  amenities: z.array(z.string().trim().min(1)).optional(),
+  images: z.array(z.string().url()).optional(),
+});
+
+export const updateCategorySchema = z.object({
+  displayName: z.string().trim().min(1).max(50).optional(),
+  description: z.string().trim().max(500).optional(),
+  pricePerNight: z.coerce.number().min(0).optional(),
+  capacity: z.coerce.number().int().min(1).optional(),
+  amenities: z.array(z.string().trim().min(1)).optional(),
+  images: z.array(z.string().url()).optional(),
+});
+
+export const categoryIdParam = z.object({ id: objectId });

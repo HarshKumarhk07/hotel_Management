@@ -18,6 +18,8 @@ import {
   listReservationsHandler,
   createReservationHandler,
   updateReservationHandler,
+  createRazorpayOrderHandler,
+  verifyPaymentHandler,
 } from './restaurant.controller';
 import * as waitlistCtrl from './waitlist.controller';
 import {
@@ -31,6 +33,11 @@ const router = Router();
 // ─── Public (no auth) ────────────────────────────────────────────────────────
 router.get('/availability',          availabilityHandler);
 router.get('/tables/resolve/:token', resolveTableHandler);
+
+// Public reservations & payments
+router.post('/reservations',         ...createReservationHandler);
+router.post('/reservations/:id/razorpay', createRazorpayOrderHandler);
+router.post('/reservations/:id/verify',   verifyPaymentHandler);
 
 // Guest Waitlist
 router.post('/waitlist', validate({ body: joinWaitlistSchema }), waitlistCtrl.join);
@@ -50,7 +57,7 @@ router.post  ('/tables/:id/close',          ...staff, closeTableHandler);
 router.get   ('/tables/:id/bill',           ...staff, getTableBillHandler);
 
 router.get   ('/reservations',              ...staff, listReservationsHandler);
-router.post  ('/reservations',              ...staff, ...createReservationHandler);
+// Staff can still create reservations manually via the same handler but they provide auth headers
 router.patch ('/reservations/:id',          ...staff, ...updateReservationHandler);
 
 // Waitlist Admin

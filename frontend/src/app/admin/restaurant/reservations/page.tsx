@@ -28,12 +28,13 @@ interface Reservation {
   notes?: string;
   cancelReason?: string;
   table?: { _id: string; number: string; section?: string; capacity: number };
+  paymentStatus?: string;
+  amountPaid?: number;
 }
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 
 const createSchema = z.object({
-  tableId:     z.string().min(1, 'Table required'),
   guestName:   z.string().trim().min(1, 'Guest name required'),
   phone:       z.string().trim().min(1, 'Phone required'),
   email:       z.string().email().optional().or(z.literal('')),
@@ -230,20 +231,9 @@ export default function ReservationsPage() {
       {showCreate && (
         <Dialog open onClose={() => setShowCreate(false)} title="New Reservation">
           <form onSubmit={handleSubmit(d => createMutation.mutate(d))} className="space-y-4">
-            <Field label="Table *">
-              <select
-                {...register('tableId')}
-                className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-              >
-                <option value="">Select table…</option>
-                {tables.map(t => (
-                  <option key={t._id} value={t._id}>
-                    {t.number}{t.section ? ` (${t.section})` : ''} — {t.capacity} seats
-                  </option>
-                ))}
-              </select>
-              <FieldError message={errors.tableId?.message} />
-            </Field>
+            <div className="p-3 bg-blue-50 text-blue-700 text-xs rounded-xl mb-2 font-semibold">
+              The system will automatically assign the best available table based on party size and time.
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Guest Name *">
                 <Input {...register('guestName')} placeholder="Full name" />
@@ -338,14 +328,21 @@ function ReservationList({
               </span>
             </div>
             <p className="text-sm text-zinc-500 mt-0.5">
-              {r.table ? `Table ${r.table.number}${r.table.section ? ` · ${r.table.section}` : ''}` : '—'}
+              {r.table ? `Table ${r.table.number}${r.table.section ? ` · ${r.table.section}` : ''}` : 'Auto-Assign Pending'}
               {' · '}{r.partySize} guests · {r.phone}
             </p>
-            <p className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {new Date(r.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              {' — '}{r.durationMins}min
-            </p>
+            <div className="flex gap-4 mt-0.5">
+              <p className="text-xs text-zinc-400 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {new Date(r.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {' — '}{r.durationMins}min
+              </p>
+              {r.paymentStatus && r.paymentStatus !== 'PENDING' && (
+                <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                  Advance Paid
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             {onConfirm && r.status === 'PENDING' && (

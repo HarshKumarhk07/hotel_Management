@@ -18,6 +18,8 @@ import bannerRoutes from '@/modules/banner/banner.routes';
 import banquetRoutes from '@/modules/banquet/banquet.routes';
 import complaintRoutes from '@/modules/complaint/complaint.routes';
 import feedbackRoutes from '@/modules/feedback/feedback.routes';
+import galleryRoutes from '@/modules/gallery/gallery.routes';
+import { getIO } from '@/realtime/socket';
 
 import { ok } from '@/utils/apiResponse';
 import { uploadImage as uploadImageMw } from '@/middleware/upload';
@@ -46,6 +48,14 @@ router.get('/health', (_req, res) =>
   ok(res, { status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() }),
 );
 
+router.get('/test-notify', (_req, res) => {
+  const io = getIO();
+  io.emit('valet:new', { carNumber: 'TEST-1234' });
+  io.emit('complaint:new', { guestName: 'Harsh', category: 'ROOM_SERVICE' });
+  io.emit('order:new', { orderNumber: 'ORD-9999' });
+  res.send('Notifications sent!');
+});
+
 router.use('/auth', authRoutes);
 router.use('/kitchens', kitchenRoutes);
 router.use('/rooms', roomRoutes);
@@ -65,7 +75,7 @@ router.use('/banners', bannerRoutes);
 router.use('/banquets', banquetRoutes);
 router.use('/complaints', complaintRoutes);
 router.use('/feedback', feedbackRoutes);
-
+router.use('/gallery', galleryRoutes);
 
 router.post(
   '/upload',

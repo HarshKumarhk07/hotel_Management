@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   title: 'The Page - Luxury Hotel & Banquets',
   description: 'Scan, browse the kitchen menu, and order food straight to your room.',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/logo.png',
   },
 };
 

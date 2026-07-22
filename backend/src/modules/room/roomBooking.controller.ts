@@ -3,7 +3,16 @@ import { asyncHandler } from '@/utils/asyncHandler';
 import { ok, created } from '@/utils/apiResponse';
 import * as service from './roomBooking.service';
 import { generateInvoicePdfBuffer } from './roomInvoicePdf.service';
+import { uploadFile } from '@/services/cloudinary.service';
+import { AppError } from '@/utils/AppError';
 
+export const uploadIdProof = asyncHandler(async (req: Request, res) => {
+  if (!req.file) {
+    throw AppError.badRequest('No document uploaded', 'MISSING_FILE');
+  }
+  const result = await uploadFile(req.file.buffer, 'kds/docs/id');
+  return ok(res, { url: result.url });
+});
 
 export const searchRooms = asyncHandler(async (req: Request, res) => {
   const q = req.query as any;

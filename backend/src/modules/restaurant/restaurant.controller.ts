@@ -110,10 +110,28 @@ export const listReservationsHandler = asyncHandler(async (req: Request, res: Re
 export const createReservationHandler = [
   validate({ body: createReservationSchema }),
   asyncHandler(async (req: Request, res: Response) => {
-    const r = await svc.createReservation(req.body, userId(req));
+    // Pass actorId only if available (public users won't have one)
+    const actor = (req as any).user?.id as string | undefined;
+    const r = await svc.createReservation(req.body, actor);
     ok(res, r);
   }),
 ];
+
+export const createRazorpayOrderHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { advanceAmount } = req.body;
+  if (!advanceAmount || isNaN(advanceAmount)) {
+    throw new Error('advanceAmount is required');
+  }
+  const order = await svc.createTableRazorpayOrder(id, Number(advanceAmount));
+  ok(res, order);
+});
+
+export const verifyPaymentHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await svc.verifyTablePayment(id, req.body);
+  ok(res, booking);
+});
 
 export const updateReservationHandler = [
   validate({ body: updateReservationSchema }),

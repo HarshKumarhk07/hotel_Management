@@ -20,6 +20,8 @@ export interface RoomBookingInfo {
   guestName: string;
   phone: string;
   email: string;
+  idProofUrl?: string;
+  idProofType?: string;
   checkInDate: string;
   checkOutDate: string;
   totalPrice: number;

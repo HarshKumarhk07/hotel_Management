@@ -281,12 +281,8 @@ export default function ValetDashboardPage() {
 
   const handleCheckinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!carNumber || !brand || !model || !color || !selectedSlot || !keyTag || !guestName || !roomNumber || !guestPhone || !guestEmail) {
-      alert('Please fill in all required fields.');
-      return;
-    }
-    if (!photoFront || !photoRear || !photoLeft || !photoRight || !photoDashboard) {
-      alert('Please upload all 5 required vehicle photos.');
+    if (!carNumber || !guestName || !guestPhone || !guestEmail) {
+      alert('Please fill in all required fields (Car Number, Name, Phone, Email).');
       return;
     }
 
@@ -309,11 +305,11 @@ export default function ValetDashboardPage() {
 
     const formData = new FormData();
     formData.append('data', JSON.stringify(payload));
-    formData.append('front', photoFront);
-    formData.append('rear', photoRear);
-    formData.append('left', photoLeft);
-    formData.append('right', photoRight);
-    formData.append('dashboard', photoDashboard);
+    if (photoFront) formData.append('front', photoFront);
+    if (photoRear) formData.append('rear', photoRear);
+    if (photoLeft) formData.append('left', photoLeft);
+    if (photoRight) formData.append('right', photoRight);
+    if (photoDashboard) formData.append('dashboard', photoDashboard);
     
     photoDamageList.forEach((file) => {
       formData.append('damage', file);
@@ -663,10 +659,9 @@ export default function ValetDashboardPage() {
                     </h3>
                     <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-zinc-500">Room Number *</label>
+                        <label className="text-xs font-bold text-zinc-500">Room Number</label>
                         <input
                           type="text"
-                          required
                           value={roomNumber}
                           onChange={(e) => setRoomNumber(e.target.value)}
                           className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 shadow-inner focus:border-brand focus:bg-white focus:outline-none"
@@ -729,10 +724,9 @@ export default function ValetDashboardPage() {
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-zinc-500">Brand / Make *</label>
+                        <label className="text-xs font-bold text-zinc-500">Brand / Make</label>
                         <input
                           type="text"
-                          required
                           placeholder="e.g. Mercedes-Benz"
                           value={brand}
                           onChange={(e) => setBrand(e.target.value)}
@@ -740,10 +734,9 @@ export default function ValetDashboardPage() {
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-zinc-500">Model *</label>
+                        <label className="text-xs font-bold text-zinc-500">Model</label>
                         <input
                           type="text"
-                          required
                           placeholder="e.g. C-Class"
                           value={model}
                           onChange={(e) => setModel(e.target.value)}
@@ -751,10 +744,9 @@ export default function ValetDashboardPage() {
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-zinc-500">Color *</label>
+                        <label className="text-xs font-bold text-zinc-500">Color</label>
                         <input
                           type="text"
-                          required
                           placeholder="e.g. Silver"
                           value={color}
                           onChange={(e) => setColor(e.target.value)}
@@ -762,14 +754,13 @@ export default function ValetDashboardPage() {
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-zinc-500">Parking Slot *</label>
+                        <label className="text-xs font-bold text-zinc-500">Parking Slot</label>
                         <select
-                          required
                           value={selectedSlot}
                           onChange={(e) => setSelectedSlot(e.target.value)}
                           className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 shadow-inner focus:border-brand focus:bg-white focus:outline-none"
                         >
-                          <option value="">Select a Slot</option>
+                          <option value="">Select a Slot (Optional)</option>
                           {slots?.map(s => (
                             <option key={s._id} value={s.slotNumber} disabled={s.isOccupied}>
                               {s.slotNumber} {s.isOccupied ? '(Occupied)' : ''}
@@ -778,10 +769,9 @@ export default function ValetDashboardPage() {
                         </select>
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-zinc-500">Key Tag *</label>
+                        <label className="text-xs font-bold text-zinc-500">Key Tag</label>
                         <input
                           type="text"
-                          required
                           placeholder="e.g. K-104"
                           value={keyTag}
                           onChange={(e) => setKeyTag(e.target.value)}

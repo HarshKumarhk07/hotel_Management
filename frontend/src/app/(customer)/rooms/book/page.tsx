@@ -50,6 +50,8 @@ function BookRoomInner() {
   const [country, setCountry] = useState('India');
   const [governmentId, setGovernmentId] = useState('');
 
+  const [hasAutofilled, setHasAutofilled] = useState(false);
+
   // Enforce login and prefill details
   useEffect(() => {
     if (authStatus !== 'loading') {
@@ -57,13 +59,14 @@ function BookRoomInner() {
         alert('We are directing you to the sign-in page for further booking.');
         const redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
         router.replace(`/login?next=${redirectUrl}`);
-      } else {
-        if (!guestName) setGuestName(user.name);
-        if (!email) setEmail(user.email);
+      } else if (!hasAutofilled) {
+        if (!guestName) setGuestName(user.name || '');
+        if (!email) setEmail(user.email || '');
         if (!phone && (user as any).phone) setPhone((user as any).phone);
+        setHasAutofilled(true);
       }
     }
-  }, [authStatus, user, router, guestName, email, phone]);
+  }, [authStatus, user, router, hasAutofilled]);
 
   // Special Requests
   const [lateCheckIn, setLateCheckIn] = useState(false);
@@ -146,6 +149,9 @@ function BookRoomInner() {
     applyCouponMutation.mutate(couponCode);
   };
 
+  const [idProofFile, setIdProofFile] = useState<File | null>(null);
+  const [idProofType, setIdProofType] = useState('Aadhaar');
+
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!room || !checkIn || !checkOut) return;
@@ -154,6 +160,16 @@ function BookRoomInner() {
     setSubmitting(true);
 
     try {
+      let uploadedIdUrl = '';
+      if (idProofFile) {
+        const formData = new FormData();
+        formData.append('document', idProofFile);
+        const uploadRes = await api.post<{ data: { url: string } }>('/rooms/bookings/upload-id', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        uploadedIdUrl = uploadRes.data.data.url;
+      }
+
       // 1. Create Room Booking
       const bookingRes = await api.post<{ data: { booking: { _id: string } } }>('/rooms/bookings', {
         room: room._id,
@@ -166,6 +182,8 @@ function BookRoomInner() {
         city,
         country,
         governmentId,
+        idProofUrl: uploadedIdUrl || undefined,
+        idProofType: uploadedIdUrl ? idProofType : undefined,
         specialRequests: {
           lateCheckIn,
           extraBed,
@@ -308,9 +326,32 @@ function BookRoomInner() {
                   <Input placeholder="India" value={country} onChange={(e) => setCountry(e.target.value)} />
                 </Field>
               </div>
-              <Field label="Government ID Card (Optional)">
-                <Input placeholder="Aadhaar Card / Passport No" value={governmentId} onChange={(e) => setGovernmentId(e.target.value)} />
+              <Field label="Government ID Number (Optional)">
+                <Input placeholder="Aadhaar / Passport No" value={governmentId} onChange={(e) => setGovernmentId(e.target.value)} />
               </Field>
+              <div className="pt-2 border-t space-y-4">
+                <Field label="Government ID Type">
+                  <select 
+                    value={idProofType} 
+                    onChange={(e) => setIdProofType(e.target.value)}
+                    className="w-full text-xs rounded-xl border border-zinc-200 p-2.5 focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  >
+                    <option value="Aadhaar">Aadhaar Card</option>
+                    <option value="Passport">Passport</option>
+                    <option value="Driving License">Driving License</option>
+                    <option value="Voter ID">Voter ID</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </Field>
+                <Field label="Upload ID Proof (PDF/Image)">
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setIdProofFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#D4AF37]/10 file:text-[#D4AF37] hover:file:bg-[#D4AF37]/20 border border-zinc-200 rounded-xl p-1.5 focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  />
+                </Field>
+              </div>
             </Card>
 
             <Card className="p-6 bg-white border rounded-3xl space-y-4 shadow-sm">

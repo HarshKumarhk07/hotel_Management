@@ -129,6 +129,16 @@ export const slots = asyncHandler(async (_req: Request, res: Response) => {
   return ok(res, data);
 });
 
+export const createSlot = asyncHandler(async (req: Request, res: Response) => {
+  const data = await valetService.createParkingSlot(req.body, req.auth!.userId);
+  return created(res, data);
+});
+
+export const deleteSlot = asyncHandler(async (req: Request, res: Response) => {
+  const data = await valetService.deleteParkingSlot(req.params.id, req.auth!.userId);
+  return ok(res, data);
+});
+
 export const listValetManagers = asyncHandler(async (req: Request, res: Response) => {
   const page = req.query.page ? Number(req.query.page) : undefined;
   const limit = req.query.limit ? Number(req.query.limit) : undefined;

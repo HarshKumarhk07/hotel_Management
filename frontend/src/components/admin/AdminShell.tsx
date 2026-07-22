@@ -28,6 +28,8 @@ import {
   Heart,
   LifeBuoy,
   Globe,
+  Settings2,
+  Hotel,
 } from 'lucide-react';
 import { AdminGate } from './AdminGate';
 import { useAuth } from '@/hooks/useAuth';
@@ -223,6 +225,7 @@ function Shell({ children }: { children: ReactNode }) {
     { href: '/admin/revenue', label: 'Revenue Dashboard', icon: <BarChart3 className="h-4 w-4" />, ready: true },
     ...(user?.role === 'SUPER_ADMIN' ? [
       { href: '/admin/kitchens', label: 'Kitchens', icon: <ChefHat className="h-4 w-4" />, ready: true },
+      { href: '/admin/rooms/categories', label: 'Room Categories', icon: <Hotel className="h-4 w-4" />, ready: true },
       { href: '/admin/rooms', label: 'Rooms & QR', icon: <DoorOpen className="h-4 w-4" />, ready: true },
       { href: '/admin/housekeeping', label: 'Housekeeping', icon: <Boxes className="h-4 w-4" />, ready: true },
       { href: '/admin/valet', label: 'Valet Parking', icon: <Car className="h-4 w-4" />, ready: true },
@@ -237,6 +240,7 @@ function Shell({ children }: { children: ReactNode }) {
     ] : []),
     { href: '/admin/orders', label: 'Orders', icon: <ScrollText className="h-4 w-4" />, ready: true },
     { href: '/admin/banners', label: 'Promotions', icon: <ImageIcon className="h-4 w-4" />, ready: true },
+    { href: '/admin/gallery', label: 'Gallery', icon: <ImageIcon className="h-4 w-4" />, ready: true },
     { href: '/admin/staff', label: 'Staff Management', icon: <Users className="h-4 w-4" />, ready: true },
     { href: '/admin/banquets', label: 'Banquet Halls', icon: <Landmark className="h-4 w-4" />, ready: true },
     ...(user?.role === 'SUPER_ADMIN' ? [
@@ -249,6 +253,7 @@ function Shell({ children }: { children: ReactNode }) {
       { href: '/admin/settings', label: 'Kitchen Settings', icon: <Settings className="h-4 w-4" />, ready: true },
     ] : []),
     ...(user?.role === 'SUPER_ADMIN' ? [
+      { href: '/admin/settings', label: 'Global Settings', icon: <Settings2 className="h-4 w-4" />, ready: true },
       { href: '/admin/audit', label: 'Audit log', icon: <Tag className="h-4 w-4" />, ready: true },
     ] : []),
   ];

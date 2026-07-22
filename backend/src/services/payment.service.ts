@@ -153,14 +153,45 @@ export async function handleWebhookEvent(body: WebhookPayload): Promise<{ handle
 
   if ((event === 'payment.captured' || event === 'payment.authorized') && payment?.order_id) {
     const order = await Order.findOne({ 'payment.razorpayOrderId': payment.order_id });
-    if (order) await markPaid(order, payment.id ?? 'unknown');
-    return { handled: true };
+    if (order) {
+      await markPaid(order, payment.id ?? 'unknown');
+      return { handled: true };
+    }
+    
+    // Check if it's a TableReservation
+    const { TableReservation } = await import('@/models');
+    const tableReservation = await TableReservation.findOne({ paymentId: payment.order_id });
+    if (tableReservation) {
+      if (tableReservation.paymentStatus !== PAYMENT_STATUS.PAID) {
+        tableReservation.paymentStatus = PAYMENT_STATUS.PAID;
+        tableReservation.status = 'CONFIRMED' as any; // RESERVATION_STATUS.CONFIRMED
+        tableReservation.confirmedAt = new Date();
+        await tableReservation.save();
+      }
+      return { handled: true };
+    }
+    return { handled: false };
   }
 
   if (event === 'payment.failed' && payment?.order_id) {
     const order = await Order.findOne({ 'payment.razorpayOrderId': payment.order_id });
-    if (order) await markFailed(order, payment.error_description);
-    return { handled: true };
+    if (order) {
+      await markFailed(order, payment.error_description);
+      return { handled: true };
+    }
+
+    const { TableReservation } = await import('@/models');
+    const tableReservation = await TableReservation.findOne({ paymentId: payment.order_id });
+    if (tableReservation) {
+      if (tableReservation.paymentStatus !== PAYMENT_STATUS.PAID) {
+        tableReservation.paymentStatus = PAYMENT_STATUS.FAILED;
+        // The lock will naturally expire or we can release the table.
+        // If it was PENDING_PAYMENT, it stays that way but payment status fails, locking expires soon.
+        await tableReservation.save();
+      }
+      return { handled: true };
+    }
+    return { handled: false };
   }
 
   if (event === 'refund.processed' && refund?.id) {

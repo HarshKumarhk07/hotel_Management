@@ -612,36 +612,67 @@ export default function BanquetManagementPage() {
         </Dialog>
       )}
 
-      {/* Update Booking Status Modal */}
       {editBookingTarget && (
-        <Dialog open onClose={() => setEditBookingTarget(null)} title="Update Booking Status" widthClass="max-w-md">
-          <form onSubmit={handleBooking(d => updateBookingMutation.mutate({ id: editBookingTarget._id, d }))} className="space-y-4">
-            <Field label="Booking Status">
-              <select
-                {...regBooking('status')}
-                className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand font-sans"
-              >
-                <option value="PENDING">PENDING</option>
-                <option value="CONFIRMED">CONFIRMED</option>
-                <option value="COMPLETED">COMPLETED</option>
-                <option value="CANCELLED">CANCELLED</option>
-              </select>
-            </Field>
+        <Dialog open onClose={() => setEditBookingTarget(null)} title="Manage Banquet Reservation" widthClass="max-w-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-sans">
+            {/* Booking Details Side */}
+            <div className="space-y-4 bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+              <h3 className="font-semibold text-sm text-zinc-900 border-b pb-2 flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#D4AF37]"/> Guest Information
+              </h3>
+              <div className="space-y-2 text-sm text-zinc-700">
+                <p><span className="text-zinc-500 font-medium w-20 inline-block">Name:</span> {editBookingTarget.guestName}</p>
+                <p><span className="text-zinc-500 font-medium w-20 inline-block">Phone:</span> {editBookingTarget.phone}</p>
+                <p><span className="text-zinc-500 font-medium w-20 inline-block">Email:</span> {editBookingTarget.email}</p>
+              </div>
 
-            <Field label="Payment Status">
-              <select
-                {...regBooking('paymentStatus')}
-                className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand font-sans"
-              >
-                <option value="PENDING">PENDING</option>
-                <option value="PAID">PAID</option>
-              </select>
-            </Field>
+              <h3 className="font-semibold text-sm text-zinc-900 border-b pb-2 mt-4 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[#D4AF37]"/> Event Details
+              </h3>
+              <div className="space-y-2 text-sm text-zinc-700">
+                <p><span className="text-zinc-500 font-medium w-24 inline-block">Event Type:</span> {editBookingTarget.eventType}</p>
+                <p><span className="text-zinc-500 font-medium w-24 inline-block">Hall:</span> {editBookingTarget.hall.name}</p>
+                <p><span className="text-zinc-500 font-medium w-24 inline-block">Date:</span> {new Date(editBookingTarget.eventDate).toLocaleDateString()}</p>
+                <p><span className="text-zinc-500 font-medium w-24 inline-block">Time:</span> {editBookingTarget.startTime} - {editBookingTarget.endTime}</p>
+                <p><span className="text-zinc-500 font-medium w-24 inline-block">Guests:</span> {editBookingTarget.guestCount} pax</p>
+                <p className="pt-2 mt-2 border-t font-semibold flex justify-between">
+                  <span>Grand Total:</span>
+                  <span className="text-[#D4AF37]">{formatINR(editBookingTarget.totalPrice)}</span>
+                </p>
+              </div>
+            </div>
 
-            <Button type="submit" className="w-full font-sans" disabled={updateBookingMutation.isPending}>
-              {updateBookingMutation.isPending ? 'Updating…' : 'Update Status'}
-            </Button>
-          </form>
+            {/* Action Side */}
+            <form onSubmit={handleBooking(d => updateBookingMutation.mutate({ id: editBookingTarget._id, d }))} className="space-y-5">
+              <h3 className="font-semibold text-sm text-zinc-900 border-b pb-2">Update Status</h3>
+              
+              <Field label="Booking Status">
+                <select
+                  {...regBooking('status')}
+                  className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] font-sans transition-shadow shadow-sm"
+                >
+                  <option value="PENDING">Pending Approval</option>
+                  <option value="CONFIRMED">Confirmed</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </Field>
+
+              <Field label="Payment Status">
+                <select
+                  {...regBooking('paymentStatus')}
+                  className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] font-sans transition-shadow shadow-sm"
+                >
+                  <option value="PENDING">Pending Payment</option>
+                  <option value="PAID">Fully Paid</option>
+                </select>
+              </Field>
+
+              <Button type="submit" className="w-full font-sans bg-[#D4AF37] hover:bg-[#AE963C] text-white py-6 shadow-md mt-4" disabled={updateBookingMutation.isPending}>
+                {updateBookingMutation.isPending ? 'Updating…' : 'Save Changes'}
+              </Button>
+            </form>
+          </div>
         </Dialog>
       )}
     </AdminShell>

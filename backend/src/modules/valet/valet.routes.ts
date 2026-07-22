@@ -13,6 +13,7 @@ import {
   scanTokenParam,
   createValetManagerSchema,
   updateValetManagerSchema,
+  createSlotSchema,
 } from './valet.validation';
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
@@ -54,6 +55,8 @@ router.post('/admin/managers/:id/reset-password', authenticate, authorize(ROLES.
 router.get('/admin/stats', authenticate, authorize(ROLES.SUPER_ADMIN), ctrl.getValetAdminStats);
 router.get('/admin/activity', authenticate, authorize(ROLES.SUPER_ADMIN), ctrl.getRecentValetActivity);
 router.get('/reports/export', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.VALET_MANAGER), ctrl.exportReport);
+router.post('/admin/slots', authenticate, authorize(ROLES.SUPER_ADMIN), validate({ body: createSlotSchema }), ctrl.createSlot);
+router.delete('/admin/slots/:id', authenticate, authorize(ROLES.SUPER_ADMIN), ctrl.deleteSlot);
 
 // ── Valet Manager / Super Admin Restricted Routes ──
 router.use(authenticate, authorize(ROLES.VALET_MANAGER, ROLES.SUPER_ADMIN));

@@ -293,7 +293,10 @@ export async function getAvailableTables(scheduledAt: Date, durationMins: number
 
   // Tables that have a conflicting active reservation in this window
   const conflicting = await TableReservation.find({
-    status: { $in: [RESERVATION_STATUS.PENDING, RESERVATION_STATUS.CONFIRMED] },
+    $or: [
+      { status: { $in: [RESERVATION_STATUS.CONFIRMED, RESERVATION_STATUS.SEATED, RESERVATION_STATUS.CHECKED_IN] } },
+      { status: RESERVATION_STATUS.PENDING_PAYMENT, lockExpiresAt: { $gt: new Date() } }
+    ],
     scheduledAt: { $lt: new Date(slotEndMs) },
   })
     .select('table scheduledAt durationMins')
@@ -350,7 +353,6 @@ export async function listReservations(filter: {
 
 export async function createReservation(
   data: {
-    tableId: string;
     guestName: string;
     phone: string;
     email?: string;
@@ -359,35 +361,26 @@ export async function createReservation(
     durationMins: number;
     notes?: string;
   },
-  actorId: string,
+  actorId?: string,
 ) {
-  const table = await RestaurantTable.findById(data.tableId).select('kitchen capacity isActive status');
-  if (!table || !table.isActive) throw AppError.notFound('Table not found or inactive');
-  if (data.partySize > table.capacity) {
-    throw AppError.badRequest(
-      `Party size ${data.partySize} exceeds table capacity ${table.capacity}`,
-      'CAPACITY_EXCEEDED',
-    );
-  }
-
   const scheduledAt = new Date(data.scheduledAt);
   if (scheduledAt < new Date()) throw AppError.badRequest('Reservation must be in the future', 'PAST_DATE');
 
-  const slotEndMs = scheduledAt.getTime() + data.durationMins * 60_000;
-  const existing = await TableReservation.find({
-    table: data.tableId,
-    status: { $in: [RESERVATION_STATUS.PENDING, RESERVATION_STATUS.CONFIRMED] },
-    scheduledAt: { $lt: new Date(slotEndMs) },
-  }).select('scheduledAt durationMins').lean();
+  // Automatic Table Assignment
+  const availableTables = await getAvailableTables(scheduledAt, data.durationMins, data.partySize);
+  if (availableTables.length === 0) {
+    throw AppError.conflict('No tables available for this time slot and party size', 'NO_TABLES_AVAILABLE');
+  }
 
-  const conflict = existing.some(
-    (r) => r.scheduledAt.getTime() + r.durationMins * 60_000 > scheduledAt.getTime(),
-  );
-  if (conflict) throw AppError.conflict('Table already reserved for this time slot', 'RESERVATION_CONFLICT');
+  // Pick the best fit table (smallest capacity that fits the party)
+  const bestTable = availableTables[0];
+
+  const lockExpiresAt = new Date();
+  lockExpiresAt.setMinutes(lockExpiresAt.getMinutes() + 10); // Default 10 min lock
 
   const reservation = await TableReservation.create({
-    table:        data.tableId,
-    kitchen:      table.kitchen,
+    table:        bestTable._id,
+    kitchen:      bestTable.kitchen,
     guestName:    data.guestName,
     phone:        data.phone,
     email:        data.email,
@@ -395,45 +388,127 @@ export async function createReservation(
     scheduledAt,
     durationMins: data.durationMins,
     notes:        data.notes,
-    status:       RESERVATION_STATUS.PENDING,
+    status:       RESERVATION_STATUS.PENDING_PAYMENT,
+    paymentStatus: PAYMENT_STATUS.PENDING,
+    lockExpiresAt,
+    createdBy:    actorId,
   });
 
+  void recordAudit({ action: AUDIT_ACTIONS.RESERVATION_CREATED, actor: actorId, metadata: { reservationId: reservation._id } });
+  return reservation;
+}
+
+export async function createTableRazorpayOrder(reservationId: string, advanceAmount: number) {
+  const reservation = await TableReservation.findById(reservationId);
+  if (!reservation) {
+    throw AppError.notFound('Reservation not found');
+  }
+  if (reservation.paymentStatus === 'PAID') {
+    throw AppError.conflict('This reservation is already paid', 'ALREADY_PAID');
+  }
+
+  const { getRazorpay } = await import('@/config/razorpay');
+  const rzp = getRazorpay();
+  const rzpOrder = await rzp.orders.create({
+    amount: Math.round(advanceAmount * 100),
+    currency: 'INR',
+    receipt: reservation._id.toString(),
+    notes: { reservationId: reservation._id.toString() },
+  });
+
+  reservation.paymentMethod = PAYMENT_METHODS.RAZORPAY;
+  reservation.paymentId = rzpOrder.id;
+  await reservation.save();
+
+  const { env } = await import('@/config/env');
+  return {
+    keyId: env.RAZORPAY_KEY_ID || 'rzp_test_key',
+    razorpayOrderId: rzpOrder.id,
+    amount: rzpOrder.amount,
+    currency: rzpOrder.currency,
+  };
+}
+
+export async function verifyTablePayment(
+  reservationId: string,
+  input: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+  }
+) {
+  const reservation = await TableReservation.findById(reservationId);
+  if (!reservation) {
+    throw AppError.notFound('Reservation not found');
+  }
+
+  const { verifyPaymentSignature } = await import('@/services/payment.service');
+  const verified = verifyPaymentSignature(
+    input.razorpayOrderId,
+    input.razorpayPaymentId,
+    input.razorpaySignature
+  );
+
+  if (!verified) {
+    reservation.paymentStatus = PAYMENT_STATUS.FAILED;
+    await reservation.save();
+    throw AppError.badRequest('Invalid payment signature', 'PAYMENT_SIGNATURE_INVALID');
+  }
+
+  reservation.paymentStatus = PAYMENT_STATUS.PAID;
+  reservation.status = RESERVATION_STATUS.CONFIRMED;
+  reservation.confirmedAt = new Date();
+  reservation.paymentId = input.razorpayPaymentId;
+  await reservation.save();
+
   // Mark table RESERVED if currently AVAILABLE
-  if (table.status === TABLE_STATUS.AVAILABLE) {
-    await RestaurantTable.findByIdAndUpdate(data.tableId, { status: TABLE_STATUS.RESERVED });
+  const table = await RestaurantTable.findById(reservation.table);
+  if (table && table.status === TABLE_STATUS.AVAILABLE) {
+    await RestaurantTable.findByIdAndUpdate(reservation.table, { status: TABLE_STATUS.RESERVED });
     emitToAdmins(SOCKET_EVENTS.TABLE_STATUS_CHANGED, {
-      tableId: data.tableId, status: TABLE_STATUS.RESERVED,
+      tableId: reservation.table.toString(), status: TABLE_STATUS.RESERVED,
     });
   }
 
-  void recordAudit({ action: AUDIT_ACTIONS.RESERVATION_CREATED, actor: actorId, metadata: { reservationId: reservation._id } });
   return reservation;
 }
 
 export async function updateReservation(
   id: string,
   data: { status: ReservationStatus; cancelReason?: string },
-  actorId: string,
+  actorId?: string,
 ) {
   const reservation = await TableReservation.findById(id);
   if (!reservation) throw AppError.notFound('Reservation not found');
 
   const prev = reservation.status;
   reservation.status = data.status;
-  if (data.status === RESERVATION_STATUS.CANCELLED) {
+  
+  if (data.status === RESERVATION_STATUS.CONFIRMED) {
+    reservation.confirmedAt = new Date();
+    reservation.paymentStatus = PAYMENT_STATUS.PAID; // For admin overrides
+  } else if (data.status === RESERVATION_STATUS.CHECKED_IN || data.status === RESERVATION_STATUS.SEATED) {
+    reservation.checkedInAt = new Date();
+  } else if (data.status === RESERVATION_STATUS.COMPLETED) {
+    reservation.completedAt = new Date();
+  } else if (data.status === RESERVATION_STATUS.CANCELLED) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (reservation as any).cancelledBy  = actorId;
+    if (actorId) reservation.cancelledBy  = actorId as any;
     reservation.cancelledAt  = new Date();
     reservation.cancelReason = data.cancelReason;
   }
+  
+  if (actorId) {
+    reservation.updatedBy = actorId as any;
+  }
   await reservation.save();
 
-  const terminal: ReservationStatus[] = [RESERVATION_STATUS.CANCELLED, RESERVATION_STATUS.NO_SHOW];
+  const terminal: ReservationStatus[] = [RESERVATION_STATUS.CANCELLED, RESERVATION_STATUS.NO_SHOW, RESERVATION_STATUS.EXPIRED];
   if (terminal.includes(data.status) && prev !== data.status) {
     const otherActive = await TableReservation.exists({
       table:  reservation.table,
       _id:    { $ne: id },
-      status: { $in: [RESERVATION_STATUS.PENDING, RESERVATION_STATUS.CONFIRMED] },
+      status: { $in: [RESERVATION_STATUS.PENDING_PAYMENT, RESERVATION_STATUS.CONFIRMED] },
     });
     if (!otherActive) {
       await RestaurantTable.findOneAndUpdate(

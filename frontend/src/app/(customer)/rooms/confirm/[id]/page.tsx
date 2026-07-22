@@ -73,8 +73,10 @@ export default function BookingConfirmationPage() {
     );
   }
 
+  const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const qrDataUrl = `${siteUrl}/rooms/confirm/${booking._id}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-    booking.confirmationNumber || booking._id
+    qrDataUrl
   )}`;
 
   const invoiceDownloadUrl = `${api.defaults.baseURL}/rooms/bookings/${booking._id}/invoice/download`;

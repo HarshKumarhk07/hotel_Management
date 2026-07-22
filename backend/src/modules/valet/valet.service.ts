@@ -30,26 +30,26 @@ export async function checkInVehicle(
   valetManagerId: string,
   input: {
     carNumber: string;
-    brand: string;
-    model: string;
-    color: string;
-    parkingSlot: string;
+    brand?: string;
+    model?: string;
+    color?: string;
+    parkingSlot?: string;
     fuelLevel?: string;
     odometer?: number;
-    keyTag: string;
+    keyTag?: string;
     guestInfo: {
       name: string;
-      roomNumber: string;
+      roomNumber?: string;
       phone: string;
       email: string;
     };
   },
   photos: {
-    front: PhotoFile;
-    rear: PhotoFile;
-    left: PhotoFile;
-    right: PhotoFile;
-    dashboard: PhotoFile;
+    front?: PhotoFile;
+    rear?: PhotoFile;
+    left?: PhotoFile;
+    right?: PhotoFile;
+    dashboard?: PhotoFile;
     damage?: PhotoFile[];
   }
 ) {
@@ -62,22 +62,25 @@ export async function checkInVehicle(
     throw AppError.conflict('Vehicle with this car number is already parked/requested in the system', 'VEHICLE_ALREADY_EXISTS');
   }
 
-  // 2. Validate and reserve slot
-  const slot = await ParkingSlot.findOne({ slotNumber: input.parkingSlot });
-  if (!slot) {
-    throw AppError.notFound('Parking slot does not exist', 'SLOT_NOT_FOUND');
-  }
-  if (slot.isOccupied) {
-    throw AppError.conflict('Parking slot is already occupied', 'SLOT_OCCUPIED');
+  // 2. Validate and reserve slot if provided
+  let slot: any = null;
+  if (input.parkingSlot) {
+    slot = await ParkingSlot.findOne({ slotNumber: input.parkingSlot });
+    if (!slot) {
+      throw AppError.notFound('Parking slot does not exist', 'SLOT_NOT_FOUND');
+    }
+    if (slot.isOccupied) {
+      throw AppError.conflict('Parking slot is already occupied', 'SLOT_OCCUPIED');
+    }
   }
 
   // 3. Upload images
   const uploadedPhotos: any = {};
-  uploadedPhotos.front = await uploadValetPhoto(photos.front, 'Front');
-  uploadedPhotos.rear = await uploadValetPhoto(photos.rear, 'Rear');
-  uploadedPhotos.left = await uploadValetPhoto(photos.left, 'Left');
-  uploadedPhotos.right = await uploadValetPhoto(photos.right, 'Right');
-  uploadedPhotos.dashboard = await uploadValetPhoto(photos.dashboard, 'Dashboard');
+  if (photos.front) uploadedPhotos.front = await uploadValetPhoto(photos.front, 'Front');
+  if (photos.rear) uploadedPhotos.rear = await uploadValetPhoto(photos.rear, 'Rear');
+  if (photos.left) uploadedPhotos.left = await uploadValetPhoto(photos.left, 'Left');
+  if (photos.right) uploadedPhotos.right = await uploadValetPhoto(photos.right, 'Right');
+  if (photos.dashboard) uploadedPhotos.dashboard = await uploadValetPhoto(photos.dashboard, 'Dashboard');
 
   if (photos.damage && photos.damage.length > 0) {
     uploadedPhotos.damage = [];
@@ -92,8 +95,10 @@ export async function checkInVehicle(
     let savedVehicle!: any;
     await session.withTransaction(async () => {
       // 4. Update slot state
-      slot.isOccupied = true;
-      await slot.save({ session });
+      if (slot) {
+        slot.isOccupied = true;
+        await slot.save({ session });
+      }
 
       // 5. Create vehicle file
       const secureToken = crypto.randomBytes(24).toString('hex');
@@ -129,7 +134,7 @@ export async function checkInVehicle(
             valetManager: valetManagerId,
             vehicle: savedVehicle._id,
             action: 'CHECKIN',
-            details: `Checked in vehicle ${input.carNumber} to slot ${input.parkingSlot}`
+            details: `Checked in vehicle ${input.carNumber}${input.parkingSlot ? ` to slot ${input.parkingSlot}` : ''}`
           }
         ],
         { session }
@@ -480,6 +485,46 @@ export async function listParkingSlots() {
   return ParkingSlot.find().sort({ slotNumber: 1 });
 }
 
+export async function createParkingSlot(input: { slotNumber: string }, adminId: string) {
+  const existing = await ParkingSlot.findOne({ slotNumber: input.slotNumber });
+  if (existing) {
+    throw AppError.conflict('A parking slot with this number already exists', 'SLOT_EXISTS');
+  }
+  
+  const slot = new ParkingSlot({ slotNumber: input.slotNumber });
+  await slot.save();
+  
+  void recordAudit({
+    action: AUDIT_ACTIONS.PARK_SLOT_CREATED as any,
+    actor: adminId,
+    role: ROLES.SUPER_ADMIN,
+    metadata: { slotNumber: input.slotNumber }
+  });
+  
+  return slot;
+}
+
+export async function deleteParkingSlot(id: string, adminId: string) {
+  const slot = await ParkingSlot.findById(id);
+  if (!slot) {
+    throw AppError.notFound('Parking slot not found', 'SLOT_NOT_FOUND');
+  }
+  if (slot.isOccupied) {
+    throw AppError.badRequest('Cannot delete an occupied parking slot', 'SLOT_OCCUPIED');
+  }
+  
+  await slot.deleteOne();
+  
+  void recordAudit({
+    action: AUDIT_ACTIONS.PARK_SLOT_DELETED as any,
+    actor: adminId,
+    role: ROLES.SUPER_ADMIN,
+    metadata: { slotNumber: slot.slotNumber }
+  });
+  
+  return slot;
+}
+
 export async function getVehicleDetailsByToken(token: string) {
   const vehicle = await Vehicle.findOne({ secureToken: token });
   if (!vehicle) {
@@ -653,44 +698,71 @@ export async function resetValetPassword(id: string, adminId: string) {
 }
 
 export async function getValetAdminStats() {
-  const [
-    totalValetManagers,
-    onlineValetManagers,
-    activeVehicles,
-    requestedVehicles,
-    bringingVehicles,
-    gateVehicles,
-    totalSlots,
-    occupiedSlots
-  ] = await Promise.all([
-    User.countDocuments({ role: ROLES.VALET_MANAGER }),
-    User.countDocuments({ role: ROLES.VALET_MANAGER, isOnline: true }),
-    Vehicle.countDocuments({ status: { $ne: 'DELIVERED' } }),
-    Vehicle.countDocuments({ status: 'REQUESTED' }),
-    Vehicle.countDocuments({ status: 'BRINGING' }),
-    Vehicle.countDocuments({ status: 'READY' }),
-    ParkingSlot.countDocuments(),
-    ParkingSlot.countDocuments({ isOccupied: true })
-  ]);
-
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
-  const deliveredToday = await Vehicle.countDocuments({
-    status: 'DELIVERED',
-    deliveredAt: { $gte: startOfToday }
-  });
+
+  const [userStats, vehicleStats, slotStats] = await Promise.all([
+    User.aggregate([
+      { $match: { role: ROLES.VALET_MANAGER } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          online: { $sum: { $cond: [{ $eq: ['$isOnline', true] }, 1, 0] } }
+        }
+      }
+    ]),
+    Vehicle.aggregate([
+      {
+        $group: {
+          _id: null,
+          active: { $sum: { $cond: [{ $ne: ['$status', 'DELIVERED'] }, 1, 0] } },
+          requested: { $sum: { $cond: [{ $eq: ['$status', 'REQUESTED'] }, 1, 0] } },
+          bringing: { $sum: { $cond: [{ $eq: ['$status', 'BRINGING'] }, 1, 0] } },
+          ready: { $sum: { $cond: [{ $eq: ['$status', 'READY'] }, 1, 0] } },
+          deliveredToday: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$status', 'DELIVERED'] },
+                    { $gte: ['$deliveredAt', startOfToday] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]),
+    ParkingSlot.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          occupied: { $sum: { $cond: [{ $eq: ['$isOccupied', true] }, 1, 0] } }
+        }
+      }
+    ])
+  ]);
+
+  const u = userStats[0] || { total: 0, online: 0 };
+  const v = vehicleStats[0] || { active: 0, requested: 0, bringing: 0, ready: 0, deliveredToday: 0 };
+  const s = slotStats[0] || { total: 0, occupied: 0 };
 
   return {
-    totalValetManagers,
-    onlineValetManagers,
-    activeVehicles,
-    requestedVehicles,
-    bringingVehicles,
-    gateVehicles,
-    deliveredToday,
-    totalSlots,
-    occupiedSlots,
-    freeSlots: totalSlots - occupiedSlots
+    totalValetManagers: u.total,
+    onlineValetManagers: u.online,
+    activeVehicles: v.active,
+    requestedVehicles: v.requested,
+    bringingVehicles: v.bringing,
+    gateVehicles: v.ready,
+    deliveredToday: v.deliveredToday,
+    totalSlots: s.total,
+    occupiedSlots: s.occupied,
+    freeSlots: s.total - s.occupied
   };
 }
 
