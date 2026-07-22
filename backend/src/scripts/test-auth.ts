@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 import { env } from '../config/env';
 import { User } from '../models';
-import { generateTokens } from '../utils/jwt';
+import { signAccessToken } from '../utils/jwt';
 import axios from 'axios';
 
 async function test() {
@@ -12,7 +12,7 @@ async function test() {
     const user = await User.findOne({ email: 'admin@hotel.com' });
     if (!user) throw new Error('Admin not found');
     
-    const { accessToken } = generateTokens(user._id.toString());
+    const accessToken = signAccessToken({ sub: user._id.toString(), role: user.role as any, email: user.email });
     
     console.log('Got token, making request to /api/v1/gallery/admin...');
     const res = await axios.get('http://localhost:5000/api/v1/gallery/admin', {

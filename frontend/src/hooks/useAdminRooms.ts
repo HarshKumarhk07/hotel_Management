@@ -45,7 +45,7 @@ export function useRoomMutations() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-rooms'] });
 
   const create = useMutation({
-    mutationFn: (input: { roomNumber: string; floor: number; kitchen?: string }) =>
+    mutationFn: (input: { roomNumber: string; floor: number; kitchen?: string; roomType?: string; category?: string }) =>
       api.post('/rooms', input),
     onSuccess: invalidate,
   });

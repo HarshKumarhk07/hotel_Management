@@ -86,7 +86,7 @@ export default function RoomCategoriesPage() {
               <Card key={cat._id} className="p-0 overflow-hidden bg-white border-zinc-200 shadow-sm flex flex-col">
                 {cat.images && cat.images.length > 0 ? (
                   <div className="h-48 bg-zinc-100 relative">
-                    <img src={cat.images[0]} alt={cat.name} className="w-full h-full object-cover" />
+                    <img src={cat.images[0]} alt={cat.displayName} className="w-full h-full object-cover" />
                   </div>
                 ) : (
                   <div className="h-48 bg-zinc-100 flex items-center justify-center text-zinc-400 text-sm font-semibold uppercase tracking-widest">
@@ -117,16 +117,16 @@ export default function RoomCategoriesPage() {
                   </div>
 
                   <div className="flex justify-end gap-2 border-t pt-4">
-                    <Button variant="outline" size="sm" onClick={() => setEditingCategory(cat)}>
-                      <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                    <Button variant="outline" size="sm" onClick={() => setEditingCategory(cat)} className="text-zinc-700">
+                      <Edit2 className="h-4 w-4 mr-2" /> Edit
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="text-red-600 hover:bg-red-50 border-red-200"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                       onClick={() => handleDelete(cat._id, cat.displayName)}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
                     </Button>
                   </div>
                 </div>
