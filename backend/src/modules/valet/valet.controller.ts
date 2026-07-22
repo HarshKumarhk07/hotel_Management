@@ -17,16 +17,7 @@ export const resolveRoom = asyncHandler(async (req: Request, res: Response) => {
 export const checkIn = asyncHandler(async (req: Request, res: Response) => {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
-  if (!files) {
-    throw AppError.badRequest('Vehicle photos are required', 'PHOTOS_REQUIRED');
-  }
-
-  const requiredPhotos = ['front', 'rear', 'left', 'right', 'dashboard'];
-  for (const name of requiredPhotos) {
-    if (!files[name] || files[name].length === 0) {
-      throw AppError.badRequest(`Vehicle photo '${name}' is required`, 'PHOTO_MISSING');
-    }
-  }
+  // Photos are optional
 
   // Parse details from JSON in req.body.data if passed as stringified JSON, or extract directly
   let inputData = req.body;
@@ -48,22 +39,22 @@ export const checkIn = asyncHandler(async (req: Request, res: Response) => {
     throw err;
   }
 
-  const frontFile = files.front[0];
-  const rearFile = files.rear[0];
-  const leftFile = files.left[0];
-  const rightFile = files.right[0];
-  const dashboardFile = files.dashboard[0];
-  const damageFiles = files.damage || [];
+  const frontFile = files?.front?.[0];
+  const rearFile = files?.rear?.[0];
+  const leftFile = files?.left?.[0];
+  const rightFile = files?.right?.[0];
+  const dashboardFile = files?.dashboard?.[0];
+  const damageFiles = files?.damage || [];
 
   const vehicle = await valetService.checkInVehicle(
     req.auth!.userId,
     inputData,
     {
-      front: { buffer: frontFile.buffer, mimetype: frontFile.mimetype },
-      rear: { buffer: rearFile.buffer, mimetype: rearFile.mimetype },
-      left: { buffer: leftFile.buffer, mimetype: leftFile.mimetype },
-      right: { buffer: rightFile.buffer, mimetype: rightFile.mimetype },
-      dashboard: { buffer: dashboardFile.buffer, mimetype: dashboardFile.mimetype },
+      front: frontFile ? { buffer: frontFile.buffer, mimetype: frontFile.mimetype } : undefined,
+      rear: rearFile ? { buffer: rearFile.buffer, mimetype: rearFile.mimetype } : undefined,
+      left: leftFile ? { buffer: leftFile.buffer, mimetype: leftFile.mimetype } : undefined,
+      right: rightFile ? { buffer: rightFile.buffer, mimetype: rightFile.mimetype } : undefined,
+      dashboard: dashboardFile ? { buffer: dashboardFile.buffer, mimetype: dashboardFile.mimetype } : undefined,
       damage: damageFiles.map(f => ({ buffer: f.buffer, mimetype: f.mimetype }))
     }
   );

@@ -11,6 +11,7 @@ import { useCategories, useMenuItems, type MenuItem } from '@/hooks/useAdminMenu
 import { useAuthStore } from '@/stores/auth';
 import { api } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface StockUpdate {
   id: string;
@@ -58,10 +59,10 @@ export default function StockManagementPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-menu-items', kitchenId] });
-      alert('Stock updated successfully!');
+      toast.success('Stock updated successfully!');
     },
     onError: () => {
-      alert('Could not update stock settings.');
+      toast.error('Could not update stock settings.');
     }
   });
 
@@ -149,7 +150,7 @@ export default function StockManagementPage() {
     }
 
     if (updatesList.length === 0) {
-      alert('No changes to save.');
+      toast.info('No changes to save.');
       return;
     }
 

@@ -11,6 +11,7 @@ import { Field, Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { formatDate, formatINR } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface AvailableRoom {
   _id: string;
@@ -105,7 +106,7 @@ export default function GuestRoomsPage() {
 
   const handleBookRedirect = (room: AvailableRoom) => {
     if (!checkIn || !checkOut) {
-      alert('Please fill out check-in and check-out dates to confirm availability.');
+      toast.error('Please fill out check-in and check-out dates to confirm availability.');
       return;
     }
     router.push(

@@ -10,6 +10,7 @@ import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QrScanner } from '@/components/qr/QrScanner';
 import jsQR from 'jsqr';
+import { toast } from 'sonner';
 
 export function Navbar() {
   const router = useRouter();
@@ -131,10 +132,10 @@ export function Navbar() {
           if (code && code.data) {
             processDecoded(code.data);
           } else {
-            alert('No valid QR code found in this image.');
+            toast.info('No valid QR code found in this image.');
           }
         } catch {
-          alert('Failed to process image.');
+          toast.error('Failed to process image.');
         }
       };
       img.src = event.target?.result as string;
@@ -269,7 +270,7 @@ export function Navbar() {
                     user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
                       ? '/admin'
                       : user?.role === 'VALET_MANAGER'
-                      ? '/valet/dashboard'
+                      ? '/valet'
                       : '/orders'
                   }
                   className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
@@ -384,7 +385,7 @@ export function Navbar() {
                       user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
                         ? '/admin'
                         : user?.role === 'VALET_MANAGER'
-                        ? '/valet/dashboard'
+                        ? '/valet'
                         : '/orders'
                     }
                     onClick={() => setMobileMenuOpen(false)}

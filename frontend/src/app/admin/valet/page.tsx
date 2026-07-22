@@ -29,6 +29,7 @@ import { api, apiErrorMessage } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth';
 import { Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -440,7 +441,7 @@ function ValetManagementContent() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Failed to download report. Make sure you are logged in.');
+      toast.error('Failed to download report. Make sure you are logged in.');
     }
   };
 

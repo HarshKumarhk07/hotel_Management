@@ -32,6 +32,7 @@ import { api, apiErrorMessage } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth';
 import { useWaitlistQueue, useWaitlistMutations, type WaitlistEntry } from '@/hooks/useWaitlist';
+import { toast } from 'sonner';
 
 interface RestaurantTable {
   _id: string;
@@ -259,7 +260,7 @@ function TableQRModal({
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Download failed', error);
-      alert('Failed to download QR code');
+      toast.error('Failed to download QR code');
     }
   };
 
@@ -790,7 +791,7 @@ export default function RestaurantPage() {
                   const amt = billInputAmount.trim();
                   const billAmount = amt ? parseFloat(amt) : undefined;
                   if (billAmount !== undefined && isNaN(billAmount)) {
-                    alert("Invalid amount entered");
+                    toast.error("Invalid amount entered");
                     return;
                   }
                   requestBillMutation.mutate(

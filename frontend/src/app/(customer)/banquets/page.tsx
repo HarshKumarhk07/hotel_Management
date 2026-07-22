@@ -30,6 +30,7 @@ import { Field, Input, FieldError } from '@/components/ui/input';
 import { Badge, Card, CenteredSpinner } from '@/components/ui/primitives';
 import { api, apiErrorMessage } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // ── Toast Utility ─────────────────────────────────────────────────────────────
 function showToast(title: string, body: string, type: 'success' | 'error' | 'info' = 'info') {
@@ -587,7 +588,7 @@ export default function CustomerBanquetsPage() {
                             className="font-sans text-xs bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl"
                             onClick={() => {
                               if (!user) {
-                                alert('We are directing you to the sign-in page for further booking.');
+                                toast.info('We are directing you to the sign-in page for further booking.');
                                 const redirectUrl = encodeURIComponent(window.location.pathname);
                                 router.push(`/login?next=${redirectUrl}`);
                                 return;

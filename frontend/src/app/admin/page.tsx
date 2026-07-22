@@ -31,6 +31,7 @@ import { api } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
 import { useKitchenMutations } from '@/hooks/useAdminKitchens';
+import { toast } from 'sonner';
 
 interface Summary {
   totalOrders: number;
@@ -410,7 +411,7 @@ function KitchenOwnerOverview() {
       });
       refetch();
     } catch (err) {
-      alert('Could not toggle kitchen status');
+      toast.error('Could not toggle kitchen status');
     }
   };
 

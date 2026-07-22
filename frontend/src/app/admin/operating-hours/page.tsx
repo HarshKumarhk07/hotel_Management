@@ -10,6 +10,7 @@ import { Field, Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/auth';
 import { useKitchenMutations } from '@/hooks/useAdminKitchens';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 const DAYS_OF_WEEK = [
   { label: 'Sunday', value: 0 },
@@ -86,12 +87,12 @@ export default function OperatingHoursPage() {
 
   const addHoliday = () => {
     if (!newDate) {
-      alert('Please select a date.');
+      toast.error('Please select a date.');
       return;
     }
     // Check if date already exists
     if (holidayTimings.some((h) => h.date === newDate)) {
-      alert('A holiday override already exists for this date.');
+      toast.info('A holiday override already exists for this date.');
       return;
     }
 
@@ -127,10 +128,10 @@ export default function OperatingHoursPage() {
           },
         },
       });
-      alert('Operating hours saved successfully!');
+      toast.success('Operating hours saved successfully!');
       refetch();
     } catch (err) {
-      alert('Could not save timings.');
+      toast.error('Could not save timings.');
     }
   };
 

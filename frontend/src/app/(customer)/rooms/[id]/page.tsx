@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CenteredSpinner, EmptyState, Badge } from '@/components/ui/primitives';
 import { api } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface RoomDetail {
   _id: string;
@@ -85,7 +86,7 @@ function RoomDetailsInner() {
 
   const handleBookRedirect = () => {
     if (!checkIn || !checkOut) {
-      alert('Please select check-in and check-out dates to lock availability.');
+      toast.error('Please select check-in and check-out dates to lock availability.');
       return;
     }
     router.push(

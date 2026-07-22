@@ -8,6 +8,7 @@ import { useAdminOrder, useOrderAdminMutations } from '@/hooks/useAdminOrders';
 import { STATUS_BADGE, STATUS_LABEL } from '@/lib/orderStatus';
 import { apiErrorMessage, api } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
+import { toast } from 'sonner';
 
 
 const NEXT: Record<string, { label: string; status: string }[]> = {
@@ -44,7 +45,7 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClo
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
     } catch (err) {
-      alert('Failed to generate invoice');
+      toast.error('Failed to generate invoice');
     } finally {
       setDownloading(false);
     }

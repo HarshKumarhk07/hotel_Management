@@ -38,6 +38,7 @@ const envSchema = z.object({
 
   ADMIN_SECRET_CODE: z.string().min(6, 'ADMIN_SECRET_CODE must be >= 6 chars'),
   KITCHEN_SECRET_CODE: z.string().min(6, 'KITCHEN_SECRET_CODE must be >= 6 chars'),
+  VALET_SECRET_CODE: z.string().default('123456'),
 
   MAX_LOGIN_ATTEMPTS: z.coerce.number().int().positive().default(5),
   ACCOUNT_LOCK_MINUTES: z.coerce.number().int().positive().default(2),

@@ -13,6 +13,7 @@ import { api, apiErrorMessage } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
 import { loadRazorpay, openRazorpay, type RazorpayResponse } from '@/lib/razorpay';
 import { useAuthStore } from '@/stores/auth';
+import { toast } from 'sonner';
 
 interface RoomDetail {
   _id: string;
@@ -56,7 +57,7 @@ function BookRoomInner() {
   useEffect(() => {
     if (authStatus !== 'loading') {
       if (!user) {
-        alert('We are directing you to the sign-in page for further booking.');
+        toast.info('We are directing you to the sign-in page for further booking.');
         const redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
         router.replace(`/login?next=${redirectUrl}`);
       } else if (!hasAutofilled) {

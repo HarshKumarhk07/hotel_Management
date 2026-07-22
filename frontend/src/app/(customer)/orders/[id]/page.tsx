@@ -13,6 +13,7 @@ import { api, apiErrorMessage } from '@/lib/api';
 import { loadRazorpay, openRazorpay, type RazorpayResponse } from '@/lib/razorpay';
 import { ORDER_STEPS, STATUS_BADGE, STATUS_LABEL, isTerminal } from '@/lib/orderStatus';
 import { cn, formatINR } from '@/lib/utils';
+import { toast } from 'sonner';
 
 function Timeline({ status, history }: { status: string; history: { status: string; at: string }[] }) {
   if (status === 'CANCELLED' || status === 'REJECTED') {
@@ -115,7 +116,7 @@ function OrderInner() {
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
     } catch (err) {
-      alert('Failed to generate invoice');
+      toast.error('Failed to generate invoice');
     } finally {
       setDownloading(false);
     }

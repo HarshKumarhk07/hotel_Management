@@ -17,6 +17,7 @@ import { useAdminRooms, useRoomMutations, useAdminBookings, useBookingMutations,
 import { api, apiErrorMessage } from '@/lib/api';
 import { downloadAuthed } from '@/lib/download';
 import { formatDate } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // ── Create room ──
 const createSchema = z.object({
@@ -647,7 +648,7 @@ function InvoiceModal({ bookingId, onClose }: { bookingId: string; onClose: () =
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      alert('Failed to download invoice PDF. Please try again.');
+      toast.error('Failed to download invoice PDF. Please try again.');
     }
   };
 

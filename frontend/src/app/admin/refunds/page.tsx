@@ -11,6 +11,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { useAuthStore } from '@/stores/auth';
 import { api } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface RefundOrder {
   _id: string;
@@ -67,10 +68,10 @@ export default function RefundsManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['refund-orders-pending'] });
       queryClient.invalidateQueries({ queryKey: ['refund-orders-history'] });
-      alert('Refund approved and processed successfully!');
+      toast.success('Refund approved and processed successfully!');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error?.message || 'Could not approve refund.');
+      toast.error(err.response?.data?.error?.message || 'Could not approve refund.');
     }
   });
 
@@ -83,10 +84,10 @@ export default function RefundsManagementPage() {
       setRejectModalOpen(false);
       setRejectReason('');
       setSelectedOrderId(null);
-      alert('Refund request rejected.');
+      toast.info('Refund request rejected.');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error?.message || 'Could not reject refund.');
+      toast.error(err.response?.data?.error?.message || 'Could not reject refund.');
     }
   });
 
@@ -123,7 +124,7 @@ export default function RefundsManagementPage() {
 
   const handleRequestSubmit = async () => {
     if (!searchedOrder || !refundReason.trim()) {
-      alert('Please fill out all fields.');
+      toast.error('Please fill out all fields.');
       return;
     }
 
@@ -132,14 +133,14 @@ export default function RefundsManagementPage() {
       await api.post(`/orders/${searchedOrder._id}/refund-request`, {
         reason: refundReason.trim(),
       });
-      alert('Refund request submitted successfully!');
+      toast.success('Refund request submitted successfully!');
       setRequestModalOpen(false);
       setSearchOrderNum('');
       setSearchedOrder(null);
       setRefundReason('');
       refetchPending();
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Could not submit refund request.');
+      toast.error(err.response?.data?.error?.message || 'Could not submit refund request.');
     } finally {
       setSubmittingRequest(false);
     }

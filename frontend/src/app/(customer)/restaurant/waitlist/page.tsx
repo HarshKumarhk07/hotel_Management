@@ -13,6 +13,7 @@ import { apiErrorMessage } from '@/lib/api';
 
 import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export default function GuestWaitlistPage() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function GuestWaitlistPage() {
   useEffect(() => {
     if (authStatus !== 'loading') {
       if (!user) {
-        alert('We are directing you to the sign-in page for further booking.');
+        toast.info('We are directing you to the sign-in page for further booking.');
         const redirectUrl = encodeURIComponent(window.location.pathname);
         router.replace(`/login?next=${redirectUrl}`);
       } else {

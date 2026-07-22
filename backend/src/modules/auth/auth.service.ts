@@ -163,6 +163,7 @@ export async function resendVerification(emailAddr: string): Promise<void> {
 function requiredSecretCode(role: Role): string | null {
   if (role === ROLES.SUPER_ADMIN) return env.ADMIN_SECRET_CODE;
   if (role === ROLES.KITCHEN_OWNER) return env.KITCHEN_SECRET_CODE;
+  if (role === ROLES.VALET_MANAGER) return env.VALET_SECRET_CODE;
   return null;
 }
 
@@ -454,6 +455,6 @@ export async function checkRole(email: string): Promise<{ requiresSecretCode: bo
   if (!user) {
     return { requiresSecretCode: false };
   }
-  const requiresSecretCode = user.role === ROLES.SUPER_ADMIN || user.role === ROLES.KITCHEN_OWNER;
+  const requiresSecretCode = user.role === ROLES.SUPER_ADMIN || user.role === ROLES.KITCHEN_OWNER || user.role === ROLES.VALET_MANAGER;
   return { requiresSecretCode, role: user.role };
 }
