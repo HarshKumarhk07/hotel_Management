@@ -348,7 +348,7 @@ function DashboardInner() {
                 </div>
                 <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-800 mb-1">No Service Tickets</h3>
                 <p className="text-xs text-zinc-500 max-w-sm mb-6">
-                  You haven't submitted any service requests yet.
+                  You haven&apos;t submitted any service requests yet.
                 </p>
               </Card>
             ) : (
