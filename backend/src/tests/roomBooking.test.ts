@@ -46,6 +46,9 @@ describe('Room Booking — API Endpoints', () => {
       .query({
         checkInDate: new Date('2026-08-01T12:00:00.000Z').toISOString(),
         checkOutDate: new Date('2026-08-05T12:00:00.000Z').toISOString(),
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
       })
       .expect(200);
 
@@ -62,6 +65,9 @@ describe('Room Booking — API Endpoints', () => {
       totalPrice: 20000,
       status: 'CONFIRMED',
       priceBreakdown: { roomPrice: 4000, nights: 5, grandTotal: 20000 },
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
     });
 
     // Search again, only Room 102 should be returned
@@ -70,6 +76,9 @@ describe('Room Booking — API Endpoints', () => {
       .query({
         checkInDate: new Date('2026-08-01T12:00:00.000Z').toISOString(),
         checkOutDate: new Date('2026-08-05T12:00:00.000Z').toISOString(),
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
       })
       .expect(200);
 
@@ -85,6 +94,9 @@ describe('Room Booking — API Endpoints', () => {
       email: 'jane@example.com',
       checkInDate: new Date('2026-09-10T12:00:00.000Z').toISOString(),
       checkOutDate: new Date('2026-09-15T12:00:00.000Z').toISOString(),
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
     };
 
     const res = await request(app)
@@ -106,6 +118,9 @@ describe('Room Booking — API Endpoints', () => {
       email: 'jane@example.com',
       checkInDate: new Date('2026-09-10T12:00:00.000Z').toISOString(),
       checkOutDate: new Date('2026-09-15T12:00:00.000Z').toISOString(),
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
     };
 
     // First booking
@@ -126,6 +141,9 @@ describe('Room Booking — API Endpoints', () => {
       totalPrice: 20000,
       status: 'CONFIRMED',
       priceBreakdown: { roomPrice: 4000, nights: 4, grandTotal: 20000 },
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
     });
 
     const res = await request(app)
@@ -148,6 +166,9 @@ describe('Room Booking — API Endpoints', () => {
       totalPrice: 20000,
       status: 'PENDING',
       priceBreakdown: { roomPrice: 4000, nights: 4, grandTotal: 20000 },
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
     });
 
     // List bookings (admin)

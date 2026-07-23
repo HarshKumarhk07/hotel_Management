@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { createApp } from '@/app';
-import { Room } from '@/models';
+import { Room, RoomBooking } from '@/models';
 import { ROLES } from '@/constants';
 import { createUserWithToken } from './helpers';
 
@@ -93,6 +93,21 @@ describe('Rooms — public QR resolution', () => {
     // attach an internal note that must never leak
     await Room.updateOne({ _id: room._id }, { $set: { internalNote: 'VIP guest' } });
 
+    await RoomBooking.create({
+      room: room._id,
+      guestName: 'Test Guest',
+      phone: '+919999999999',
+      email: 'test@example.com',
+      checkInDate: new Date(Date.now() - 100000),
+      checkOutDate: new Date(Date.now() + 86400000),
+      totalPrice: 1000,
+      status: 'CONFIRMED',
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
+      priceBreakdown: { roomPrice: 1000, nights: 1, grandTotal: 1000 },
+    });
+
     const res = await request(app).get(`${api}/resolve/${room.qr.token}`).expect(200);
     expect(res.body.data.room.roomNumber).toBe('601');
     expect(JSON.stringify(res.body)).not.toContain('VIP guest');
@@ -101,6 +116,22 @@ describe('Rooms — public QR resolution', () => {
   it('rejects a disabled QR', async () => {
     const bearer = await adminBearer();
     const room = await createRoom(bearer, '602', 6);
+
+    await RoomBooking.create({
+      room: room._id,
+      guestName: 'Test Guest',
+      phone: '+919999999999',
+      email: 'test@example.com',
+      checkInDate: new Date(Date.now() - 100000),
+      checkOutDate: new Date(Date.now() + 86400000),
+      totalPrice: 1000,
+      status: 'CONFIRMED',
+      governmentId: 'ID123',
+      idProofUrl: 'https://example.com/id.jpg',
+      idProofType: 'Aadhaar',
+      priceBreakdown: { roomPrice: 1000, nights: 1, grandTotal: 1000 },
+    });
+
     await request(app).patch(`${api}/${room._id}/qr/disable`).set('Authorization', bearer).expect(200);
 
     const res = await request(app).get(`${api}/resolve/${room.qr.token}`).expect(403);
