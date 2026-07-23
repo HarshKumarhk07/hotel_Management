@@ -49,9 +49,9 @@ export interface IRoomBooking extends Document {
   address?: string;
   city?: string;
   country?: string;
-  governmentId?: string;
-  idProofUrl?: string;
-  idProofType?: string;
+  governmentId: string;
+  idProofUrl: string;
+  idProofType: string;
   specialRequests: ISpecialRequests;
   priceBreakdown: IPriceBreakdown;
   payment: IBookingPayment;
@@ -132,9 +132,9 @@ const roomBookingSchema = new Schema<IRoomBooking>(
     address: { type: String, trim: true },
     city: { type: String, trim: true },
     country: { type: String, trim: true },
-    governmentId: { type: String },
-    idProofUrl: { type: String },
-    idProofType: { type: String, enum: ['Aadhaar', 'Passport', 'Driving License', 'Other'] },
+    governmentId: { type: String, required: true },
+    idProofUrl: { type: String, required: true },
+    idProofType: { type: String, enum: ['Aadhaar', 'Passport', 'Driving License', 'Voter ID', 'Other'], required: true },
     specialRequests: { type: specialRequestsSchema, default: () => ({}) },
     priceBreakdown: { type: priceBreakdownSchema, required: true },
     payment: { type: bookingPaymentSchema, default: () => ({}) },

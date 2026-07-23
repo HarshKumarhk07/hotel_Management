@@ -37,9 +37,10 @@ export default function AboutPage() {
           </div>
           <div className="relative h-[400px] w-full rounded-2xl overflow-hidden shadow-2xl">
             <Image 
-              src="https://images.unsplash.com/photo-1542314831-c6a420325142?auto=format&fit=crop&q=80" 
+              src="/abt1.png" 
               alt="The Page Hotel Exterior" 
               fill 
+              priority
               className="object-cover"
             />
           </div>

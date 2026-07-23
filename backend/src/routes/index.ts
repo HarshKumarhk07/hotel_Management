@@ -19,6 +19,7 @@ import banquetRoutes from '@/modules/banquet/banquet.routes';
 import complaintRoutes from '@/modules/complaint/complaint.routes';
 import feedbackRoutes from '@/modules/feedback/feedback.routes';
 import galleryRoutes from '@/modules/gallery/gallery.routes';
+import contactRoutes from '@/modules/contact/contact.routes';
 import { getIO } from '@/realtime/socket';
 
 import { ok } from '@/utils/apiResponse';
@@ -76,6 +77,7 @@ router.use('/banquets', banquetRoutes);
 router.use('/complaints', complaintRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/gallery', galleryRoutes);
+router.use('/contact', contactRoutes);
 
 router.post(
   '/upload',

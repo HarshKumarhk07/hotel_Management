@@ -1,11 +1,14 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'next/navigation';
-import { Landmark, CheckCircle2, Calendar, FileText, Download, Phone, MapPin, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
+import { Landmark, CheckCircle2, Calendar, FileText, Download, Phone, MapPin, ArrowRight, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
 import { Card, CenteredSpinner, EmptyState, Badge } from '@/components/ui/primitives';
 import { api } from '@/lib/api';
 import { formatINR } from '@/lib/utils';
@@ -46,7 +49,11 @@ interface BookingDetail {
 }
 
 export default function BookingConfirmationPage() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
   const params = useParams();
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const { data: booking, isLoading, isError } = useQuery<BookingDetail>({
     queryKey: ['booking-confirmation', params.id],
@@ -55,6 +62,20 @@ export default function BookingConfirmationPage() {
       return res.data.data.booking;
     },
     enabled: !!params.id,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      await api.post(`/rooms/bookings/${params.id}/cancel`, { reason: cancelReason });
+    },
+    onSuccess: () => {
+      toast.success('Booking cancelled successfully');
+      setIsCancelModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['booking-confirmation', params.id] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to cancel booking');
+    },
   });
 
   if (isLoading) {
@@ -94,9 +115,13 @@ export default function BookingConfirmationPage() {
           </div>
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-[0.25em]">Imperial Reservation</span>
-            <h1 className="text-3xl md:text-5xl font-serif text-zinc-900 uppercase font-semibold">Stay Confirmed!</h1>
+            <h1 className="text-3xl md:text-5xl font-serif text-zinc-900 uppercase font-semibold">
+              {booking.status === 'CANCELLED' ? 'Booking Cancelled' : 'Stay Confirmed!'}
+            </h1>
             <p className="text-zinc-500 text-sm max-w-md mx-auto">
-              Thank you, {booking.guestName}. Your premium suite booking is finalized. An email confirmation has been sent.
+              {booking.status === 'CANCELLED' 
+                ? `Sorry to see you cancel, ${booking.guestName}. Your reservation has been cancelled.` 
+                : `Thank you, ${booking.guestName}. Your premium suite booking is finalized. An email confirmation has been sent.`}
             </p>
           </div>
         </div>
@@ -109,9 +134,19 @@ export default function BookingConfirmationPage() {
                 <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Confirmation Number</span>
                 <span className="text-xl font-bold text-zinc-950 font-mono tracking-wider">{booking.confirmationNumber || 'CONF-XYZ123'}</span>
               </div>
-              <Badge className="bg-green-50 text-green-700 border border-green-200">
-                {booking.paymentStatus === 'PAID' ? 'PAID IN FULL' : 'PENDING'}
-              </Badge>
+              <div className="flex flex-col items-end gap-2">
+                <Badge className={
+                  booking.status === 'CANCELLED' ? 'bg-red-50 text-red-700 border-red-200' :
+                  'bg-green-50 text-green-700 border-green-200'
+                }>
+                  {booking.status === 'CANCELLED' ? 'CANCELLED' : (booking.paymentStatus === 'PAID' ? 'PAID IN FULL' : 'PENDING')}
+                </Badge>
+                {['PENDING', 'CONFIRMED'].includes(booking.status) && (
+                  <button onClick={() => setIsCancelModalOpen(true)} className="text-[10px] text-red-500 hover:text-red-700 font-bold uppercase tracking-wider underline">
+                    Cancel Booking
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-zinc-700 border-b pb-4">
@@ -190,6 +225,38 @@ export default function BookingConfirmationPage() {
       </main>
 
       <SiteFooter />
+
+      <Dialog open={isCancelModalOpen} onClose={() => setIsCancelModalOpen(false)} title="Cancel Booking">
+        <div className="space-y-4 font-sans">
+          <p className="text-sm text-zinc-600">
+            Are you sure you want to cancel your booking?
+            {booking?.paymentStatus === 'PAID' && ' A refund will be initiated according to our cancellation policy.'}
+          </p>
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Reason (Optional)</label>
+            <textarea
+              rows={3}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Why are you cancelling?"
+              className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900"
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setIsCancelModalOpen(false)}>
+              Keep Booking
+            </Button>
+            <Button 
+              variant="default" 
+              className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+              onClick={() => cancelMutation.mutate()}
+              disabled={cancelMutation.isPending}
+            >
+              {cancelMutation.isPending ? 'Cancelling...' : 'Confirm Cancellation'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

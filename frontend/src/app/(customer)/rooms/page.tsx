@@ -28,6 +28,12 @@ interface AvailableRoom {
   cancellationPolicy: string;
 }
 
+interface RoomCategory {
+  _id: string;
+  roomType: string;
+  displayName: string;
+}
+
 interface CustomerBooking {
   _id: string;
   room: { roomNumber: string; floor: number; roomType: string };
@@ -75,6 +81,15 @@ export default function GuestRoomsPage() {
         },
       });
       return res.data.data.rooms;
+    },
+  });
+
+  // Fetch Room Categories
+  const { data: categories } = useQuery({
+    queryKey: ['public-room-categories'],
+    queryFn: async () => {
+      const res = await api.get<{ data: { categories: RoomCategory[] } }>('/rooms/categories');
+      return res.data.data.categories;
     },
   });
 
@@ -167,11 +182,11 @@ export default function GuestRoomsPage() {
                     className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
                   >
                     <option value="">Any Room Type</option>
-                    <option value="STANDARD">Standard Class</option>
-                    <option value="DELUXE">Deluxe Class</option>
-                    <option value="EXECUTIVE">Executive Class</option>
-                    <option value="SUITE">Junior Suite</option>
-                    <option value="PRESIDENTIAL">Presidential Penthouse</option>
+                    {categories?.map((cat) => (
+                      <option key={cat._id} value={cat.roomType}>
+                        {cat.displayName}
+                      </option>
+                    ))}
                   </select>
                 </Field>
                 <div className="flex items-end h-full">

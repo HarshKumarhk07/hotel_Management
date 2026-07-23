@@ -29,7 +29,9 @@ export default async function ScanPage({ params }: { params: Promise<{ token: st
     errorMessage = 'We could not reach the server. Please try again.';
   }
 
-  if (resolution?.kitchen) {
+  if (resolution?.bookingId) {
+    redirect(`/rooms/confirm/${resolution.bookingId}`);
+  } else if (resolution?.kitchen) {
     const { room, kitchen } = resolution;
     redirect(`/k/${kitchen._id}?room=${room.id}&rno=${encodeURIComponent(room.roomNumber)}`);
   }

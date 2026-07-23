@@ -76,5 +76,6 @@ export const createBookingSchema = z.object({
 
 export const updateBookingSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']).optional(),
+  enquiryStatus: z.enum(['NEW', 'CONTACTED', 'CLOSED']).optional(),
   paymentStatus: z.enum(['PENDING', 'PAID']).optional(),
 });

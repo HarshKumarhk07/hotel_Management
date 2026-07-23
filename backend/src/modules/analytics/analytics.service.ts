@@ -94,7 +94,7 @@ export async function getSummary(scope: AnalyticsScope) {
     BanquetBooking.countDocuments({ status: 'PENDING' }),
     // Room Revenue (Not applicable if a specific kitchen is scoped)
     scope.kitchenId ? Promise.resolve([{ revenue: 0 }]) : RoomBooking.aggregate([
-      { $match: { ...match, status: { $in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] } } },
+      { $match: { ...match, paymentStatus: 'PAID' } },
       { $group: { _id: null, revenue: { $sum: '$totalPrice' } } },
     ]),
     // Banquet Revenue
@@ -102,7 +102,7 @@ export async function getSummary(scope: AnalyticsScope) {
       { 
         $match: { 
           ...match, 
-          status: { $in: ['CONFIRMED', 'COMPLETED'] },
+          paymentStatus: 'PAID',
           ...(banquetHallsFilter ? { hall: { $in: banquetHallsFilter.map(id => new Types.ObjectId(id)) } } : {})
         } 
       },

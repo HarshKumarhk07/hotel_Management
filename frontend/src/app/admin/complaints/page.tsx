@@ -45,8 +45,9 @@ interface Complaint {
   guestName: string;
   phone: string;
   category: 'HOUSEKEEPING' | 'MAINTENANCE' | 'ROOM_SERVICE' | 'OTHER';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   description: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'RESOLVED';
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
   assignedStaff?: StaffMember;
   staffNotes?: string;
   createdAt: string;
@@ -54,7 +55,7 @@ interface Complaint {
 }
 
 const updateSchema = z.object({
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'RESOLVED']),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED']),
   assignedStaff: z.string().optional().or(z.literal('')),
   staffNotes: z.string().trim().max(1000).optional(),
 });
@@ -147,8 +148,10 @@ export default function AdminComplaintsPage() {
         return <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
       case 'IN_PROGRESS':
         return <Badge className="bg-blue-50 text-blue-700 border-blue-200">In Progress</Badge>;
-      case 'RESOLVED':
-        return <Badge className="bg-green-50 text-green-700 border-green-200">Resolved</Badge>;
+      case 'COMPLETED':
+        return <Badge className="bg-green-50 text-green-700 border-green-200">Completed</Badge>;
+      case 'REJECTED':
+        return <Badge className="bg-red-50 text-red-700 border-red-200">Rejected</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -185,7 +188,7 @@ export default function AdminComplaintsPage() {
               </div>
               <div className="flex items-start gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-200 text-[10px] font-bold text-blue-800">3</span>
-                <p><span className="font-semibold">Assign a staff member</span>, update status to <em>In Progress</em>, add resolution notes, then mark it <em>Resolved</em> when done. The guest sees live status updates from their QR menu.</p>
+                <p><span className="font-semibold">Assign a staff member</span>, update status to <em>In Progress</em>, add resolution notes, then mark it <em>Completed</em> when done. The guest sees live status updates from their QR menu.</p>
               </div>
             </div>
           </div>
@@ -213,7 +216,8 @@ export default function AdminComplaintsPage() {
               <option value="">All Statuses</option>
               <option value="PENDING">Pending</option>
               <option value="IN_PROGRESS">In Progress</option>
-              <option value="RESOLVED">Resolved</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="REJECTED">Rejected</option>
             </select>
 
             <select
@@ -254,6 +258,13 @@ export default function AdminComplaintsPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold uppercase tracking-wider">
                       <span>{c.category}</span>
+                      <span>·</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        c.priority === 'URGENT' ? 'bg-red-100 text-red-700' :
+                        c.priority === 'HIGH' ? 'bg-orange-100 text-orange-700' :
+                        c.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700' :
+                        'bg-zinc-100 text-zinc-700'
+                      }`}>{c.priority} Priority</span>
                       <span>·</span>
                       <span className="text-[10px]">#{c._id.substring(18).toUpperCase()}</span>
                     </div>
@@ -323,7 +334,8 @@ export default function AdminComplaintsPage() {
                 >
                   <option value="PENDING">Pending</option>
                   <option value="IN_PROGRESS">In Progress</option>
-                  <option value="RESOLVED">Resolved</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="REJECTED">Rejected</option>
                 </select>
               </div>
 

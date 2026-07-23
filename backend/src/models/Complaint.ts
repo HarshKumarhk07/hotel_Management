@@ -5,9 +5,11 @@ export interface IComplaint extends Document {
   room: Types.ObjectId;
   guestName: string;
   phone: string;
+  email?: string;
   category: 'HOUSEKEEPING' | 'MAINTENANCE' | 'ROOM_SERVICE' | 'OTHER';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   description: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'RESOLVED';
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
   assignedStaff?: Types.ObjectId;
   staffNotes?: string;
   createdAt: Date;
@@ -19,6 +21,7 @@ const complaintSchema = new Schema<IComplaint>(
     room: { type: Schema.Types.ObjectId, ref: 'Room', required: true, index: true },
     guestName: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
+    email: { type: String, trim: true, index: true },
     category: {
       type: String,
       enum: ['HOUSEKEEPING', 'MAINTENANCE', 'ROOM_SERVICE', 'OTHER'],
@@ -26,9 +29,15 @@ const complaintSchema = new Schema<IComplaint>(
       index: true,
     },
     description: { type: String, required: true, trim: true, maxlength: 1000 },
+    priority: {
+      type: String,
+      enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'],
+      default: 'MEDIUM',
+      index: true,
+    },
     status: {
       type: String,
-      enum: ['PENDING', 'IN_PROGRESS', 'RESOLVED'],
+      enum: ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'],
       default: 'PENDING',
       index: true,
     },

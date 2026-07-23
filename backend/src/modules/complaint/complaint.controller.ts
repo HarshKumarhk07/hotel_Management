@@ -9,7 +9,7 @@ import type { FilterQuery } from 'mongoose';
 
 // Guest side: Create Complaint
 export const createComplaint = asyncHandler(async (req: Request, res: Response) => {
-  const { roomId, guestName, phone, category, description } = req.body;
+  const { roomId, guestName, phone, email, category, priority, description } = req.body;
 
   const room = await Room.findById(roomId);
   if (!room) throw AppError.notFound('Room not found');
@@ -18,7 +18,9 @@ export const createComplaint = asyncHandler(async (req: Request, res: Response) 
     room: roomId,
     guestName,
     phone,
+    email,
     category,
+    priority: priority || 'MEDIUM',
     description,
     status: 'PENDING',
   });
@@ -31,16 +33,17 @@ export const createComplaint = asyncHandler(async (req: Request, res: Response) 
   return created(res, { complaint: populated });
 });
 
-// Guest side: Track Complaints by phone or room
+// Guest side: Track Complaints by phone, email or room
 export const getGuestComplaints = asyncHandler(async (req: Request, res: Response) => {
-  const { phone, roomId } = req.query;
+  const { phone, email, roomId } = req.query;
 
   const filter: FilterQuery<any> = {};
   if (phone) filter.phone = (phone as string).trim();
+  if (email) filter.email = (email as string).trim();
   if (roomId) filter.room = roomId as string;
 
-  if (!phone && !roomId) {
-    throw AppError.badRequest('Phone or Room ID is required');
+  if (!phone && !email && !roomId) {
+    throw AppError.badRequest('Phone, Email, or Room ID is required');
   }
 
   const complaints = await Complaint.find(filter)

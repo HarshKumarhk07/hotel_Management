@@ -1,5 +1,5 @@
 import { startSession, type FilterQuery } from 'mongoose';
-import { Kitchen, Room, type IRoom } from '@/models';
+import { Kitchen, Room, RoomBooking, type IRoom } from '@/models';
 import { RoomCategory } from '@/models/RoomCategory';
 import { generateQrToken } from '@/services/qr.service';
 import { getPageParams, pageMeta } from '@/utils/pagination';
@@ -202,8 +202,20 @@ export async function resolveScan(token: string) {
   if (!room.qr.isActive) throw AppError.forbidden('This QR code has been disabled', 'QR_DISABLED');
   if (!room.isActive) throw AppError.forbidden('This room is currently unavailable', 'ROOM_INACTIVE');
 
+  // Find the active booking for this room
+  const activeBooking = await RoomBooking.findOne({
+    room: room._id,
+    status: { $in: ['PENDING', 'CONFIRMED', 'CHECKED_IN'] },
+    checkOutDate: { $gte: new Date() },
+  }).sort({ checkInDate: 1 });
+
+  if (!activeBooking) {
+    throw AppError.notFound('No active reservation found for this room.', 'NO_RESERVATION');
+  }
+
   return {
     room: { id: room._id.toString(), roomNumber: room.roomNumber, floor: room.floor },
     kitchen: room.kitchen,
+    bookingId: activeBooking._id.toString(),
   };
 }

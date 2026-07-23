@@ -20,6 +20,7 @@ export { RefreshToken, type IRefreshToken } from './RefreshToken';
 export { VerificationToken, type IVerificationToken } from './VerificationToken';
 export { AuditLog, type IAuditLog } from './AuditLog';
 export { Notification, type INotification } from './Notification';
+export { ContactMessage, type IContactMessage } from './ContactMessage';
 export { Coupon, type ICoupon } from './Coupon';
 export { CouponRedemption, type ICouponRedemption } from './CouponRedemption';
 export { CouponUserCounter, type ICouponUserCounter } from './CouponUserCounter';

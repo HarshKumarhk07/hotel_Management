@@ -107,14 +107,35 @@ export default function GuestManagementPage() {
 
     if (history.roomBookings) {
       history.roomBookings.forEach((rb: any) => {
-        items.push({
-          date: new Date(rb.checkInDate),
-          type: 'room',
-          title: `Room Stay: ${rb.room?.roomNumber ? `Chamber ${rb.room.roomNumber}` : 'Hotel Chamber'}`,
-          desc: `Check-in: ${new Date(rb.checkInDate).toLocaleDateString()} · Check-out: ${new Date(rb.checkOutDate).toLocaleDateString()}`,
-          amount: rb.totalPrice,
-          badge: rb.status,
-        });
+        if (rb.timeline && rb.timeline.length > 0) {
+          rb.timeline.forEach((event: any) => {
+            const statusLabels: Record<string, string> = {
+              PENDING: 'Pending Payment',
+              CONFIRMED: 'Confirmed',
+              CHECKED_IN: 'Checked In',
+              CHECKED_OUT: 'Completed',
+              CANCELLED: 'Cancelled'
+            };
+            items.push({
+              date: new Date(event.timestamp),
+              type: 'room',
+              title: `Room Stay: ${rb.room?.roomNumber ? `Chamber ${rb.room.roomNumber}` : 'Hotel Chamber'}`,
+              desc: event.note || `Status updated to ${statusLabels[event.status] || event.status}`,
+              amount: event.status === 'CONFIRMED' || event.status === 'PENDING' ? rb.totalPrice : undefined,
+              badge: statusLabels[event.status] || event.status,
+            });
+          });
+        } else {
+          // Fallback if no timeline exists
+          items.push({
+            date: new Date(rb.checkInDate),
+            type: 'room',
+            title: `Room Stay: ${rb.room?.roomNumber ? `Chamber ${rb.room.roomNumber}` : 'Hotel Chamber'}`,
+            desc: `Check-in: ${new Date(rb.checkInDate).toLocaleDateString()} · Check-out: ${new Date(rb.checkOutDate).toLocaleDateString()}`,
+            amount: rb.totalPrice,
+            badge: rb.status,
+          });
+        }
       });
     }
 

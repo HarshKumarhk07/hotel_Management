@@ -160,6 +160,12 @@ function BookRoomInner() {
     setPaymentError(null);
     setSubmitting(true);
 
+    if (!idProofFile) {
+      setPaymentError('A Government ID Proof document is strictly required.');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       let uploadedIdUrl = '';
       if (idProofFile) {
@@ -327,8 +333,8 @@ function BookRoomInner() {
                   <Input placeholder="India" value={country} onChange={(e) => setCountry(e.target.value)} />
                 </Field>
               </div>
-              <Field label="Government ID Number (Optional)">
-                <Input placeholder="Aadhaar / Passport No" value={governmentId} onChange={(e) => setGovernmentId(e.target.value)} />
+              <Field label="Government ID Number (Required)">
+                <Input required placeholder="Aadhaar / Passport No" value={governmentId} onChange={(e) => setGovernmentId(e.target.value)} />
               </Field>
               <div className="pt-2 border-t space-y-4">
                 <Field label="Government ID Type">
@@ -344,8 +350,9 @@ function BookRoomInner() {
                     <option value="Other">Other</option>
                   </select>
                 </Field>
-                <Field label="Upload ID Proof (PDF/Image)">
+                <Field label="Upload ID Proof (PDF/Image) - Required">
                   <input
+                    required
                     type="file"
                     accept="image/*,application/pdf"
                     onChange={(e) => setIdProofFile(e.target.files?.[0] || null)}

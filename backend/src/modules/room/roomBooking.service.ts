@@ -218,15 +218,16 @@ export async function createRoomBooking(input: {
     const roomNum = (populated.room as any)?.roomNumber || 'N/A';
 
     if (isPayAtHotel) {
-      // Pay at Hotel: confirmation email
-      await emailService.sendRoomBookingConfirmation(
+      // Pay at Hotel: send pending email indicating payment on arrival
+      await emailService.sendRoomBookingPending(
         booking.email,
         booking.guestName,
         roomNum,
         booking.checkInDate.toISOString(),
         booking.checkOutDate.toISOString(),
         booking.confirmationNumber || 'N/A',
-        booking.totalPrice
+        booking.totalPrice,
+        true
       );
     } else {
       // Online Razorpay: pending email — let guest know booking is held, pay when arrive if needed
@@ -313,11 +314,9 @@ export async function updateBookingStatus(
     updatedBy,
   });
 
-  if (status === 'CONFIRMED') {
-    booking.paymentStatus = 'PAID';
-    booking.payment.status = 'PAID';
-    booking.payment.paidAt = new Date();
-  } else if (status === 'CHECKED_IN') {
+  // Removed auto-forcing paymentStatus to PAID when status is CONFIRMED
+  // paymentStatus must only be updated via webhook or explicit payment collection.
+  if (status === 'CHECKED_IN') {
     booking.paymentStatus = 'PAID';
     booking.payment.status = 'PAID';
     booking.payment.paidAt = new Date();
@@ -341,15 +340,28 @@ export async function updateBookingStatus(
   if (status === 'CONFIRMED') {
     try {
       const roomNum = (populated.room as any)?.roomNumber || 'N/A';
-      await emailService.sendRoomBookingConfirmation(
-        booking.email,
-        booking.guestName,
-        roomNum,
-        booking.checkInDate.toISOString(),
-        booking.checkOutDate.toISOString(),
-        booking.confirmationNumber || 'N/A',
-        booking.totalPrice
-      );
+      if (booking.paymentStatus === 'PAID') {
+        await emailService.sendRoomBookingConfirmation(
+          booking.email,
+          booking.guestName,
+          roomNum,
+          booking.checkInDate.toISOString(),
+          booking.checkOutDate.toISOString(),
+          booking.confirmationNumber || 'N/A',
+          booking.totalPrice
+        );
+      } else {
+        await emailService.sendRoomBookingPending(
+          booking.email,
+          booking.guestName,
+          roomNum,
+          booking.checkInDate.toISOString(),
+          booking.checkOutDate.toISOString(),
+          booking.confirmationNumber || 'N/A',
+          booking.totalPrice,
+          booking.payment?.method === 'CASH'
+        );
+      }
     } catch (err) {
       logger.error({ err }, 'Failed to dispatch room stay confirmation email');
     }
@@ -644,12 +656,13 @@ export async function getReports() {
   const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
 
   const revenueResult = await RoomBooking.aggregate([
-    { $match: { status: { $in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] } } },
+    { $match: { paymentStatus: 'PAID' } },
     { $group: { _id: null, total: { $sum: '$totalPrice' } } },
   ]);
   const totalRevenue = revenueResult[0]?.total || 0;
 
   const trends = await RoomBooking.aggregate([
+    { $match: { paymentStatus: 'PAID' } },
     {
       $group: {
         _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
@@ -775,3 +788,31 @@ export async function verifyBookingPayment(
   return populated;
 }
 
+export async function cancelGuestBooking(bookingId: string, email: string, reason?: string) {
+  const booking = await RoomBooking.findById(bookingId);
+  if (!booking) {
+    throw AppError.notFound('Booking not found');
+  }
+
+  // Ensure it's the guest's own booking
+  if (booking.email !== email) {
+    throw AppError.forbidden('You are not authorized to cancel this booking');
+  }
+
+  if (['CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'].includes(booking.status)) {
+    throw AppError.badRequest(`Cannot cancel booking with status ${booking.status}`);
+  }
+
+  const cancelReason = reason || 'Guest requested cancellation via portal';
+  const refundNote = booking.paymentStatus === 'PAID' ? 'Refund initiated for paid booking.' : 'No refund required.';
+
+  booking.status = 'CANCELLED';
+  booking.timeline.push({
+    status: 'CANCELLED',
+    timestamp: new Date(),
+    note: `Booking cancelled by guest. Reason: ${cancelReason}. ${refundNote}`,
+  });
+
+  await booking.save();
+  return booking;
+}

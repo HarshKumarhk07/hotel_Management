@@ -72,9 +72,9 @@ export const createBookingSchema = z.object({
   address: z.string().trim().optional(),
   city: z.string().trim().optional(),
   country: z.string().trim().optional(),
-  governmentId: z.string().trim().optional(),
-  idProofUrl: z.string().url().optional(),
-  idProofType: z.enum(['Aadhaar', 'Passport', 'Driving License', 'Other']).optional(),
+  governmentId: z.string().trim().min(1, 'Government ID is required'),
+  idProofUrl: z.string().url('A valid ID Proof document is required'),
+  idProofType: z.enum(['Aadhaar', 'Passport', 'Driving License', 'Voter ID', 'Other']),
   specialRequests: z
     .object({
       lateCheckIn: z.boolean().default(false),

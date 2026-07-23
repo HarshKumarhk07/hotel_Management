@@ -33,6 +33,7 @@ const hallSchema = z.object({
 
 const bookingSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']),
+  enquiryStatus: z.enum(['NEW', 'CONTACTED', 'CLOSED']),
   paymentStatus: z.enum(['PENDING', 'PAID']),
 });
 
@@ -73,6 +74,7 @@ interface BanquetBooking {
   menuPreset?: string;
   totalPrice: number;
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  enquiryStatus: 'NEW' | 'CONTACTED' | 'CLOSED';
   paymentStatus: 'PENDING' | 'PAID';
 }
 
@@ -87,7 +89,7 @@ export default function BanquetManagementPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [selectedHallFilter, setSelectedHallFilter] = useState('');
 
-  const [activeTab, setActiveTab] = useState<'bookings' | 'halls' | 'calendar'>('bookings');
+  const [activeTab, setActiveTab] = useState<'enquiries' | 'bookings' | 'halls' | 'calendar'>('enquiries');
   const [showCreateHall, setShowCreateHall] = useState(false);
   const [editBookingTarget, setEditBookingTarget] = useState<BanquetBooking | null>(null);
   const [editHallTarget, setEditHallTarget] = useState<BanquetHall | null>(null);
@@ -237,6 +239,14 @@ export default function BanquetManagementPage() {
         {/* Tabs */}
         <div className="border-b flex gap-4">
           <button
+            onClick={() => setActiveTab('enquiries')}
+            className={`pb-2.5 text-sm font-semibold border-b-2 transition-all ${
+              activeTab === 'enquiries' ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Enquiries
+          </button>
+          <button
             onClick={() => setActiveTab('bookings')}
             className={`pb-2.5 text-sm font-semibold border-b-2 transition-all ${
               activeTab === 'bookings' ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-800'
@@ -263,7 +273,68 @@ export default function BanquetManagementPage() {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'bookings' ? (
+        {activeTab === 'enquiries' ? (
+          loadingBookings ? (
+            <CenteredSpinner />
+          ) : bookings.length === 0 ? (
+            <Card className="py-16 text-center">
+              <Calendar className="mx-auto h-10 w-10 text-zinc-300 mb-3" />
+              <p className="text-zinc-500 font-medium font-sans">No banquet enquiries found</p>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {bookings.map(booking => (
+                <Card key={booking._id} className="p-4 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-zinc-900 text-base font-sans">{booking.guestName}</h3>
+                      <Badge className={
+                        booking.enquiryStatus === 'NEW' ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20' :
+                        booking.enquiryStatus === 'CONTACTED' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        'bg-zinc-100 text-zinc-500 border-zinc-200'
+                      }>
+                        {booking.enquiryStatus || 'NEW'}
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs text-zinc-500 font-sans">
+                      Event: <strong className="text-zinc-700">{booking.eventType}</strong> · Hall: <strong className="text-zinc-700">{booking.hall?.name || 'Deleted Hall'}</strong>
+                    </p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-xs text-zinc-500 font-sans">
+                      <p>Guest count: <strong>{booking.guestCount}</strong></p>
+                      <p>Email: <strong>{booking.email}</strong></p>
+                      <p>Phone: <strong>{booking.phone}</strong></p>
+                      <p>Total Revenue: <strong className="text-zinc-900 font-semibold">{formatINR(booking.totalPrice)}</strong></p>
+                    </div>
+
+                    <div className="text-[11px] text-zinc-400 bg-zinc-50 p-2 rounded-lg font-mono">
+                      Time: {new Date(booking.startTime).toLocaleString()} - {new Date(booking.endTime).toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 self-start md:self-center shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="font-sans"
+                      onClick={() => {
+                        resetBooking({
+                          status: booking.status,
+                          enquiryStatus: booking.enquiryStatus || 'NEW',
+                          paymentStatus: booking.paymentStatus,
+                        });
+                        setEditBookingTarget(booking);
+                      }}
+                    >
+                      Update Enquiry
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )
+        ) : activeTab === 'bookings' ? (
           loadingBookings ? (
             <CenteredSpinner />
           ) : bookings.length === 0 ? (
@@ -333,6 +404,7 @@ export default function BanquetManagementPage() {
                       onClick={() => {
                         resetBooking({
                           status: booking.status,
+                          enquiryStatus: booking.enquiryStatus || 'NEW',
                           paymentStatus: booking.paymentStatus,
                         });
                         setEditBookingTarget(booking);
@@ -644,8 +716,19 @@ export default function BanquetManagementPage() {
 
             {/* Action Side */}
             <form onSubmit={handleBooking(d => updateBookingMutation.mutate({ id: editBookingTarget._id, d }))} className="space-y-5">
-              <h3 className="font-semibold text-sm text-zinc-900 border-b pb-2">Update Status</h3>
+              <h3 className="font-semibold text-sm text-zinc-900 border-b pb-2">Update Status & Enquiry</h3>
               
+              <Field label="Enquiry Status">
+                <select
+                  {...regBooking('enquiryStatus')}
+                  className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] font-sans transition-shadow shadow-sm"
+                >
+                  <option value="NEW">New Enquiry</option>
+                  <option value="CONTACTED">Contacted Guest</option>
+                  <option value="CLOSED">Closed/Resolved</option>
+                </select>
+              </Field>
+
               <Field label="Booking Status">
                 <select
                   {...regBooking('status')}

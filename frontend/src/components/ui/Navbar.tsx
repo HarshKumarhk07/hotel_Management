@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useQrStore } from '@/stores/qr';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QrScanner } from '@/components/qr/QrScanner';
 import jsQR from 'jsqr';
@@ -201,14 +201,6 @@ export function Navbar() {
               Banquet
             </button>
             <button
-              onClick={() => handleNavClick('/menu')}
-              className={`transition-colors pb-1 border-b-2 ${
-                pathname.startsWith('/menu') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
-              }`}
-            >
-              Menu
-            </button>
-            <button
               onClick={() => handleNavClick('/restaurant/waitlist')}
               className={`transition-colors pb-1 border-b-2 ${
                 pathname.startsWith('/restaurant') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
@@ -217,26 +209,12 @@ export function Navbar() {
               Restaurant
             </button>
             <button
-              onClick={() => handleScrollToSection('amenities')}
-              className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
-            >
-              Amenities
-            </button>
-            <button
-              onClick={() => handleNavClick('/facilities')}
+              onClick={() => handleNavClick('/menu')}
               className={`transition-colors pb-1 border-b-2 ${
-                pathname.startsWith('/facilities') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
+                pathname.startsWith('/menu') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
               }`}
             >
-              Facilities
-            </button>
-            <button
-              onClick={() => handleNavClick('/about')}
-              className={`transition-colors pb-1 border-b-2 ${
-                pathname.startsWith('/about') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
-              }`}
-            >
-              About
+              Menu
             </button>
             <button
               onClick={() => handleNavClick('/gallery')}
@@ -247,6 +225,14 @@ export function Navbar() {
               Gallery
             </button>
             <button
+              onClick={() => handleNavClick('/about')}
+              className={`transition-colors pb-1 border-b-2 ${
+                pathname.startsWith('/about') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
+              }`}
+            >
+              About
+            </button>
+            <button
               onClick={() => handleNavClick('/contact')}
               className={`transition-colors pb-1 border-b-2 ${
                 pathname.startsWith('/contact') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
@@ -254,6 +240,38 @@ export function Navbar() {
             >
               Contact
             </button>
+
+            {/* More Dropdown */}
+            <div className="relative group pb-1">
+              <button
+                className={`flex items-center gap-1 transition-colors border-b-2 ${
+                  pathname.startsWith('/facilities') || pathname === '/#amenities'
+                    ? 'text-[#D4AF37] border-[#D4AF37]'
+                    : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
+                }`}
+              >
+                More <ChevronDown className="h-3 w-3" />
+              </button>
+              
+              <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
+                <div className="flex flex-col gap-3 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl p-4 min-w-[140px] shadow-2xl">
+                  <button
+                    onClick={() => handleScrollToSection('amenities')}
+                    className="text-left text-white/80 hover:text-[#D4AF37] transition-colors py-1"
+                  >
+                    Amenities
+                  </button>
+                  <button
+                    onClick={() => handleNavClick('/facilities')}
+                    className={`text-left transition-colors py-1 ${
+                      pathname.startsWith('/facilities') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'
+                    }`}
+                  >
+                    Facilities
+                  </button>
+                </div>
+              </div>
+            </div>
           </nav>
 
           <nav className="hidden lg:flex items-center gap-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white">
@@ -337,34 +355,16 @@ export function Navbar() {
                 Banquet
               </button>
               <button
-                onClick={() => handleNavClick('/menu')}
-                className={`text-left ${pathname.startsWith('/menu') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
-              >
-                Menu
-              </button>
-              <button
                 onClick={() => handleNavClick('/restaurant/waitlist')}
                 className={`text-left ${pathname.startsWith('/restaurant') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
               >
                 Restaurant
               </button>
               <button
-                onClick={() => handleScrollToSection('amenities')}
-                className="text-white hover:text-[#D4AF37] text-left"
+                onClick={() => handleNavClick('/menu')}
+                className={`text-left ${pathname.startsWith('/menu') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
               >
-                Amenities
-              </button>
-              <button
-                onClick={() => handleNavClick('/facilities')}
-                className={`text-left ${pathname.startsWith('/facilities') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
-              >
-                Facilities
-              </button>
-              <button
-                onClick={() => handleNavClick('/about')}
-                className={`text-left ${pathname.startsWith('/about') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
-              >
-                About
+                Menu
               </button>
               <button
                 onClick={() => handleNavClick('/gallery')}
@@ -373,11 +373,32 @@ export function Navbar() {
                 Gallery
               </button>
               <button
+                onClick={() => handleNavClick('/about')}
+                className={`text-left ${pathname.startsWith('/about') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
+              >
+                About
+              </button>
+              <button
                 onClick={() => handleNavClick('/contact')}
                 className={`text-left ${pathname.startsWith('/contact') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
               >
                 Contact
               </button>
+              
+              <div className="pt-2 pb-1 border-b border-white/10 text-white/50">More</div>
+              <button
+                onClick={() => handleScrollToSection('amenities')}
+                className="text-white/80 hover:text-[#D4AF37] text-left pl-2"
+              >
+                Amenities
+              </button>
+              <button
+                onClick={() => handleNavClick('/facilities')}
+                className={`text-left pl-2 ${pathname.startsWith('/facilities') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'}`}
+              >
+                Facilities
+              </button>
+
               {status === 'authenticated' ? (
                 <>
                   <Link

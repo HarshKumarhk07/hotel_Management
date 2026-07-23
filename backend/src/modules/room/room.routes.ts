@@ -68,6 +68,7 @@ router.get('/bookings/my-bookings', bookingCtrl.getGuestBookings);
 router.get('/bookings/:id', bookingCtrl.getBookingById);
 router.post('/bookings/:id/razorpay', bookingCtrl.createRazorpayOrder);
 router.post('/bookings/:id/verify', bookingCtrl.verifyPayment);
+router.post('/bookings/:id/cancel', authenticate, bookingCtrl.cancelGuestBooking);
 router.get('/:id', validate({ params: roomIdParam }), ctrl.getOne);
 
 // Booking Invoices — view requires auth, download is public (ID is the credential)

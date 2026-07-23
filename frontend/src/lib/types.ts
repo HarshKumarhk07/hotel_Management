@@ -22,6 +22,7 @@ export interface ScanResolution {
     timings?: { open: string; close: string; timezone: string };
     settings?: { serviceChargePercent: number; taxPercent: number };
   } | null;
+  bookingId?: string;
 }
 
 export interface PublicMenuItem {

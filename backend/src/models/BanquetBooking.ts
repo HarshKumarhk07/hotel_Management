@@ -14,6 +14,7 @@ export interface IBanquetBooking extends Document {
   menuPreset?: string;
   totalPrice: number;
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  enquiryStatus: 'NEW' | 'CONTACTED' | 'CLOSED';
   paymentStatus: 'PENDING' | 'PAID';
   createdAt: Date;
   updatedAt: Date;
@@ -48,6 +49,12 @@ const banquetBookingSchema = new Schema<IBanquetBooking>(
       type: String,
       enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'],
       default: 'PENDING',
+      index: true,
+    },
+    enquiryStatus: {
+      type: String,
+      enum: ['NEW', 'CONTACTED', 'CLOSED'],
+      default: 'NEW',
       index: true,
     },
     paymentStatus: {

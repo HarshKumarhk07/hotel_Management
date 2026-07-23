@@ -137,3 +137,16 @@ export const verifyPayment = asyncHandler(async (req: Request, res) => {
   return ok(res, { booking });
 });
 
+export const cancelGuestBooking = asyncHandler(async (req: Request, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+  const user = (req as any).user;
+  
+  if (!user || !user.email) {
+    throw AppError.unauthorized('User email is required to cancel a booking');
+  }
+
+  const booking = await service.cancelGuestBooking(id, user.email, reason);
+  return ok(res, { booking });
+});
+

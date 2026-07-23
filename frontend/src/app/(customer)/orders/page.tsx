@@ -15,10 +15,18 @@ import {
   ArrowRight,
   Sparkles,
   Compass,
+  LifeBuoy,
+  Plus,
 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { Badge, Card, CenteredSpinner, EmptyState } from '@/components/ui/primitives';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
+import { Field, Input } from '@/components/ui/input';
 import { useMyOrders } from '@/hooks/useOrders';
 import { useAuthStore } from '@/stores/auth';
 import { api } from '@/lib/api';
@@ -27,7 +35,7 @@ import { formatDate, formatINR } from '@/lib/utils';
 
 interface CustomerBooking {
   _id: string;
-  room: { roomNumber: string; floor: number; roomType: string };
+  room: { _id: string; roomNumber: string; floor: number; roomType: string };
   guestName: string;
   checkInDate: string;
   checkOutDate: string;
@@ -40,7 +48,8 @@ interface CustomerBooking {
 function DashboardInner() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const [activeTab, setActiveTab] = useState<'bookings' | 'orders'>('bookings');
+  const [activeTab, setActiveTab] = useState<'bookings' | 'orders' | 'tickets'>('bookings');
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
 
   // Fetch food orders
   const { data: orders, isLoading: isLoadingOrders } = useMyOrders();
@@ -57,6 +66,51 @@ function DashboardInner() {
     },
     enabled: !!user?.email,
   });
+
+  // Fetch service tickets
+  const { data: tickets, isLoading: isLoadingTickets, refetch: refetchTickets } = useQuery({
+    queryKey: ['my-service-tickets', user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      const res = await api.get('/complaints', {
+        params: { email: user.email },
+      });
+      return res.data.complaints;
+    },
+    enabled: !!user?.email,
+  });
+
+  const ticketSchema = z.object({
+    roomId: z.string().min(1, 'Please select your room'),
+    category: z.enum(['HOUSEKEEPING', 'MAINTENANCE', 'ROOM_SERVICE', 'OTHER']),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
+    description: z.string().min(1, 'Description is required'),
+  });
+
+  const { register: registerTicket, handleSubmit: handleTicketSubmit, formState: { errors: ticketErrors, isSubmitting: isSubmittingTicket }, reset: resetTicket } = useForm<z.infer<typeof ticketSchema>>({
+    resolver: zodResolver(ticketSchema),
+    defaultValues: {
+      category: 'HOUSEKEEPING',
+      priority: 'MEDIUM',
+    }
+  });
+
+  const onTicketSubmit = async (data: z.infer<typeof ticketSchema>) => {
+    try {
+      await api.post('/complaints', {
+        ...data,
+        guestName: user?.name || 'Guest',
+        phone: (user as any)?.phone || '0000000000',
+        email: user?.email,
+      });
+      toast.success('Service request submitted successfully');
+      setIsTicketModalOpen(false);
+      resetTicket();
+      refetchTickets();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to submit request');
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl w-full p-4 sm:p-6 pt-24 lg:pt-32 space-y-6">
@@ -121,7 +175,17 @@ function DashboardInner() {
               : 'text-zinc-400 hover:text-zinc-600'
           } px-4`}
         >
-          <UtensilsCrossed className="h-4 w-4" /> Dining orders ({orders?.length ?? 0})
+          <UtensilsCrossed className="h-4 w-4" /> Dining ({orders?.length ?? 0})
+        </button>
+        <button
+          onClick={() => setActiveTab('tickets')}
+          className={`flex items-center gap-2 pb-4 text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all ${
+            activeTab === 'tickets'
+              ? 'border-b-2 border-[#D4AF37] text-zinc-950'
+              : 'text-zinc-400 hover:text-zinc-600'
+          } px-4`}
+        >
+          <LifeBuoy className="h-4 w-4" /> Service ({tickets?.length ?? 0})
         </button>
       </div>
 
@@ -266,8 +330,114 @@ function DashboardInner() {
             )}
           </>
         )}
+
+        {activeTab === 'tickets' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-800">Your Service Tickets</h3>
+              <Button onClick={() => setIsTicketModalOpen(true)} className="bg-[#111] hover:bg-zinc-800 text-white text-xs px-4 py-2 rounded-lg flex items-center gap-2">
+                <Plus className="h-4 w-4 text-[#D4AF37]" /> Request Service
+              </Button>
+            </div>
+            {isLoadingTickets ? (
+              <CenteredSpinner label="Loading tickets…" />
+            ) : !tickets || tickets.length === 0 ? (
+              <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed border-zinc-200">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-50 border border-zinc-200 text-zinc-400 mb-4">
+                  <LifeBuoy className="h-6 w-6" />
+                </div>
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-800 mb-1">No Service Tickets</h3>
+                <p className="text-xs text-zinc-500 max-w-sm mb-6">
+                  You haven't submitted any service requests yet.
+                </p>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {tickets.map((t: any) => (
+                  <Card key={t._id} className="p-5 border-zinc-200/80 bg-white rounded-2xl space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-zinc-900">Room {t.room?.roomNumber}</span>
+                          <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider">{t.category}</span>
+                        </div>
+                        <p className="text-xs text-zinc-400">Filed on: {new Date(t.createdAt).toLocaleString()}</p>
+                      </div>
+                      <Badge className={`
+                        ${t.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' : ''}
+                        ${t.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700' : ''}
+                        ${t.status === 'COMPLETED' ? 'bg-green-50 text-green-700' : ''}
+                        ${t.status === 'REJECTED' ? 'bg-red-50 text-red-700' : ''}
+                      `}>
+                        {t.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-zinc-700 bg-zinc-50 p-3 rounded-lg border">{t.description}</p>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
+      <Dialog open={isTicketModalOpen} onClose={() => setIsTicketModalOpen(false)} title="Request Service">
+        <form onSubmit={handleTicketSubmit(onTicketSubmit)} className="space-y-4 font-sans">
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Select Room</label>
+            <select
+              {...registerTicket('roomId')}
+              className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900"
+            >
+              <option value="">-- Choose your booked room --</option>
+              {bookings?.filter(b => ['CONFIRMED', 'CHECKED_IN'].includes(b.status)).map(b => (
+                <option key={b.room._id} value={b.room._id}>Room {b.room.roomNumber}</option>
+              ))}
+            </select>
+            {ticketErrors.roomId && <p className="text-xs text-red-500">{ticketErrors.roomId.message}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Category</label>
+              <select
+                {...registerTicket('category')}
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900"
+              >
+                <option value="HOUSEKEEPING">Housekeeping</option>
+                <option value="MAINTENANCE">Maintenance</option>
+                <option value="ROOM_SERVICE">Room Service</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Priority</label>
+              <select
+                {...registerTicket('priority')}
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900"
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          <Field label="Description" error={ticketErrors.description?.message}>
+            <textarea
+              {...registerTicket('description')}
+              rows={4}
+              placeholder="Please describe your request (e.g. extra towels, AC not working...)"
+              className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900"
+            />
+          </Field>
+
+          <Button type="submit" className="w-full" disabled={isSubmittingTicket}>
+            {isSubmittingTicket ? 'Submitting...' : 'Submit Request'}
+          </Button>
+        </form>
+      </Dialog>
     </div>
   );
 }

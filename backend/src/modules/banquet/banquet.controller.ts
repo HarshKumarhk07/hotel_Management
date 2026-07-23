@@ -199,6 +199,7 @@ export const updateBooking = asyncHandler(async (req: Request, res: Response) =>
   }
 
   if (req.body.status) booking.status = req.body.status;
+  if (req.body.enquiryStatus) booking.enquiryStatus = req.body.enquiryStatus;
   if (req.body.paymentStatus) booking.paymentStatus = req.body.paymentStatus;
 
   await booking.save();
