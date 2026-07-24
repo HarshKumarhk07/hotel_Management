@@ -12,8 +12,13 @@ import {
   valetWelcomeTemplate,
   roomBookingConfirmationTemplate,
   roomBookingPendingTemplate,
+  roomBookingCancelledTemplate,
+  roomTransferTemplate,
+  roomUpgradePaymentTemplate,
+  serviceTicketStatusTemplate,
   checkoutFeedbackTemplate,
   type EmailContent,
+  type RoomTransferData,
   type SecurityAlertData,
 } from './templates';
 
@@ -124,6 +129,39 @@ export const emailService = {
         totalAmount,
         payAtHotel
       )
+    );
+  },
+  sendRoomBookingCancelled(
+    to: string,
+    name: string,
+    roomNumber: string,
+    confirmationNumber: string,
+    reason: string,
+    refundNote: string
+  ) {
+    return send(
+      to,
+      roomBookingCancelledTemplate(name, roomNumber, confirmationNumber, reason, refundNote)
+    );
+  },
+  sendRoomTransfer(to: string, data: RoomTransferData) {
+    return send(to, roomTransferTemplate(data));
+  },
+  sendRoomUpgradePaymentPending(to: string, data: RoomTransferData) {
+    return send(to, roomUpgradePaymentTemplate(data));
+  },
+  sendServiceTicketStatus(
+    to: string,
+    name: string,
+    ticketId: string,
+    roomNumber: string,
+    category: string,
+    status: string,
+    staffNotes?: string
+  ) {
+    return send(
+      to,
+      serviceTicketStatusTemplate(name, ticketId, roomNumber, category, status, staffNotes)
     );
   },
   sendCheckoutFeedback(to: string, name: string, roomNumber: string, feedbackLink: string) {

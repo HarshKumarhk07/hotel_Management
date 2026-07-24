@@ -2,7 +2,7 @@ import request from 'supertest';
 import { createApp } from '@/app';
 import { Room, RoomBooking } from '@/models';
 import { ROLES } from '@/constants';
-import { createUserWithToken } from './helpers';
+import { createUserWithToken, seedRoomCategory } from './helpers';
 
 const app = createApp();
 const api = '/api/v1/rooms';
@@ -21,11 +21,13 @@ describe('Room Booking — API Endpoints', () => {
     adminToken = await adminBearer();
     await Room.deleteMany({});
     await RoomBooking.deleteMany({});
+    await seedRoomCategory({ roomType: 'STANDARD', pricePerNight: 5000 });
 
     room1 = await Room.create({
       roomNumber: '101',
       floor: 1,
       isActive: true,
+      roomType: 'STANDARD',
       pricePerNight: 5000,
       qr: { token: 'qr-token-101', isActive: true, version: 1 },
     });
@@ -34,9 +36,27 @@ describe('Room Booking — API Endpoints', () => {
       roomNumber: '102',
       floor: 1,
       isActive: true,
+      roomType: 'STANDARD',
       pricePerNight: 5000,
       qr: { token: 'qr-token-102', isActive: true, version: 1 },
     });
+  });
+
+  it('rejects a booking that is missing mandatory registration fields', async () => {
+    const res = await request(app)
+      .post(`${api}/bookings`)
+      .send({
+        room: room1._id.toString(),
+        guestName: 'Jane Smith',
+        phone: '+919876543210',
+        email: 'jane@example.com',
+        checkInDate: new Date('2026-09-10T12:00:00.000Z').toISOString(),
+        checkOutDate: new Date('2026-09-15T12:00:00.000Z').toISOString(),
+        // address / city / country / governmentId / idProof* deliberately omitted
+      })
+      .expect(400);
+
+    expect(res.body.error).toBeDefined();
   });
 
   it('searches available rooms and returns empty/populated lists correctly', async () => {
@@ -94,7 +114,10 @@ describe('Room Booking — API Endpoints', () => {
       email: 'jane@example.com',
       checkInDate: new Date('2026-09-10T12:00:00.000Z').toISOString(),
       checkOutDate: new Date('2026-09-15T12:00:00.000Z').toISOString(),
-      governmentId: 'ID123',
+      address: '12 Marine Drive',
+      city: 'Mumbai',
+      country: 'India',
+      governmentId: 'ID1234',
       idProofUrl: 'https://example.com/id.jpg',
       idProofType: 'Aadhaar',
     };
@@ -118,7 +141,10 @@ describe('Room Booking — API Endpoints', () => {
       email: 'jane@example.com',
       checkInDate: new Date('2026-09-10T12:00:00.000Z').toISOString(),
       checkOutDate: new Date('2026-09-15T12:00:00.000Z').toISOString(),
-      governmentId: 'ID123',
+      address: '12 Marine Drive',
+      city: 'Mumbai',
+      country: 'India',
+      governmentId: 'ID1234',
       idProofUrl: 'https://example.com/id.jpg',
       idProofType: 'Aadhaar',
     };

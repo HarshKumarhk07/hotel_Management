@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
-import { Landmark, CheckCircle2, Calendar, FileText, Download, Phone, MapPin, ArrowRight, XCircle } from 'lucide-react';
+import { Landmark, CheckCircle2, Calendar, FileText, Download, Phone, MapPin, ArrowRight, XCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { SiteFooter } from '@/components/site/SiteFooter';
@@ -28,6 +28,7 @@ interface BookingDetail {
   totalPrice: number;
   status: string;
   paymentStatus: string;
+  payment?: { method?: string; status?: string; paidAt?: string };
   confirmationNumber: string;
   priceBreakdown: {
     roomPrice: number;
@@ -66,7 +67,12 @@ export default function BookingConfirmationPage() {
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
-      await api.post(`/rooms/bookings/${params.id}/cancel`, { reason: cancelReason });
+      // The confirmation number on this ticket is the guest's proof of ownership —
+      // no email is ever requested, and an expired session no longer blocks them.
+      await api.post(`/rooms/bookings/${params.id}/cancel`, {
+        reason: cancelReason,
+        confirmationNumber: booking?.confirmationNumber,
+      });
     },
     onSuccess: () => {
       toast.success('Booking cancelled successfully');
@@ -94,6 +100,9 @@ export default function BookingConfirmationPage() {
     );
   }
 
+  const isPaid = booking.paymentStatus === 'PAID';
+  const isPayAtHotel = (booking.payment?.method || '').toUpperCase() === 'CASH';
+
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const qrDataUrl = `${siteUrl}/rooms/confirm/${booking._id}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
@@ -119,12 +128,30 @@ export default function BookingConfirmationPage() {
               {booking.status === 'CANCELLED' ? 'Booking Cancelled' : 'Stay Confirmed!'}
             </h1>
             <p className="text-zinc-500 text-sm max-w-md mx-auto">
-              {booking.status === 'CANCELLED' 
-                ? `Sorry to see you cancel, ${booking.guestName}. Your reservation has been cancelled.` 
+              {booking.status === 'CANCELLED'
+                ? `Sorry to see you cancel, ${booking.guestName}. Your reservation has been cancelled.`
                 : `Thank you, ${booking.guestName}. Your premium suite booking is finalized. An email confirmation has been sent.`}
             </p>
           </div>
         </div>
+
+        {booking.status !== 'CANCELLED' && !isPaid && (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="text-sm font-bold text-amber-900">
+                Payment Pending{isPayAtHotel ? ' · Pay at Hotel' : ''}
+              </p>
+              <p className="text-xs text-amber-800">
+                Your stay is confirmed and the room is reserved. The outstanding amount of{' '}
+                <b>{formatINR(booking.totalPrice)}</b>{' '}
+                {isPayAtHotel
+                  ? 'is to be settled at the hotel front desk on arrival.'
+                  : 'has not been received yet — you can settle it online or at the front desk on arrival.'}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Ticket Grid */}
         <div className="grid gap-6 md:grid-cols-3">
@@ -135,12 +162,35 @@ export default function BookingConfirmationPage() {
                 <span className="text-xl font-bold text-zinc-950 font-mono tracking-wider">{booking.confirmationNumber || 'CONF-XYZ123'}</span>
               </div>
               <div className="flex flex-col items-end gap-2">
+                {/* Stay status and payment status are deliberately separate: a
+                    "Pay at Hotel" reservation is confirmed but not yet paid. */}
                 <Badge className={
                   booking.status === 'CANCELLED' ? 'bg-red-50 text-red-700 border-red-200' :
+                  booking.status === 'CHECKED_OUT' ? 'bg-zinc-100 text-zinc-700 border-zinc-200' :
                   'bg-green-50 text-green-700 border-green-200'
                 }>
-                  {booking.status === 'CANCELLED' ? 'CANCELLED' : (booking.paymentStatus === 'PAID' ? 'PAID IN FULL' : 'PENDING')}
+                  {booking.status === 'CANCELLED'
+                    ? 'CANCELLED'
+                    : booking.status === 'CHECKED_IN'
+                    ? 'CHECKED IN'
+                    : booking.status === 'CHECKED_OUT'
+                    ? 'CHECKED OUT'
+                    : 'STAY CONFIRMED'}
                 </Badge>
+                {booking.status !== 'CANCELLED' && (
+                  <Badge className={
+                    isPaid
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }>
+                    {isPaid ? 'PAID IN FULL' : 'PAYMENT PENDING'}
+                  </Badge>
+                )}
+                {!isPaid && booking.status !== 'CANCELLED' && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                    {isPayAtHotel ? 'Pay at Hotel' : 'Pay Online / At Hotel'}
+                  </span>
+                )}
                 {['PENDING', 'CONFIRMED'].includes(booking.status) && (
                   <button onClick={() => setIsCancelModalOpen(true)} className="text-[10px] text-red-500 hover:text-red-700 font-bold uppercase tracking-wider underline">
                     Cancel Booking

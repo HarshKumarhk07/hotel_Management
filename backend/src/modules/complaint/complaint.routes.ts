@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '@/middleware/authenticate';
+import { authenticate, optionalAuthenticate } from '@/middleware/authenticate';
 import { authorize } from '@/middleware/authorize';
 import { validate } from '@/middleware/validate';
 import { ROLES } from '@/constants';
@@ -8,9 +8,11 @@ import { createComplaintSchema, updateComplaintSchema } from './complaint.valida
 
 const router = Router();
 
-// Guest routes
-router.post('/', validate({ body: createComplaintSchema }), ctrl.createComplaint);
-router.get('/my', ctrl.getGuestComplaints);
+// Guest routes. `optionalAuthenticate` lets a signed-in guest be identified by
+// their account without turning an expired token into a 401 for QR-only guests.
+router.post('/', optionalAuthenticate, validate({ body: createComplaintSchema }), ctrl.createComplaint);
+router.get('/my', optionalAuthenticate, ctrl.getGuestComplaints);
+router.get('/eligibility', optionalAuthenticate, ctrl.getServiceEligibility);
 
 // Admin/Staff routes
 router.get('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.KITCHEN_OWNER), ctrl.listComplaints);

@@ -12,8 +12,17 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, FieldError } from '@/components/ui/input';
 import { Badge, Card, CenteredSpinner, EmptyState, Spinner } from '@/components/ui/primitives';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAdminKitchens } from '@/hooks/useAdminKitchens';
-import { useAdminRooms, useRoomMutations, useAdminBookings, useBookingMutations, type AdminRoom, type RoomBookingInfo } from '@/hooks/useAdminRooms';
+import {
+  useAdminRooms,
+  useRoomMutations,
+  useAdminBookings,
+  useBookingMutations,
+  useTransferOptions,
+  type AdminRoom,
+  type RoomBookingInfo,
+} from '@/hooks/useAdminRooms';
 import { api, apiErrorMessage } from '@/lib/api';
 import { downloadAuthed } from '@/lib/download';
 import { formatDate } from '@/lib/utils';
@@ -24,7 +33,8 @@ const createSchema = z.object({
   roomNumber: z.string().min(1, 'Room number is required'),
   floor: z.coerce.number().int(),
   kitchen: z.string().optional(),
-  roomType: z.string().optional(),
+  // A room can only exist against a real Room Category.
+  roomType: z.string().min(1, 'Select a room category'),
 });
 type CreateForm = z.infer<typeof createSchema>;
 
@@ -80,7 +90,7 @@ function CreateRoomDialog({ open, onClose }: { open: boolean; onClose: () => voi
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Room Type">
+          <Field label="Room Category" error={errors.roomType?.message}>
             <select
               className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
               {...register('roomType')}
@@ -218,6 +228,17 @@ function QrDialog({
   );
 }
 
+const TRANSFER_TYPE_LABEL: Record<string, string> = {
+  NORMAL: 'Same category',
+  UPGRADE: 'Upgrade',
+  DOWNGRADE: 'Downgrade',
+};
+
+/**
+ * Transfer dialog. Targets come from the backend already classified as a
+ * same-category move, an upgrade (guest owes the differential) or a downgrade
+ * (hotel owes a refund), so the admin sees the billing consequence up front.
+ */
 function TransferDialog({
   booking,
   onClose,
@@ -225,18 +246,34 @@ function TransferDialog({
   booking: RoomBookingInfo;
   onClose: () => void;
 }) {
-  const { data: rooms } = useAdminRooms();
+  const { data: options, isLoading } = useTransferOptions(booking._id);
   const { transfer } = useBookingMutations();
   const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [scope, setScope] = useState<'SAME' | 'ALL'>('SAME');
   const [error, setError] = useState<string | null>(null);
 
-  const availableRooms = rooms?.filter((r) => r.status === 'AVAILABLE' && r.isActive) || [];
+  const allOptions = options?.options ?? [];
+  // Rule 2: a plain transfer stays inside the same category. Cross-category
+  // moves are opt-in and always route through the upgrade/downgrade billing.
+  const visibleOptions =
+    scope === 'SAME' ? allOptions.filter((o) => o.transferType === 'NORMAL') : allOptions;
+
+  const selected = allOptions.find((o) => o._id === selectedRoomId) ?? null;
 
   const handleTransfer = async () => {
     if (!selectedRoomId) return;
     setError(null);
     try {
-      await transfer.mutateAsync({ id: booking._id, newRoomId: selectedRoomId });
+      const result = await transfer.mutateAsync({ id: booking._id, newRoomId: selectedRoomId });
+      if (result?.type === 'UPGRADE') {
+        toast.success(
+          `Upgrade requested. ₹${result.amountDue} is due from the guest — confirm payment to complete the move.`,
+        );
+      } else if (result?.type === 'DOWNGRADE') {
+        toast.success(`Room changed. Refund of ₹${result.refundAmount} recorded for the guest.`);
+      } else {
+        toast.success('Room transferred. The guest has been emailed the new room details.');
+      }
       onClose();
     } catch (err) {
       setError(apiErrorMessage(err, 'Failed to transfer room.'));
@@ -246,23 +283,105 @@ function TransferDialog({
   return (
     <Dialog open onClose={onClose} title={`Transfer Booking · ${booking.guestName}`}>
       <div className="space-y-4">
-        <p className="text-xs text-zinc-500">
-          Current Room: <b>Room {booking.room?.roomNumber} (Floor {booking.room?.floor})</b>
-        </p>
-        <Field label="Select New Available Room">
-          <select
-            value={selectedRoomId}
-            onChange={(e) => setSelectedRoomId(e.target.value)}
-            className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
-          >
-            <option value="">— Choose a Room —</option>
-            {availableRooms.map((r) => (
-              <option key={r._id} value={r._id}>
-                Room {r.roomNumber} ({r.roomType || 'Standard'} · Floor {r.floor})
-              </option>
-            ))}
-          </select>
-        </Field>
+        {isLoading || !options ? (
+          <CenteredSpinner label="Checking available rooms…" />
+        ) : options.pendingTransfer ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 space-y-1">
+            <p className="font-bold">Upgrade already awaiting payment</p>
+            <p>
+              Room {options.pendingTransfer.fromRoomNumber} → Room {options.pendingTransfer.toRoomNumber} ·
+              ₹{options.pendingTransfer.amountDue} due. Confirm or cancel that upgrade before starting
+              another transfer.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-lg border bg-zinc-50 p-3 text-xs text-zinc-600 space-y-1">
+              <p>
+                Current room:{' '}
+                <b className="text-zinc-900">
+                  Room {options.currentRoom.roomNumber} · {options.currentRoom.roomType} · Floor{' '}
+                  {options.currentRoom.floor}
+                </b>
+              </p>
+              <p>
+                {options.nights} night{options.nights === 1 ? '' : 's'} at ₹
+                {options.currentRoom.pricePerNight}/night
+              </p>
+            </div>
+
+            <div className="flex gap-1.5">
+              {(['SAME', 'ALL'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setScope(s);
+                    setSelectedRoomId('');
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    scope === s ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  }`}
+                >
+                  {s === 'SAME' ? 'Same category' : 'Upgrade / Downgrade'}
+                </button>
+              ))}
+            </div>
+
+            <Field label="Select New Available Room">
+              <select
+                value={selectedRoomId}
+                onChange={(e) => setSelectedRoomId(e.target.value)}
+                className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+              >
+                <option value="">— Choose a Room —</option>
+                {visibleOptions.map((r) => (
+                  <option key={r._id} value={r._id}>
+                    Room {r.roomNumber} ({r.roomType} · Floor {r.floor}) —{' '}
+                    {TRANSFER_TYPE_LABEL[r.transferType]}
+                    {r.transferType === 'UPGRADE' ? ` +₹${r.amountDue}` : ''}
+                    {r.transferType === 'DOWNGRADE' ? ` −₹${r.refundAmount}` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            {visibleOptions.length === 0 && (
+              <p className="text-xs text-zinc-500">
+                {scope === 'SAME'
+                  ? 'No free rooms in the same category for these dates. Switch to Upgrade / Downgrade to see other classes.'
+                  : 'No rooms are free for these dates.'}
+              </p>
+            )}
+
+            {selected && selected.transferType === 'UPGRADE' && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+                <p className="font-bold">Upgrade — ₹{selected.amountDue} due from the guest</p>
+                <p className="mt-1">
+                  The guest is emailed a payment request and stays in Room {options.currentRoom.roomNumber}{' '}
+                  until you confirm the payment was collected.
+                </p>
+              </div>
+            )}
+
+            {selected && selected.transferType === 'DOWNGRADE' && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <p className="font-bold">Downgrade — ₹{selected.refundAmount} refund owed</p>
+                <p className="mt-1">
+                  The move takes effect immediately, the booking total is reduced and the refund is recorded
+                  as pending for the finance team.
+                </p>
+              </div>
+            )}
+
+            {selected && selected.transferType === 'NORMAL' && (
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-700">
+                Same category move — no billing change. The guest is emailed the new room and QR details.
+              </div>
+            )}
+          </>
+        )}
+
         {error && <FieldError message={error} />}
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={onClose}>
@@ -270,10 +389,14 @@ function TransferDialog({
           </Button>
           <Button
             onClick={handleTransfer}
-            disabled={!selectedRoomId || transfer.isPending}
+            disabled={!selectedRoomId || transfer.isPending || !!options?.pendingTransfer}
             className="bg-[#D4AF37] hover:bg-[#AE963C] text-white"
           >
-            {transfer.isPending ? 'Transferring…' : 'Transfer Room'}
+            {transfer.isPending
+              ? 'Transferring…'
+              : selected?.transferType === 'UPGRADE'
+              ? 'Request Upgrade'
+              : 'Transfer Room'}
           </Button>
         </div>
       </div>
@@ -283,8 +406,20 @@ function TransferDialog({
 
 function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }) {
   const { data: bookings, isLoading } = useAdminBookings();
-  const { updateStatus } = useBookingMutations();
+  const {
+    updateStatus,
+    recordPayment,
+    confirmTransferPayment,
+    cancelTransfer,
+    markRefundProcessed,
+  } = useBookingMutations();
   const [transferBooking, setTransferBooking] = useState<RoomBookingInfo | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    description: string;
+    confirmText?: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   if (isLoading) return <CenteredSpinner />;
   if (!bookings || bookings.length === 0) {
@@ -308,16 +443,50 @@ function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }
     }
   };
 
+  /** Payment state is tracked independently of the booking status. */
+  const getPaymentBadge = (booking: RoomBookingInfo) => {
+    if (booking.status === 'CANCELLED') return null;
+    if (booking.paymentStatus === 'PAID') {
+      return <Badge className="bg-green-100 text-green-800 border-green-200">Paid</Badge>;
+    }
+    const payAtHotel = (booking.payment?.method || '').toUpperCase() === 'CASH';
+    return (
+      <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+        {payAtHotel ? 'Pending Payment · Pay at Hotel' : 'Pending Payment'}
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-4">
-      {bookings.map((booking) => (
+      {bookings.map((booking) => {
+        const pendingRefund = booking.transfers?.find(
+          (t) => t.type === 'DOWNGRADE' && t.refundStatus === 'PENDING',
+        );
+        return (
         <Card key={booking._id} className="p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-lg font-bold text-zinc-900">Room {booking.room?.roomNumber || 'Unknown'}</span>
                 {getStatusBadge(booking.status)}
+                {getPaymentBadge(booking)}
               </div>
+
+              {booking.pendingTransfer && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <b>Upgrade awaiting payment:</b> Room {booking.pendingTransfer.fromRoomNumber} →{' '}
+                  Room {booking.pendingTransfer.toRoomNumber} ({booking.pendingTransfer.toRoomType}) · ₹
+                  {booking.pendingTransfer.amountDue} due
+                </div>
+              )}
+
+              {pendingRefund && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                  <b>Downgrade refund pending:</b> ₹{pendingRefund.refundAmount} owed to the guest
+                  (Room {pendingRefund.fromRoomNumber} → Room {pendingRefund.toRoomNumber})
+                </div>
+              )}
               <div className="grid gap-x-6 gap-y-1 text-sm text-zinc-600 sm:grid-cols-2">
                 <p className="flex items-center gap-2">
                   <User className="h-4 w-4 text-zinc-400" /> {booking.guestName}
@@ -346,6 +515,87 @@ function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }
             </div>
 
             <div className="flex flex-wrap gap-2">
+              {/* Settlement is always an explicit action — never implied by check-in. */}
+              {booking.status !== 'CANCELLED' && booking.paymentStatus !== 'PAID' && (
+                <Button
+                  size="sm"
+                  className="bg-emerald-700 hover:bg-emerald-800"
+                  onClick={() => {
+                    setConfirmDialog({
+                      title: 'Confirm Payment',
+                      description: `Record ₹${booking.totalPrice} as received from ${booking.guestName}?`,
+                      confirmText: 'Record Payment',
+                      onConfirm: () => {
+                        recordPayment.mutate(
+                          { id: booking._id, status: 'PAID' },
+                          {
+                            onSuccess: () => toast.success('Payment recorded. Revenue and guest email updated.'),
+                            onError: (err) => toast.error(apiErrorMessage(err, 'Failed to record payment')),
+                          },
+                        );
+                      }
+                    });
+                  }}
+                  disabled={recordPayment.isPending}
+                >
+                  Mark Payment Received
+                </Button>
+              )}
+
+              {booking.pendingTransfer && (
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-indigo-700 hover:bg-indigo-800"
+                    onClick={() => {
+                      setConfirmDialog({
+                        title: 'Confirm Upgrade Payment',
+                        description: `Confirm ₹${booking.pendingTransfer?.amountDue} upgrade payment and move the guest?`,
+                        confirmText: 'Confirm Upgrade',
+                        onConfirm: () => {
+                          confirmTransferPayment.mutate(booking._id, {
+                            onSuccess: () => toast.success('Upgrade completed. The guest has been emailed.'),
+                            onError: (err) => toast.error(apiErrorMessage(err, 'Failed to confirm upgrade')),
+                          });
+                        }
+                      });
+                    }}
+                    disabled={confirmTransferPayment.isPending}
+                  >
+                    Confirm Upgrade Payment
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      cancelTransfer.mutate(booking._id, {
+                        onSuccess: () => toast.success('Upgrade cancelled and the held room released.'),
+                        onError: (err) => toast.error(apiErrorMessage(err, 'Failed to cancel upgrade')),
+                      })
+                    }
+                    disabled={cancelTransfer.isPending}
+                  >
+                    Cancel Upgrade
+                  </Button>
+                </>
+              )}
+
+              {pendingRefund && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    markRefundProcessed.mutate(booking._id, {
+                      onSuccess: () => toast.success('Refund marked as processed.'),
+                      onError: (err) => toast.error(apiErrorMessage(err, 'Failed to update refund')),
+                    })
+                  }
+                  disabled={markRefundProcessed.isPending}
+                >
+                  Mark Refund Processed
+                </Button>
+              )}
+
               {booking.status === 'PENDING' && (
                 <>
                   <Button
@@ -426,12 +676,24 @@ function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }
             </div>
           </div>
         </Card>
-      ))}
+        );
+      })}
 
       {transferBooking && (
         <TransferDialog
           booking={transferBooking}
           onClose={() => setTransferBooking(null)}
+        />
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          open={!!confirmDialog}
+          onClose={() => setConfirmDialog(null)}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmText={confirmDialog.confirmText}
+          onConfirm={confirmDialog.onConfirm}
         />
       )}
     </div>

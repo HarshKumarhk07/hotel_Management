@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '@/middleware/authenticate';
+import { authenticate, optionalAuthenticate } from '@/middleware/authenticate';
 import { authorize } from '@/middleware/authorize';
 import { validate } from '@/middleware/validate';
 import { searchLimiter } from '@/middleware/rateLimit';
@@ -21,6 +21,10 @@ import {
   createCategorySchema,
   updateCategorySchema,
   categoryIdParam,
+  cancelBookingSchema,
+  transferRoomSchema,
+  recordPaymentSchema,
+  migrateCategorySchema,
 } from './room.validation';
 import * as categoryCtrl from './category.controller';
 import { uploadDocument, uploadImage as uploadImageMw } from '@/middleware/upload';
@@ -55,6 +59,16 @@ router.route('/categories')
   .post(authenticate, authorize(ROLES.SUPER_ADMIN), validate({ body: createCategorySchema }), categoryCtrl.createCategory)
   .get(categoryCtrl.listCategories); // Get list of categories should probably be public anyway for users to see, but leaving it open
 
+// Category consistency tooling — report orphaned rooms and migrate them.
+router.get('/categories-audit', authenticate, authorize(ROLES.SUPER_ADMIN), categoryCtrl.auditCategories);
+router.post(
+  '/categories-migrate',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN),
+  validate({ body: migrateCategorySchema }),
+  categoryCtrl.migrateOrphans,
+);
+
 router.route('/categories/:id')
   .get(validate({ params: categoryIdParam }), categoryCtrl.getCategory)
   .patch(authenticate, authorize(ROLES.SUPER_ADMIN), validate({ params: categoryIdParam, body: updateCategorySchema }), categoryCtrl.updateCategory)
@@ -68,7 +82,15 @@ router.get('/bookings/my-bookings', bookingCtrl.getGuestBookings);
 router.get('/bookings/:id', bookingCtrl.getBookingById);
 router.post('/bookings/:id/razorpay', bookingCtrl.createRazorpayOrder);
 router.post('/bookings/:id/verify', bookingCtrl.verifyPayment);
-router.post('/bookings/:id/cancel', authenticate, bookingCtrl.cancelGuestBooking);
+// Cancellation never prompts for an email: `optionalAuthenticate` lets a signed-in
+// guest be matched against the email already stored on the booking, and the
+// confirmation number on their own ticket authorises them if the session lapsed.
+router.post(
+  '/bookings/:id/cancel',
+  optionalAuthenticate,
+  validate({ body: cancelBookingSchema }),
+  bookingCtrl.cancelGuestBooking,
+);
 router.get('/:id', validate({ params: roomIdParam }), ctrl.getOne);
 
 // Booking Invoices — view requires auth, download is public (ID is the credential)
@@ -150,8 +172,22 @@ router.patch('/:id/status', validate({ body: setRoomStatusSchema }), bookingCtrl
 
 router.post('/bookings/:id/checkin', bookingCtrl.checkIn);
 router.post('/bookings/:id/checkout', bookingCtrl.checkOut);
-router.post('/bookings/:id/upgrade', bookingCtrl.upgradeRoom);
-router.post('/bookings/:id/transfer', bookingCtrl.transferRoom);
+
+// Explicit settlement entry — the only admin path that can mark a stay as paid.
+router.patch(
+  '/bookings/:id/payment',
+  validate({ body: recordPaymentSchema }),
+  bookingCtrl.recordPayment,
+);
+
+// ── Room transfer workflow ──
+router.get('/bookings/:id/transfer-options', bookingCtrl.getTransferOptions);
+router.post('/bookings/:id/upgrade', validate({ body: transferRoomSchema }), bookingCtrl.upgradeRoom);
+router.post('/bookings/:id/transfer', validate({ body: transferRoomSchema }), bookingCtrl.transferRoom);
+router.post('/bookings/:id/transfer/confirm-payment', bookingCtrl.confirmTransferPayment);
+router.post('/bookings/:id/transfer/cancel', bookingCtrl.cancelPendingTransfer);
+router.post('/bookings/:id/transfer/refund-processed', bookingCtrl.markTransferRefundProcessed);
+
 router.get('/admin/reports', bookingCtrl.getReports);
 
 export default router;

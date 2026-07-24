@@ -2,7 +2,7 @@ import request from 'supertest';
 import { createApp } from '@/app';
 import { Room, RoomBooking } from '@/models';
 import { ROLES } from '@/constants';
-import { createUserWithToken } from './helpers';
+import { createUserWithToken, seedRoomCategory } from './helpers';
 
 const app = createApp();
 const api = '/api/v1/rooms';
@@ -12,11 +12,16 @@ async function adminBearer() {
   return bearer;
 }
 
+// A room can only be created against an existing Room Category.
+beforeEach(async () => {
+  await seedRoomCategory();
+});
+
 async function createRoom(bearer: string, roomNumber = '101', floor = 1) {
   const res = await request(app)
     .post(api)
     .set('Authorization', bearer)
-    .send({ roomNumber, floor })
+    .send({ roomNumber, floor, roomType: 'STANDARD' })
     .expect(201);
   return res.body.data.room;
 }
@@ -36,7 +41,7 @@ describe('Rooms — CRUD & QR lifecycle', () => {
     const res = await request(app)
       .post(api)
       .set('Authorization', bearer)
-      .send({ roomNumber: '202', floor: 2 })
+      .send({ roomNumber: '202', floor: 2, roomType: 'STANDARD' })
       .expect(409);
     expect(res.body.error.code).toBe('ROOM_EXISTS');
   });

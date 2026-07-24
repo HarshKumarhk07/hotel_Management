@@ -97,9 +97,11 @@ export const listBookings = asyncHandler(async (req: Request, res: Response) => 
     if (phone) q.phone = phone;
   }
 
+  // Newest enquiry first — the admin timeline, enquiry list and reservation list
+  // all read from this endpoint, so they share a single newest-first ordering.
   const items = await BanquetBooking.find(q)
     .populate('hall', 'name capacity pricePerHour pricePerPlate')
-    .sort({ startTime: 1 });
+    .sort({ createdAt: -1, _id: -1 });
 
   return ok(res, { bookings: items });
 });

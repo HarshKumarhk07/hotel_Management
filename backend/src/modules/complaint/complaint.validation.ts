@@ -13,7 +13,9 @@ export const createComplaintSchema = z.object({
 });
 
 export const updateComplaintSchema = z.object({
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED']).optional(),
-  assignedStaff: objectId.optional().nullable(),
+  status: z
+    .enum(['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CLOSED', 'REJECTED'])
+    .optional(),
+  assignedStaff: objectId.optional().nullable().or(z.literal('')),
   staffNotes: z.string().trim().max(1000).optional(),
 });

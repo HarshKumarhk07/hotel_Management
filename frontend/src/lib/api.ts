@@ -79,9 +79,25 @@ export function apiErrorMessage(err: unknown, fallback = 'Something went wrong')
   if (axios.isAxiosError(err)) {
     const data = err.response?.data as any;
     if (data) {
+      // Prefer a specific field-level reason over the generic top-level message
+      // (e.g. "Validation failed") so the user knows what to fix.
+      const generic = typeof data.message === 'string' && /validation failed/i.test(data.message);
+      const fieldError = firstFieldError(data.errors);
+      if (fieldError && (generic || !data.message)) return fieldError;
       if (typeof data.message === 'string') return data.message;
       if (data.error && typeof data.error.message === 'string') return data.error.message;
+      if (fieldError) return fieldError;
     }
   }
   return fallback;
+}
+
+/** Pull the first field-level error string from a `{ field: message }` map. */
+function firstFieldError(errors: unknown): string | undefined {
+  if (!errors || typeof errors !== 'object') return undefined;
+  for (const value of Object.values(errors as Record<string, unknown>)) {
+    if (typeof value === 'string' && value.trim()) return value;
+    if (Array.isArray(value) && typeof value[0] === 'string' && value[0].trim()) return value[0];
+  }
+  return undefined;
 }

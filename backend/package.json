@@ -14,6 +14,7 @@
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "seed:dev": "tsx src/scripts/seedLocalDev.ts",
     "migrate:indexes": "tsx src/scripts/syncIndexes.ts",
+    "migrate:rooms": "tsx src/scripts/migrateOrphanRooms.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "cross-env NODE_ENV=test jest --runInBand",

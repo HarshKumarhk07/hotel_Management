@@ -29,7 +29,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { Field, Input } from '@/components/ui/input';
 import { useMyOrders } from '@/hooks/useOrders';
 import { useAuthStore } from '@/stores/auth';
-import { api } from '@/lib/api';
+import { api, apiErrorMessage } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import { STATUS_BADGE, STATUS_LABEL } from '@/lib/orderStatus';
 import { formatDate, formatINR } from '@/lib/utils';
 
@@ -42,8 +43,36 @@ interface CustomerBooking {
   totalPrice: number;
   status: string;
   paymentStatus: string;
+  payment?: { method?: string };
   confirmationNumber?: string;
 }
+
+interface ServiceTicket {
+  _id: string;
+  room?: { _id: string; roomNumber: string; floor: number };
+  category: string;
+  priority: string;
+  description: string;
+  status: string;
+  staffNotes?: string;
+  assignedStaff?: { name: string; designation?: string };
+  createdAt: string;
+}
+
+interface ServiceEligibility {
+  eligible: boolean;
+  reason: string | null;
+  rooms: { bookingId: string; roomId: string; roomNumber: string; floor: number; roomType: string }[];
+}
+
+const TICKET_STATUS_BADGE: Record<string, string> = {
+  PENDING: 'bg-yellow-50 text-yellow-700',
+  ASSIGNED: 'bg-indigo-50 text-indigo-700',
+  IN_PROGRESS: 'bg-blue-50 text-blue-700',
+  COMPLETED: 'bg-green-50 text-green-700',
+  CLOSED: 'bg-zinc-100 text-zinc-700',
+  REJECTED: 'bg-red-50 text-red-700',
+};
 
 function DashboardInner() {
   const router = useRouter();
@@ -57,7 +86,10 @@ function DashboardInner() {
 
   const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.post(`/rooms/bookings/${id}/cancel`, { reason: cancelReason });
+      await api.post(`/rooms/bookings/${id}/cancel`, {
+        reason: cancelReason,
+        confirmationNumber: bookingToCancel?.confirmationNumber,
+      });
     },
     onSuccess: () => {
       toast.success('Booking cancelled successfully');
@@ -87,18 +119,51 @@ function DashboardInner() {
     enabled: !!user?.email,
   });
 
-  // Fetch service tickets
-  const { data: tickets, isLoading: isLoadingTickets, refetch: refetchTickets } = useQuery({
+  // Fetch service tickets. `/complaints` is the admin-only list endpoint — a guest
+  // hitting it gets a 403, which is why this list never populated. `/complaints/my`
+  // is the guest-scoped route and its payload is nested under `data`.
+  const { data: tickets, isLoading: isLoadingTickets, refetch: refetchTickets } = useQuery<ServiceTicket[]>({
     queryKey: ['my-service-tickets', user?.email],
     queryFn: async () => {
       if (!user?.email) return [];
-      const res = await api.get('/complaints', {
+      const res = await api.get<{ data: { complaints: ServiceTicket[] } }>('/complaints/my', {
         params: { email: user.email },
       });
-      return res.data.complaints;
+      return res.data.data.complaints ?? [];
     },
     enabled: !!user?.email,
   });
+
+  // Only a checked-in guest may raise a service request.
+  const { data: eligibility } = useQuery<ServiceEligibility>({
+    queryKey: ['service-eligibility', user?.email],
+    queryFn: async () => {
+      const res = await api.get<{ data: ServiceEligibility }>('/complaints/eligibility', {
+        params: { email: user?.email },
+      });
+      return res.data.data;
+    },
+    enabled: !!user?.email,
+  });
+
+  const canRequestService = !!eligibility?.eligible;
+
+  // Keep the guest's ticket list live as staff work through it.
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const onChange = () => {
+      queryClient.invalidateQueries({ queryKey: ['my-service-tickets'] });
+    };
+    socket.on('complaint:new', onChange);
+    socket.on('complaint:updated', onChange);
+
+    return () => {
+      socket.off('complaint:new', onChange);
+      socket.off('complaint:updated', onChange);
+    };
+  }, [queryClient]);
 
   const ticketSchema = z.object({
     roomId: z.string().min(1, 'Please select your room'),
@@ -116,13 +181,11 @@ function DashboardInner() {
   });
 
   useEffect(() => {
-    if (bookings) {
-      const activeBookings = bookings.filter((b: any) => ['CONFIRMED', 'CHECKED_IN'].includes(b.status));
-      if (activeBookings.length === 1) {
-        setTicketValue('roomId', activeBookings[0].room._id);
-      }
+    // Only rooms the guest has actually checked into can receive a ticket.
+    if (eligibility?.rooms?.length === 1) {
+      setTicketValue('roomId', eligibility.rooms[0].roomId);
     }
-  }, [bookings, setTicketValue]);
+  }, [eligibility, setTicketValue]);
 
   const onTicketSubmit = async (data: z.infer<typeof ticketSchema>) => {
     try {
@@ -136,9 +199,17 @@ function DashboardInner() {
       setIsTicketModalOpen(false);
       resetTicket();
       refetchTickets();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to submit request');
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to submit request'));
     }
+  };
+
+  const openTicketModal = () => {
+    if (!canRequestService) {
+      toast.info(eligibility?.reason || 'You can request hotel services after completing check-in.');
+      return;
+    }
+    setIsTicketModalOpen(true);
   };
 
   return (
@@ -183,7 +254,7 @@ function DashboardInner() {
             <Button
               onClick={() => {
                 setActiveTab('tickets');
-                setIsTicketModalOpen(true);
+                openTicketModal();
               }}
               className="flex-1 md:flex-none bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs px-5 py-5 rounded-xl uppercase tracking-wider font-extrabold hidden md:flex"
             >
@@ -291,6 +362,21 @@ function DashboardInner() {
                         >
                           {b.status}
                         </Badge>
+                        {b.status !== 'CANCELLED' && (
+                          <Badge
+                            className={`border font-semibold text-[10px] px-2 py-0.5 rounded-full ${
+                              b.paymentStatus === 'PAID'
+                                ? 'bg-green-50 text-green-700 border-green-200/60'
+                                : 'bg-amber-50 text-amber-700 border-amber-200/60'
+                            }`}
+                          >
+                            {b.paymentStatus === 'PAID'
+                              ? 'PAID'
+                              : (b.payment?.method || '').toUpperCase() === 'CASH'
+                                ? 'PAY AT HOTEL'
+                                : 'PAYMENT PENDING'}
+                          </Badge>
+                        )}
                         {['PENDING', 'CONFIRMED'].includes(b.status) && (
                           <button
                             onClick={() => {
@@ -384,10 +470,22 @@ function DashboardInner() {
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-800">Your Service Tickets</h3>
-              <Button onClick={() => setIsTicketModalOpen(true)} className="bg-[#111] hover:bg-zinc-800 text-white text-xs px-4 py-2 rounded-lg flex items-center gap-2">
+              <Button
+                onClick={openTicketModal}
+                disabled={!canRequestService}
+                title={canRequestService ? undefined : eligibility?.reason ?? undefined}
+                className="bg-[#111] hover:bg-zinc-800 text-white text-xs px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <Plus className="h-4 w-4 text-[#D4AF37]" /> Request Service
               </Button>
             </div>
+
+            {!canRequestService && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-xs text-amber-900 font-semibold">
+                {eligibility?.reason || 'You can request hotel services after completing check-in.'}
+              </div>
+            )}
+
             {isLoadingTickets ? (
               <CenteredSpinner label="Loading tickets…" />
             ) : !tickets || tickets.length === 0 ? (
@@ -402,26 +500,38 @@ function DashboardInner() {
               </Card>
             ) : (
               <div className="grid gap-4">
-                {tickets.map((t: any) => (
+                {tickets.map((t) => (
                   <Card key={t._id} className="p-5 border-zinc-200/80 bg-white rounded-2xl space-y-3">
                     <div className="flex justify-between items-start">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-zinc-900">Room {t.room?.roomNumber}</span>
                           <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider">{t.category}</span>
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            #{t._id.slice(-6).toUpperCase()}
+                          </span>
                         </div>
                         <p className="text-xs text-zinc-400">Filed on: {new Date(t.createdAt).toLocaleString()}</p>
                       </div>
-                      <Badge className={`
-                        ${t.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' : ''}
-                        ${t.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700' : ''}
-                        ${t.status === 'COMPLETED' ? 'bg-green-50 text-green-700' : ''}
-                        ${t.status === 'REJECTED' ? 'bg-red-50 text-red-700' : ''}
-                      `}>
-                        {t.status}
+                      <Badge className={TICKET_STATUS_BADGE[t.status] ?? 'bg-zinc-100 text-zinc-700'}>
+                        {t.status.replace(/_/g, ' ')}
                       </Badge>
                     </div>
                     <p className="text-sm text-zinc-700 bg-zinc-50 p-3 rounded-lg border">{t.description}</p>
+                    {t.assignedStaff && (
+                      <p className="text-[11px] text-zinc-500">
+                        <span className="font-bold">Assigned to:</span> {t.assignedStaff.name}
+                        {t.assignedStaff.designation ? ` (${t.assignedStaff.designation})` : ''}
+                      </p>
+                    )}
+                    {t.staffNotes && (
+                      <div className="rounded-lg border border-green-100 bg-green-50/60 p-3 text-xs text-zinc-700">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-green-700">
+                          Staff update
+                        </span>
+                        {t.staffNotes}
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>
@@ -438,9 +548,11 @@ function DashboardInner() {
               {...registerTicket('roomId')}
               className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900"
             >
-              <option value="">-- Choose your booked room --</option>
-              {bookings?.filter(b => ['CONFIRMED', 'CHECKED_IN'].includes(b.status)).map(b => (
-                <option key={b.room._id} value={b.room._id}>Room {b.room.roomNumber}</option>
+              <option value="">-- Choose your checked-in room --</option>
+              {eligibility?.rooms?.map((r) => (
+                <option key={r.roomId} value={r.roomId}>
+                  Room {r.roomNumber} ({r.roomType})
+                </option>
               ))}
             </select>
             {ticketErrors.roomId && <p className="text-xs text-red-500">{ticketErrors.roomId.message}</p>}

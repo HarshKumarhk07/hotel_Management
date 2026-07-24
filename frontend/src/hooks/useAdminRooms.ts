@@ -14,6 +14,49 @@ export interface AdminRoom {
   roomType?: string;
 }
 
+export type TransferKind = 'NORMAL' | 'UPGRADE' | 'DOWNGRADE';
+
+export interface RoomTransfer {
+  type: TransferKind;
+  state: 'PENDING_PAYMENT' | 'COMPLETED' | 'CANCELLED';
+  fromRoomNumber: string;
+  toRoomNumber: string;
+  fromRoomType: string;
+  toRoomType: string;
+  fromFloor: number;
+  toFloor: number;
+  nights: number;
+  amountDue: number;
+  refundAmount: number;
+  refundStatus?: 'PENDING' | 'PROCESSED';
+  requestedAt: string;
+  completedAt?: string;
+}
+
+export interface TransferOption {
+  _id: string;
+  roomNumber: string;
+  floor: number;
+  roomType: string;
+  pricePerNight: number;
+  transferType: TransferKind;
+  amountDue: number;
+  refundAmount: number;
+}
+
+export interface TransferOptionsResponse {
+  nights: number;
+  currentRoom: {
+    _id: string;
+    roomNumber: string;
+    floor: number;
+    roomType: string;
+    pricePerNight: number;
+  };
+  pendingTransfer: RoomTransfer | null;
+  options: TransferOption[];
+}
+
 export interface RoomBookingInfo {
   _id: string;
   room: { _id: string; roomNumber: string; floor: number; roomType?: string };
@@ -27,6 +70,9 @@ export interface RoomBookingInfo {
   totalPrice: number;
   status: 'PENDING' | 'CONFIRMED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED';
   paymentStatus: 'PENDING' | 'PAID';
+  payment?: { method?: string; status?: string; paidAt?: string };
+  transfers?: RoomTransfer[];
+  pendingTransfer?: RoomTransfer | null;
   createdAt: string;
 }
 
@@ -101,9 +147,53 @@ export function useBookingMutations() {
 
   const transfer = useMutation({
     mutationFn: ({ id, newRoomId }: { id: string; newRoomId: string }) =>
-      api.post(`/rooms/bookings/${id}/transfer`, { newRoomId }),
+      api
+        .post<{ data: { transfer: RoomTransfer } }>(`/rooms/bookings/${id}/transfer`, { newRoomId })
+        .then((r) => r.data.data.transfer),
     onSuccess: invalidate,
   });
 
-  return { updateStatus, transfer };
+  const confirmTransferPayment = useMutation({
+    mutationFn: (id: string) => api.post(`/rooms/bookings/${id}/transfer/confirm-payment`),
+    onSuccess: invalidate,
+  });
+
+  const cancelTransfer = useMutation({
+    mutationFn: (id: string) => api.post(`/rooms/bookings/${id}/transfer/cancel`),
+    onSuccess: invalidate,
+  });
+
+  const markRefundProcessed = useMutation({
+    mutationFn: (id: string) => api.post(`/rooms/bookings/${id}/transfer/refund-processed`),
+    onSuccess: invalidate,
+  });
+
+  const recordPayment = useMutation({
+    mutationFn: ({ id, status, method }: { id: string; status: 'PAID' | 'PENDING'; method?: string }) =>
+      api.patch(`/rooms/bookings/${id}/payment`, { status, method }),
+    onSuccess: invalidate,
+  });
+
+  return {
+    updateStatus,
+    transfer,
+    confirmTransferPayment,
+    cancelTransfer,
+    markRefundProcessed,
+    recordPayment,
+  };
+}
+
+/** Legal transfer targets for a booking, annotated with the billing consequence. */
+export function useTransferOptions(bookingId: string | null) {
+  return useQuery({
+    queryKey: ['booking-transfer-options', bookingId],
+    enabled: !!bookingId,
+    queryFn: async () => {
+      const res = await api.get<{ data: TransferOptionsResponse }>(
+        `/rooms/bookings/${bookingId}/transfer-options`,
+      );
+      return res.data.data;
+    },
+  });
 }

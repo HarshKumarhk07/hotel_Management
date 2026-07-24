@@ -74,13 +74,14 @@ export function ContactForm() {
         <Input name="subject" value={formData.subject} onChange={handleChange} placeholder="Reservation Inquiry" required />
       </Field>
       <Field label="Message">
-        <textarea 
+        <textarea
           name="message"
           rows={4}
           required
+          minLength={10}
           value={formData.message}
           onChange={handleChange}
-          placeholder="How can we help you?"
+          placeholder="How can we help you? (at least 10 characters)"
           className="w-full text-sm rounded-xl border border-zinc-200 p-3 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
         ></textarea>
       </Field>

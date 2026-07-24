@@ -5,6 +5,9 @@ import { Room } from '@/models/Room';
 import { AppError } from '@/utils/AppError';
 import { ok } from '@/utils/apiResponse';
 import { uploadImage } from '@/services/cloudinary.service';
+import { recordAudit } from '@/services/audit.service';
+import { AUDIT_ACTIONS } from '@/constants';
+import * as roomService from './room.service';
 
 const userId = (req: Request) => (req as any).user?.id as string;
 
@@ -20,13 +23,20 @@ export const uploadCategoryImage = async (req: Request, res: Response) => {
  * Create a new room category
  */
 export const createCategory = async (req: Request, res: Response) => {
-  const existing = await RoomCategory.findOne({ roomType: req.body.roomType });
+  // Normalised so "Deluxe" and "DELUXE" can never coexist as two categories —
+  // that split is what leaves rooms pointing at a class the filters don't offer.
+  const roomType = String(req.body.roomType).trim().toUpperCase();
+
+  const existing = await RoomCategory.findOne({
+    roomType: { $regex: `^${roomType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+  });
   if (existing) {
-    throw AppError.conflict(`Room category for type ${req.body.roomType} already exists`);
+    throw AppError.conflict(`Room category for type ${roomType} already exists`);
   }
 
   const category = await RoomCategory.create({
     ...req.body,
+    roomType,
     createdBy: userId(req),
   });
 
@@ -39,6 +49,32 @@ export const createCategory = async (req: Request, res: Response) => {
 export const listCategories = async (_req: Request, res: Response) => {
   const categories = await RoomCategory.find().sort({ pricePerNight: 1 });
   ok(res, { categories });
+};
+
+/**
+ * Consistency report: which rooms point at a category that no longer exists.
+ */
+export const auditCategories = async (_req: Request, res: Response) => {
+  const report = await roomService.auditRoomCategories();
+  ok(res, { audit: report });
+};
+
+/**
+ * Reassign orphaned rooms onto a real category (optionally only one orphaned type).
+ */
+export const migrateOrphans = async (req: Request, res: Response) => {
+  const result = await roomService.migrateOrphanRooms({
+    toRoomType: req.body.toRoomType,
+    fromRoomType: req.body.fromRoomType,
+  });
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ROOM_CATEGORY_MIGRATED,
+    actor: userId(req),
+    metadata: result,
+  });
+
+  ok(res, { migration: result });
 };
 
 /**
@@ -111,10 +147,16 @@ export const deleteCategory = async (req: Request, res: Response) => {
     throw AppError.notFound('Room category not found');
   }
 
-  // Check if rooms depend on this category
-  const roomsCount = await Room.countDocuments({ roomType: category.roomType });
+  // Check if rooms depend on this category. Matched case-insensitively so a
+  // delete can never leave rooms stranded on a differently-cased variant.
+  const roomsCount = await Room.countDocuments({
+    roomType: { $regex: `^${category.roomType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+  });
   if (roomsCount > 0) {
-    throw AppError.badRequest(`Cannot delete category because ${roomsCount} rooms are using it`);
+    throw AppError.badRequest(
+      `Cannot delete category because ${roomsCount} room(s) are using it. Reassign those rooms to another category first.`,
+      'CATEGORY_IN_USE',
+    );
   }
 
   await category.deleteOne();

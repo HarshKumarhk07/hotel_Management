@@ -153,18 +153,56 @@ function BookRoomInner() {
   const [idProofFile, setIdProofFile] = useState<File | null>(null);
   const [idProofType, setIdProofType] = useState('Aadhaar');
 
+  // Per-field validation errors, mirroring the backend's createBookingSchema so
+  // the guest is told exactly what is missing instead of getting a generic 400.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validateForm = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+
+    if (guestName.trim().length < 2) errs.guestName = 'Guest full name is required.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = 'A valid email address is required.';
+
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10) errs.phone = 'A valid phone number with at least 10 digits is required.';
+
+    if (address.trim().length < 5) errs.address = 'Street address is required.';
+    if (city.trim().length < 2) errs.city = 'City is required.';
+    if (country.trim().length < 2) errs.country = 'Country is required.';
+
+    if (governmentId.trim().length < 4) errs.governmentId = 'Government ID number is required.';
+    if (!idProofType) errs.idProofType = 'Select your government ID type.';
+    if (!idProofFile) errs.idProofFile = 'A government ID proof document must be uploaded.';
+
+    if (specialNote.trim().length > 500) errs.specialNote = 'Special instructions must be under 500 characters.';
+
+    return errs;
+  };
+
+  const clearFieldError = (field: string) =>
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!room || !checkIn || !checkOut) return;
 
     setPaymentError(null);
-    setSubmitting(true);
 
-    if (!idProofFile) {
-      setPaymentError('A Government ID Proof document is strictly required.');
-      setSubmitting(false);
+    const errs = validateForm();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setPaymentError('Please complete all required guest registration fields before continuing.');
+      // Bring the first offending field into view.
+      document.querySelector('[data-invalid="true"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+
+    setSubmitting(true);
 
     try {
       let uploadedIdUrl = '';
@@ -180,22 +218,22 @@ function BookRoomInner() {
       // 1. Create Room Booking
       const bookingRes = await api.post<{ data: { booking: { _id: string } } }>('/rooms/bookings', {
         room: room._id,
-        guestName,
-        phone,
-        email,
+        guestName: guestName.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
         checkInDate: new Date(checkIn).toISOString(),
         checkOutDate: new Date(checkOut).toISOString(),
-        address,
-        city,
-        country,
-        governmentId,
-        idProofUrl: uploadedIdUrl || undefined,
-        idProofType: uploadedIdUrl ? idProofType : undefined,
+        address: address.trim(),
+        city: city.trim(),
+        country: country.trim(),
+        governmentId: governmentId.trim(),
+        idProofUrl: uploadedIdUrl,
+        idProofType,
         specialRequests: {
           lateCheckIn,
           extraBed,
           airportPickup,
-          note: specialNote,
+          note: specialNote.trim() || undefined,
         },
         couponCode: appliedCoupon || undefined,
         paymentMethod,
@@ -305,15 +343,43 @@ function BookRoomInner() {
               <h2 className="text-lg font-serif text-zinc-900 border-b pb-2 font-bold flex items-center gap-2">
                 <Landmark className="h-5 w-5 text-[#D4AF37]" /> Contact Information
               </h2>
-              <Field label="Guest Full Name">
-                <Input required placeholder="John Doe" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+              <Field label="Guest Full Name *" error={fieldErrors.guestName}>
+                <Input
+                  required
+                  data-invalid={!!fieldErrors.guestName}
+                  placeholder="John Doe"
+                  value={guestName}
+                  onChange={(e) => {
+                    setGuestName(e.target.value);
+                    clearFieldError('guestName');
+                  }}
+                />
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Email Address">
-                  <Input required type="email" placeholder="john@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Field label="Email Address *" error={fieldErrors.email}>
+                  <Input
+                    required
+                    type="email"
+                    data-invalid={!!fieldErrors.email}
+                    placeholder="john@example.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      clearFieldError('email');
+                    }}
+                  />
                 </Field>
-                <Field label="Phone Number">
-                  <Input required placeholder="+91 99999 88888" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Field label="Phone Number *" error={fieldErrors.phone}>
+                  <Input
+                    required
+                    data-invalid={!!fieldErrors.phone}
+                    placeholder="+91 99999 88888"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      clearFieldError('phone');
+                    }}
+                  />
                 </Field>
               </div>
             </Card>
@@ -322,25 +388,66 @@ function BookRoomInner() {
               <h2 className="text-lg font-serif text-zinc-900 border-b pb-2 font-bold flex items-center gap-2">
                 <Landmark className="h-5 w-5 text-[#D4AF37]" /> Billing Address
               </h2>
-              <Field label="Street Address">
-                <Input placeholder="123 Palace Lane" value={address} onChange={(e) => setAddress(e.target.value)} />
+              <Field label="Street Address *" error={fieldErrors.address}>
+                <Input
+                  required
+                  data-invalid={!!fieldErrors.address}
+                  placeholder="123 Palace Lane"
+                  value={address}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    clearFieldError('address');
+                  }}
+                />
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="City">
-                  <Input placeholder="Mumbai" value={city} onChange={(e) => setCity(e.target.value)} />
+                <Field label="City *" error={fieldErrors.city}>
+                  <Input
+                    required
+                    data-invalid={!!fieldErrors.city}
+                    placeholder="Mumbai"
+                    value={city}
+                    onChange={(e) => {
+                      setCity(e.target.value);
+                      clearFieldError('city');
+                    }}
+                  />
                 </Field>
-                <Field label="Country">
-                  <Input placeholder="India" value={country} onChange={(e) => setCountry(e.target.value)} />
+                <Field label="Country *" error={fieldErrors.country}>
+                  <Input
+                    required
+                    data-invalid={!!fieldErrors.country}
+                    placeholder="India"
+                    value={country}
+                    onChange={(e) => {
+                      setCountry(e.target.value);
+                      clearFieldError('country');
+                    }}
+                  />
                 </Field>
               </div>
-              <Field label="Government ID Number (Required)">
-                <Input required placeholder="Aadhaar / Passport No" value={governmentId} onChange={(e) => setGovernmentId(e.target.value)} />
+              <Field label="Government ID Number *" error={fieldErrors.governmentId}>
+                <Input
+                  required
+                  data-invalid={!!fieldErrors.governmentId}
+                  placeholder="Aadhaar / Passport No"
+                  value={governmentId}
+                  onChange={(e) => {
+                    setGovernmentId(e.target.value);
+                    clearFieldError('governmentId');
+                  }}
+                />
               </Field>
               <div className="pt-2 border-t space-y-4">
-                <Field label="Government ID Type">
-                  <select 
-                    value={idProofType} 
-                    onChange={(e) => setIdProofType(e.target.value)}
+                <Field label="Government ID Type *" error={fieldErrors.idProofType}>
+                  <select
+                    required
+                    value={idProofType}
+                    data-invalid={!!fieldErrors.idProofType}
+                    onChange={(e) => {
+                      setIdProofType(e.target.value);
+                      clearFieldError('idProofType');
+                    }}
                     className="w-full text-xs rounded-xl border border-zinc-200 p-2.5 focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
                   >
                     <option value="Aadhaar">Aadhaar Card</option>
@@ -350,12 +457,16 @@ function BookRoomInner() {
                     <option value="Other">Other</option>
                   </select>
                 </Field>
-                <Field label="Upload ID Proof (PDF/Image) - Required">
+                <Field label="Upload ID Proof (PDF/Image) *" error={fieldErrors.idProofFile}>
                   <input
                     required
                     type="file"
                     accept="image/*,application/pdf"
-                    onChange={(e) => setIdProofFile(e.target.files?.[0] || null)}
+                    data-invalid={!!fieldErrors.idProofFile}
+                    onChange={(e) => {
+                      setIdProofFile(e.target.files?.[0] || null);
+                      clearFieldError('idProofFile');
+                    }}
                     className="w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#D4AF37]/10 file:text-[#D4AF37] hover:file:bg-[#D4AF37]/20 border border-zinc-200 rounded-xl p-1.5 focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
                   />
                 </Field>
@@ -408,12 +519,16 @@ function BookRoomInner() {
               </div>
 
               <div className="pt-2 border-t">
-                <Field label="Special instructions or notes">
+                <Field label="Special instructions or notes" error={fieldErrors.specialNote}>
                   <textarea
                     rows={3}
+                    maxLength={500}
                     placeholder="Dietary requests, floor suggestions, etc."
                     value={specialNote}
-                    onChange={(e) => setSpecialNote(e.target.value)}
+                    onChange={(e) => {
+                      setSpecialNote(e.target.value);
+                      clearFieldError('specialNote');
+                    }}
                     className="w-full text-xs rounded-xl border border-zinc-200 p-2.5 focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
                   />
                 </Field>

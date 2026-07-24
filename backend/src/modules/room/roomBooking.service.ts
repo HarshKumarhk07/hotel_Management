@@ -1,5 +1,18 @@
 import crypto from 'node:crypto';
-import { Room, RoomBooking, BookingInvoice, Order, Vehicle, BanquetBooking, type IRoom } from '@/models';
+import {
+  Room,
+  RoomBooking,
+  RoomCategory,
+  BookingInvoice,
+  Order,
+  Vehicle,
+  BanquetBooking,
+  type IRoom,
+  type IRoomTransfer,
+  type TransferKind,
+} from '@/models';
+import { buildScanUrl } from '@/services/qr.service';
+import { emitToAdmins } from '@/realtime/emit';
 import { AppError } from '@/utils/AppError';
 import { getPageParams, pageMeta } from '@/utils/pagination';
 import type { FilterQuery } from 'mongoose';
@@ -47,8 +60,19 @@ export async function searchAvailableRooms(query: {
   if (typeof query.floor === 'number') {
     filter.floor = query.floor;
   }
+
+  // The booking page must only ever surface rooms whose class still exists in
+  // the Room Categories table, so its filter options and its results agree.
+  const categories = await RoomCategory.find().select('roomType');
+  const knownTypes = categories.map((c) => c.roomType);
   if (query.roomType) {
-    filter.roomType = query.roomType;
+    const match = knownTypes.find((t) => t.toUpperCase() === query.roomType!.toUpperCase());
+    if (!match) {
+      throw AppError.badRequest('Unknown room category', 'ROOM_TYPE_UNKNOWN');
+    }
+    filter.roomType = match;
+  } else if (knownTypes.length > 0) {
+    filter.roomType = { $in: knownTypes };
   }
   if (typeof query.minPrice === 'number' || typeof query.maxPrice === 'number') {
     filter.pricePerNight = {};
@@ -255,7 +279,13 @@ export async function getGuestBookings(query: { email?: string; phone?: string }
   }
 
   const filter: FilterQuery<any> = {};
-  if (query.email) filter.email = query.email.trim();
+  if (query.email) {
+    // Stored emails are not normalised, so match case-insensitively.
+    filter.email = {
+      $regex: `^${query.email.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+      $options: 'i',
+    };
+  }
   if (query.phone) filter.phone = query.phone.trim();
 
   return RoomBooking.find(filter)
@@ -314,12 +344,10 @@ export async function updateBookingStatus(
     updatedBy,
   });
 
-  // Removed auto-forcing paymentStatus to PAID when status is CONFIRMED
-  // paymentStatus must only be updated via webhook or explicit payment collection.
+  // paymentStatus is never inferred from booking status — neither CONFIRMED nor
+  // CHECKED_IN implies money was collected. It moves to PAID only via the
+  // Razorpay webhook/verification or an explicit admin payment entry.
   if (status === 'CHECKED_IN') {
-    booking.paymentStatus = 'PAID';
-    booking.payment.status = 'PAID';
-    booking.payment.paidAt = new Date();
     await Room.findByIdAndUpdate(booking.room, { status: 'OCCUPIED' });
   } else if (status === 'CHECKED_OUT') {
     await booking.save();
@@ -368,6 +396,72 @@ export async function updateBookingStatus(
   }
 
   return populated;
+}
+
+/**
+ * Explicit admin record of a settlement (typically a "Pay at Hotel" booking
+ * collected at the front desk). This is the only path — besides the Razorpay
+ * verification — that can flip a booking to PAID, which is what keeps unpaid
+ * reservations out of the revenue figures.
+ */
+export async function recordBookingPayment(
+  bookingId: string,
+  input: { status: 'PAID' | 'PENDING'; method?: string; reference?: string },
+  updatedBy?: string
+) {
+  const booking = await RoomBooking.findById(bookingId).populate('room');
+  if (!booking) {
+    throw AppError.notFound('Booking not found');
+  }
+  if (booking.status === 'CANCELLED') {
+    throw AppError.badRequest('Cannot record payment against a cancelled booking');
+  }
+  if (booking.paymentStatus === input.status) {
+    throw AppError.conflict(`Payment is already marked ${input.status}`, 'PAYMENT_STATUS_UNCHANGED');
+  }
+
+  const method = input.method || booking.payment?.method || 'CASH';
+  booking.paymentStatus = input.status;
+  booking.payment.status = input.status;
+  booking.payment.method = method;
+  booking.payment.paidAt = input.status === 'PAID' ? new Date() : undefined;
+
+  booking.timeline.push({
+    status: booking.status,
+    timestamp: new Date(),
+    note:
+      input.status === 'PAID'
+        ? `Payment of ₹${booking.totalPrice} received via ${method}${input.reference ? ` (ref: ${input.reference})` : ''}.`
+        : 'Payment marked as pending by the front desk.',
+    updatedBy,
+  });
+
+  await booking.save();
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ROOM_BOOKING_PAYMENT_RECORDED,
+    actor: updatedBy,
+    metadata: { bookingId: booking._id, status: input.status, method, amount: booking.totalPrice },
+  });
+
+  if (input.status === 'PAID') {
+    try {
+      const roomNum = (booking.room as any)?.roomNumber || 'N/A';
+      await emailService.sendRoomBookingConfirmation(
+        booking.email,
+        booking.guestName,
+        roomNum,
+        booking.checkInDate.toISOString(),
+        booking.checkOutDate.toISOString(),
+        booking.confirmationNumber || 'N/A',
+        booking.totalPrice
+      );
+    } catch (err) {
+      logger.error({ err }, 'Failed to dispatch payment-received confirmation email');
+    }
+  }
+
+  return booking;
 }
 
 export async function setRoomStatus(roomId: string, status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'CLEANING' | 'MAINTENANCE' | 'BLOCKED' | 'OUT_OF_SERVICE' | 'VIP_RESERVED') {
@@ -535,11 +629,13 @@ export async function checkInGuest(bookingId: string, updatedBy?: string) {
   }
 
   booking.status = 'CHECKED_IN';
-  booking.paymentStatus = 'PAID';
   booking.timeline.push({
     status: 'CHECKED_IN',
     timestamp: new Date(),
-    note: 'Guest checked in successfully.',
+    note:
+      booking.paymentStatus === 'PAID'
+        ? 'Guest checked in successfully.'
+        : 'Guest checked in successfully. Payment still pending — settle at the front desk.',
     updatedBy,
   });
 
@@ -580,7 +676,9 @@ export async function checkOutGuest(bookingId: string, updatedBy?: string) {
       grandTotal: pricing.grandTotal,
     },
     paymentSummary: {
-      paidAmount: pricing.grandTotal,
+      // Only what was actually collected — an unpaid "Pay at Hotel" stay must
+      // not be recorded as settled just because the guest checked out.
+      paidAmount: pricing.alreadyPaidTotal,
       method: booking.payment?.method || 'RAZORPAY',
       transactionId: booking.payment?.razorpayPaymentId || 'CASH',
     },
@@ -612,39 +710,457 @@ export async function checkOutGuest(bookingId: string, updatedBy?: string) {
   return { booking: await booking.populate('room'), invoice };
 }
 
-export async function upgradeRoom(bookingId: string, newRoomId: string, updatedBy?: string) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Room transfer / upgrade / downgrade
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GST_RATE = 0.18;
+const SERVICE_RATE = 0.05;
+
+/** Tax-inclusive value of a per-night rate difference over the remaining stay. */
+function differentialTotal(perNightDelta: number, nights: number) {
+  const base = Math.abs(perNightDelta) * nights;
+  const gst = Math.round(base * GST_RATE);
+  const serviceCharge = Math.round(base * SERVICE_RATE);
+  return { base, gst, serviceCharge, total: base + gst + serviceCharge };
+}
+
+/** Nightly rate for a room, preferring its category's canonical price. */
+async function nightlyRate(room: IRoom): Promise<number> {
+  const category = await RoomCategory.findOne({
+    roomType: { $regex: `^${(room.roomType || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+  });
+  return category?.pricePerNight ?? room.pricePerNight;
+}
+
+function transferEmailPayload(
+  booking: { guestName: string; confirmationNumber?: string },
+  transfer: IRoomTransfer,
+  qrScanUrl?: string
+) {
+  return {
+    name: booking.guestName,
+    confirmationNumber: booking.confirmationNumber || 'N/A',
+    oldRoomNumber: transfer.fromRoomNumber,
+    oldRoomType: transfer.fromRoomType,
+    oldFloor: transfer.fromFloor,
+    newRoomNumber: transfer.toRoomNumber,
+    newRoomType: transfer.toRoomType,
+    newFloor: transfer.toFloor,
+    transferTime: (transfer.completedAt ?? transfer.requestedAt).toISOString(),
+    qrScanUrl,
+    type: transfer.type,
+    amountDue: transfer.amountDue,
+    refundAmount: transfer.refundAmount,
+  };
+}
+
+/** Move the physical room state after a transfer actually takes effect. */
+async function applyRoomOccupancy(booking: { status: string }, fromRoomId: unknown, toRoomId: unknown) {
+  if (booking.status === 'CHECKED_IN') {
+    await Room.findByIdAndUpdate(fromRoomId, { status: 'CLEANING' });
+    await Room.findByIdAndUpdate(toRoomId, { status: 'OCCUPIED' });
+  } else {
+    await Room.findByIdAndUpdate(fromRoomId, { status: 'AVAILABLE' });
+    await Room.findByIdAndUpdate(toRoomId, { status: 'RESERVED' });
+  }
+}
+
+/**
+ * Request a room transfer for a booking.
+ *
+ * - Same category  → completes immediately, no billing change.
+ * - Higher-priced category → parked as a PENDING_PAYMENT upgrade; the guest is
+ *   asked for the differential and an admin confirms collection before the move
+ *   takes effect.
+ * - Lower-priced category → completes immediately and records a refund owed.
+ */
+export async function transferRoom(bookingId: string, newRoomId: string, updatedBy?: string) {
   const booking = await RoomBooking.findById(bookingId);
   if (!booking) throw AppError.notFound('Booking not found');
+
   if (['CHECKED_OUT', 'CANCELLED'].includes(booking.status)) {
-    throw AppError.badRequest('Cannot upgrade room for this booking status');
+    throw AppError.badRequest(
+      `Cannot transfer a booking with status ${booking.status}`,
+      'TRANSFER_NOT_ALLOWED',
+    );
+  }
+  if (booking.pendingTransfer) {
+    throw AppError.conflict(
+      'This booking already has an upgrade awaiting payment confirmation. Confirm or cancel it first.',
+      'TRANSFER_ALREADY_PENDING',
+    );
+  }
+
+  const currentRoom = await Room.findById(booking.room);
+  if (!currentRoom) throw AppError.notFound('Current room not found');
+
+  if (currentRoom._id.toString() === newRoomId) {
+    throw AppError.badRequest('The guest is already in this room', 'TRANSFER_SAME_ROOM');
   }
 
   const newRoom = await Room.findById(newRoomId);
-  if (!newRoom) throw AppError.notFound('New room not found');
-  if (newRoom.status !== 'AVAILABLE' || !newRoom.isActive) {
-    throw AppError.badRequest('New room is not available');
+  if (!newRoom) throw AppError.notFound('Target room not found');
+  if (!newRoom.isActive) {
+    throw AppError.badRequest('The target room is inactive', 'TARGET_ROOM_INACTIVE');
+  }
+  if (!['AVAILABLE', 'CLEANING'].includes(newRoom.status)) {
+    throw AppError.badRequest(
+      `The target room is currently ${newRoom.status} and cannot accept a transfer`,
+      'TARGET_ROOM_UNAVAILABLE',
+    );
   }
 
-  const oldRoomId = booking.room;
+  // The target must also be free for this booking's dates — room status alone
+  // says nothing about a reservation starting next week.
+  const clash = await RoomBooking.findOne({
+    _id: { $ne: booking._id },
+    room: newRoom._id,
+    status: { $in: ['PENDING', 'CONFIRMED', 'CHECKED_IN'] },
+    checkInDate: { $lt: booking.checkOutDate },
+    checkOutDate: { $gt: booking.checkInDate },
+  });
+  if (clash) {
+    throw AppError.conflict(
+      'The target room is already reserved for these dates',
+      'TARGET_ROOM_BOOKED',
+    );
+  }
+
+  const nights = Math.max(
+    1,
+    Math.ceil((booking.checkOutDate.getTime() - booking.checkInDate.getTime()) / (1000 * 60 * 60 * 24)),
+  );
+
+  const oldRate = await nightlyRate(currentRoom);
+  const newRate = await nightlyRate(newRoom);
+  const sameCategory = (currentRoom.roomType || '').toUpperCase() === (newRoom.roomType || '').toUpperCase();
+
+  let type: TransferKind = 'NORMAL';
+  let amountDue = 0;
+  let refundAmount = 0;
+
+  if (!sameCategory) {
+    const delta = newRate - oldRate;
+    if (delta > 0) {
+      type = 'UPGRADE';
+      amountDue = differentialTotal(delta, nights).total;
+    } else if (delta < 0) {
+      type = 'DOWNGRADE';
+      refundAmount = differentialTotal(delta, nights).total;
+    } else {
+      // Different class, identical price — treat as a like-for-like move.
+      type = 'NORMAL';
+    }
+  }
+
+  const now = new Date();
+  const transfer: IRoomTransfer = {
+    type,
+    state: type === 'UPGRADE' ? 'PENDING_PAYMENT' : 'COMPLETED',
+    fromRoom: currentRoom._id,
+    toRoom: newRoom._id,
+    fromRoomNumber: currentRoom.roomNumber,
+    toRoomNumber: newRoom.roomNumber,
+    fromRoomType: currentRoom.roomType,
+    toRoomType: newRoom.roomType,
+    fromFloor: currentRoom.floor,
+    toFloor: newRoom.floor,
+    nights,
+    amountDue,
+    refundAmount,
+    refundStatus: type === 'DOWNGRADE' ? 'PENDING' : undefined,
+    requestedAt: now,
+    requestedBy: updatedBy,
+  };
+
+  if (type === 'UPGRADE') {
+    // Hold the upgrade; the guest stays put until the differential is settled.
+    booking.pendingTransfer = transfer;
+    booking.timeline.push({
+      status: booking.status,
+      timestamp: now,
+      note: `Upgrade requested: Room ${currentRoom.roomNumber} (${currentRoom.roomType}) → Room ${newRoom.roomNumber} (${newRoom.roomType}). ₹${amountDue} due before the move completes.`,
+      updatedBy,
+    });
+    await booking.save();
+    await Room.findByIdAndUpdate(newRoom._id, { status: 'RESERVED' });
+
+    void recordAudit({
+      action: AUDIT_ACTIONS.ROOM_TRANSFER_REQUESTED,
+      actor: updatedBy,
+      metadata: { bookingId: booking._id, type, amountDue, from: currentRoom.roomNumber, to: newRoom.roomNumber },
+    });
+
+    try {
+      await emailService.sendRoomUpgradePaymentPending(
+        booking.email,
+        transferEmailPayload(booking, transfer),
+      );
+    } catch (err) {
+      logger.error({ err }, 'Failed to dispatch upgrade payment-pending email');
+    }
+
+    emitToAdmins('booking:transfer-pending', {
+      bookingId: booking._id.toString(),
+      guestName: booking.guestName,
+      amountDue,
+      from: currentRoom.roomNumber,
+      to: newRoom.roomNumber,
+    });
+
+    return { booking: await booking.populate('room'), transfer };
+  }
+
+  // NORMAL and DOWNGRADE both take effect immediately.
+  transfer.completedAt = now;
+  transfer.completedBy = updatedBy;
+
   booking.room = newRoom._id;
+  booking.transfers.push(transfer);
+  booking.timeline.push({
+    status: booking.status,
+    timestamp: now,
+    note:
+      type === 'DOWNGRADE'
+        ? `Room changed: Room ${currentRoom.roomNumber} (${currentRoom.roomType}) → Room ${newRoom.roomNumber} (${newRoom.roomType}). Refund of ₹${refundAmount} due to the guest.`
+        : `Room transferred: Room ${currentRoom.roomNumber} → Room ${newRoom.roomNumber} (${newRoom.roomType}). No billing change.`,
+    updatedBy,
+  });
+
+  if (type === 'DOWNGRADE') {
+    booking.totalPrice = Math.max(0, booking.totalPrice - refundAmount);
+    booking.priceBreakdown.roomPrice = newRate;
+    booking.priceBreakdown.grandTotal = booking.totalPrice;
+  }
+
+  await booking.save();
+  await applyRoomOccupancy(booking, currentRoom._id, newRoom._id);
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ROOM_TRANSFER_COMPLETED,
+    actor: updatedBy,
+    metadata: { bookingId: booking._id, type, refundAmount, from: currentRoom.roomNumber, to: newRoom.roomNumber },
+  });
+
+  try {
+    await emailService.sendRoomTransfer(
+      booking.email,
+      transferEmailPayload(booking, transfer, buildScanUrl(newRoom.qr.token)),
+    );
+  } catch (err) {
+    logger.error({ err }, 'Failed to dispatch room transfer email');
+  }
+
+  if (type === 'DOWNGRADE') {
+    emitToAdmins('booking:refund-due', {
+      bookingId: booking._id.toString(),
+      guestName: booking.guestName,
+      refundAmount,
+      from: currentRoom.roomNumber,
+      to: newRoom.roomNumber,
+    });
+  }
+
+  return { booking: await booking.populate('room'), transfer };
+}
+
+/**
+ * Admin confirms the upgrade differential was collected — only now does the
+ * guest actually move rooms.
+ */
+export async function confirmTransferPayment(bookingId: string, updatedBy?: string) {
+  const booking = await RoomBooking.findById(bookingId);
+  if (!booking) throw AppError.notFound('Booking not found');
+
+  const pending = booking.pendingTransfer;
+  if (!pending) {
+    throw AppError.badRequest('This booking has no upgrade awaiting payment', 'NO_PENDING_TRANSFER');
+  }
+
+  const newRoom = await Room.findById(pending.toRoom);
+  if (!newRoom) throw AppError.notFound('Target room no longer exists');
+
+  const now = new Date();
+  pending.state = 'COMPLETED';
+  pending.completedAt = now;
+  pending.completedBy = updatedBy;
+
+  booking.room = newRoom._id;
+  booking.totalPrice += pending.amountDue;
+  booking.priceBreakdown.additionalCharges =
+    (booking.priceBreakdown.additionalCharges || 0) + pending.amountDue;
+  booking.priceBreakdown.grandTotal = booking.totalPrice;
+  booking.transfers.push(pending);
+  booking.pendingTransfer = undefined;
+
+  booking.timeline.push({
+    status: booking.status,
+    timestamp: now,
+    note: `Upgrade payment of ₹${pending.amountDue} confirmed. Guest moved to Room ${pending.toRoomNumber} (${pending.toRoomType}).`,
+    updatedBy,
+  });
+
+  await booking.save();
+  await applyRoomOccupancy(booking, pending.fromRoom, newRoom._id);
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ROOM_TRANSFER_COMPLETED,
+    actor: updatedBy,
+    metadata: { bookingId: booking._id, type: 'UPGRADE', amountDue: pending.amountDue },
+  });
+
+  try {
+    await emailService.sendRoomTransfer(
+      booking.email,
+      transferEmailPayload(booking, pending, buildScanUrl(newRoom.qr.token)),
+    );
+  } catch (err) {
+    logger.error({ err }, 'Failed to dispatch upgrade completion email');
+  }
+
+  return { booking: await booking.populate('room'), transfer: pending };
+}
+
+/** Abandon a pending upgrade and release the room that was being held. */
+export async function cancelPendingTransfer(bookingId: string, updatedBy?: string) {
+  const booking = await RoomBooking.findById(bookingId);
+  if (!booking) throw AppError.notFound('Booking not found');
+
+  const pending = booking.pendingTransfer;
+  if (!pending) {
+    throw AppError.badRequest('This booking has no upgrade awaiting payment', 'NO_PENDING_TRANSFER');
+  }
+
+  pending.state = 'CANCELLED';
+  pending.completedAt = new Date();
+  pending.completedBy = updatedBy;
+  booking.transfers.push(pending);
+  booking.pendingTransfer = undefined;
+
   booking.timeline.push({
     status: booking.status,
     timestamp: new Date(),
-    note: `Room transferred from Room #${oldRoomId} to Room #${newRoom.roomNumber}.`,
+    note: `Upgrade to Room ${pending.toRoomNumber} cancelled. The guest remains in Room ${pending.fromRoomNumber}.`,
+    updatedBy,
+  });
+
+  await booking.save();
+  await Room.findByIdAndUpdate(pending.toRoom, { status: 'AVAILABLE' });
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ROOM_TRANSFER_CANCELLED,
+    actor: updatedBy,
+    metadata: { bookingId: booking._id, to: pending.toRoomNumber },
+  });
+
+  return { booking: await booking.populate('room'), transfer: pending };
+}
+
+/** Mark a downgrade refund as settled. */
+export async function markTransferRefundProcessed(bookingId: string, updatedBy?: string) {
+  const booking = await RoomBooking.findById(bookingId);
+  if (!booking) throw AppError.notFound('Booking not found');
+
+  const pendingRefund = [...booking.transfers]
+    .reverse()
+    .find((t) => t.type === 'DOWNGRADE' && t.refundStatus === 'PENDING');
+
+  if (!pendingRefund) {
+    throw AppError.badRequest('No pending transfer refund on this booking', 'NO_PENDING_REFUND');
+  }
+
+  pendingRefund.refundStatus = 'PROCESSED';
+  booking.timeline.push({
+    status: booking.status,
+    timestamp: new Date(),
+    note: `Downgrade refund of ₹${pendingRefund.refundAmount} processed.`,
     updatedBy,
   });
   await booking.save();
 
-  if (booking.status === 'CHECKED_IN') {
-    await Room.findByIdAndUpdate(oldRoomId, { status: 'CLEANING' });
-    await Room.findByIdAndUpdate(newRoom._id, { status: 'OCCUPIED' });
-  }
-
   return booking.populate('room');
 }
 
-export async function transferRoom(bookingId: string, newRoomId: string, updatedBy?: string) {
-  return upgradeRoom(bookingId, newRoomId, updatedBy);
+/** Back-compat alias — the upgrade path is decided by the category price delta. */
+export async function upgradeRoom(bookingId: string, newRoomId: string, updatedBy?: string) {
+  return transferRoom(bookingId, newRoomId, updatedBy);
+}
+
+/**
+ * Rooms a booking may legally be transferred into, annotated with the billing
+ * consequence so the admin sees the cost before committing.
+ */
+export async function getTransferOptions(bookingId: string) {
+  const booking = await RoomBooking.findById(bookingId);
+  if (!booking) throw AppError.notFound('Booking not found');
+
+  const currentRoom = await Room.findById(booking.room);
+  if (!currentRoom) throw AppError.notFound('Current room not found');
+
+  const nights = Math.max(
+    1,
+    Math.ceil((booking.checkOutDate.getTime() - booking.checkInDate.getTime()) / (1000 * 60 * 60 * 24)),
+  );
+
+  const clashes = await RoomBooking.find({
+    _id: { $ne: booking._id },
+    status: { $in: ['PENDING', 'CONFIRMED', 'CHECKED_IN'] },
+    checkInDate: { $lt: booking.checkOutDate },
+    checkOutDate: { $gt: booking.checkInDate },
+  }).select('room');
+  const blocked = new Set(clashes.map((c) => c.room.toString()));
+
+  const candidates = await Room.find({
+    _id: { $ne: currentRoom._id },
+    isActive: true,
+    status: { $in: ['AVAILABLE', 'CLEANING'] },
+  }).sort({ floor: 1, roomNumber: 1 });
+
+  const oldRate = await nightlyRate(currentRoom);
+
+  const options = [];
+  for (const room of candidates) {
+    if (blocked.has(room._id.toString())) continue;
+    const rate = await nightlyRate(room);
+    const sameCategory = (room.roomType || '').toUpperCase() === (currentRoom.roomType || '').toUpperCase();
+    const delta = rate - oldRate;
+
+    let type: TransferKind = 'NORMAL';
+    let amountDue = 0;
+    let refundAmount = 0;
+    if (!sameCategory && delta > 0) {
+      type = 'UPGRADE';
+      amountDue = differentialTotal(delta, nights).total;
+    } else if (!sameCategory && delta < 0) {
+      type = 'DOWNGRADE';
+      refundAmount = differentialTotal(delta, nights).total;
+    }
+
+    options.push({
+      _id: room._id.toString(),
+      roomNumber: room.roomNumber,
+      floor: room.floor,
+      roomType: room.roomType,
+      pricePerNight: rate,
+      transferType: type,
+      amountDue,
+      refundAmount,
+    });
+  }
+
+  return {
+    nights,
+    currentRoom: {
+      _id: currentRoom._id.toString(),
+      roomNumber: currentRoom.roomNumber,
+      floor: currentRoom.floor,
+      roomType: currentRoom.roomType,
+      pricePerNight: oldRate,
+    },
+    pendingTransfer: booking.pendingTransfer ?? null,
+    options,
+  };
 }
 
 export async function getReports() {
@@ -788,31 +1304,84 @@ export async function verifyBookingPayment(
   return populated;
 }
 
-export async function cancelGuestBooking(bookingId: string, email: string, reason?: string) {
-  const booking = await RoomBooking.findById(bookingId);
+/**
+ * Cancel a booking on the guest's behalf.
+ *
+ * The guest is never asked to re-enter their email: ownership is proven by the
+ * signed-in account matching the email already stored on the booking, by the
+ * confirmation number that only appears on their own ticket, or by staff
+ * privileges. `actor.email` is optional precisely so an expired session cannot
+ * block a cancellation the guest is otherwise entitled to make.
+ */
+export async function cancelGuestBooking(
+  bookingId: string,
+  actor: { email?: string; role?: string; confirmationNumber?: string; isStaff?: boolean },
+  reason?: string
+) {
+  const booking = await RoomBooking.findById(bookingId).populate('room');
   if (!booking) {
     throw AppError.notFound('Booking not found');
   }
 
-  // Ensure it's the guest's own booking
-  if (booking.email !== email) {
-    throw AppError.forbidden('You are not authorized to cancel this booking');
+  const emailMatches =
+    !!actor.email && actor.email.trim().toLowerCase() === (booking.email || '').trim().toLowerCase();
+  const confirmationMatches =
+    !!actor.confirmationNumber &&
+    !!booking.confirmationNumber &&
+    actor.confirmationNumber.trim().toUpperCase() === booking.confirmationNumber.trim().toUpperCase();
+
+  if (!emailMatches && !confirmationMatches && !actor.isStaff) {
+    throw AppError.forbidden(
+      'You are not authorized to cancel this booking',
+      'BOOKING_CANCEL_DENIED',
+    );
   }
 
   if (['CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'].includes(booking.status)) {
-    throw AppError.badRequest(`Cannot cancel booking with status ${booking.status}`);
+    throw AppError.badRequest(
+      `Cannot cancel a booking with status ${booking.status}`,
+      'BOOKING_NOT_CANCELLABLE',
+    );
   }
 
-  const cancelReason = reason || 'Guest requested cancellation via portal';
-  const refundNote = booking.paymentStatus === 'PAID' ? 'Refund initiated for paid booking.' : 'No refund required.';
+  const cancelReason = reason?.trim() || 'Guest requested cancellation via portal';
+  const refundNote =
+    booking.paymentStatus === 'PAID'
+      ? 'A refund has been initiated in line with our cancellation policy.'
+      : 'No payment was collected, so no refund is required.';
 
   booking.status = 'CANCELLED';
+  booking.pendingTransfer = undefined;
   booking.timeline.push({
     status: 'CANCELLED',
     timestamp: new Date(),
-    note: `Booking cancelled by guest. Reason: ${cancelReason}. ${refundNote}`,
+    note: `Booking cancelled by ${actor.isStaff ? 'hotel staff' : 'guest'}. Reason: ${cancelReason}. ${refundNote}`,
+    updatedBy: actor.email,
   });
 
   await booking.save();
+
+  // Free the room again so it returns to the availability search.
+  await Room.findByIdAndUpdate(booking.room, { status: 'AVAILABLE' });
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ROOM_BOOKING_CANCELLED,
+    actor: actor.email,
+    metadata: { bookingId: booking._id, reason: cancelReason },
+  });
+
+  try {
+    await emailService.sendRoomBookingCancelled(
+      booking.email,
+      booking.guestName,
+      (booking.room as any)?.roomNumber || 'N/A',
+      booking.confirmationNumber || 'N/A',
+      cancelReason,
+      refundNote
+    );
+  } catch (err) {
+    logger.error({ err }, 'Failed to dispatch booking cancellation email');
+  }
+
   return booking;
 }

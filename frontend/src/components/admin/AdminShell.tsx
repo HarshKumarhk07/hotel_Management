@@ -30,6 +30,7 @@ import {
   Globe,
   Settings2,
   Hotel,
+  MessageSquare,
 } from 'lucide-react';
 import { AdminGate } from './AdminGate';
 import { useAuth } from '@/hooks/useAuth';
@@ -47,7 +48,7 @@ interface NavItem {
 
 interface Notif {
   id: string;
-  type: 'valet' | 'ticket' | 'order';
+  type: 'valet' | 'ticket' | 'order' | 'contact';
   title: string;
   body: string;
   time: Date;
@@ -56,9 +57,10 @@ interface Notif {
 }
 
 const TYPE_STYLES: Record<Notif['type'], { bg: string; icon: string; color: string }> = {
-  valet:  { bg: 'bg-amber-100',   color: 'text-amber-600',  icon: '🚗' },
-  ticket: { bg: 'bg-red-100',     color: 'text-red-600',    icon: '🎫' },
-  order:  { bg: 'bg-emerald-100', color: 'text-emerald-600', icon: '🍽️' },
+  valet:   { bg: 'bg-amber-100',   color: 'text-amber-600',   icon: '🚗' },
+  ticket:  { bg: 'bg-red-100',     color: 'text-red-600',     icon: '🎫' },
+  order:   { bg: 'bg-emerald-100', color: 'text-emerald-600', icon: '🍽️' },
+  contact: { bg: 'bg-blue-100',    color: 'text-blue-600',    icon: '✉️' },
 };
 
 /** Unified notification bell for valet, service-tickets, and new orders */
@@ -117,10 +119,18 @@ function NotificationBell({ role, align = 'right' }: { role: string; align?: 'ri
       addNotif({ type: 'order', title: 'New Order', body: `Order ${num} placed`, href: '/admin/orders' });
     });
 
+    // New contact-form message (emitted by contact controller)
+    socket.on('contact:new', (p: { name?: string; subject?: string }) => {
+      const from = p?.name ?? 'Someone';
+      const subject = p?.subject ?? 'New message';
+      addNotif({ type: 'contact', title: 'New Contact Message', body: `${subject} · from ${from}`, href: '/admin/contact' });
+    });
+
     return () => {
       socket.off('valet:new');
       socket.off('complaint:new');
       socket.off('order:new');
+      socket.off('contact:new');
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, status]);
@@ -204,6 +214,8 @@ function NotificationBell({ role, align = 'right' }: { role: string; align?: 'ri
             <Link href="/admin/complaints" onClick={() => setOpen(false)} className="flex-1 text-center text-[11px] font-medium text-zinc-500 hover:text-zinc-800">Tickets</Link>
             <span className="text-zinc-200">|</span>
             <Link href="/admin/orders" onClick={() => setOpen(false)} className="flex-1 text-center text-[11px] font-medium text-zinc-500 hover:text-zinc-800">Orders</Link>
+            <span className="text-zinc-200">|</span>
+            <Link href="/admin/contact" onClick={() => setOpen(false)} className="flex-1 text-center text-[11px] font-medium text-zinc-500 hover:text-zinc-800">Messages</Link>
           </div>
         </div>
       )}
@@ -229,8 +241,10 @@ function Shell({ children }: { children: ReactNode }) {
       { href: '/admin/rooms', label: 'Rooms & QR', icon: <DoorOpen className="h-4 w-4" />, ready: true },
       { href: '/admin/housekeeping', label: 'Housekeeping', icon: <Boxes className="h-4 w-4" />, ready: true },
       { href: '/admin/valet', label: 'Valet Parking', icon: <Car className="h-4 w-4" />, ready: true },
+      { href: '/admin/banquets', label: 'Banquet Halls', icon: <Landmark className="h-4 w-4" />, ready: true },
       { href: '/admin/restaurant', label: 'Restaurant', icon: <UtensilsCrossed className="h-4 w-4" />, ready: true },
       { href: '/admin/complaints', label: 'Service Tickets', icon: <LifeBuoy className="h-4 w-4" />, ready: true },
+      { href: '/admin/contact', label: 'Contact Messages', icon: <MessageSquare className="h-4 w-4" />, ready: true },
       { href: '/admin/guests', label: 'Guests', icon: <Users className="h-4 w-4" />, ready: true },
       { href: '/admin/feedback', label: 'Guest Feedback', icon: <Heart className="h-4 w-4" />, ready: true },
     ] : []),
@@ -242,7 +256,11 @@ function Shell({ children }: { children: ReactNode }) {
     { href: '/admin/banners', label: 'Promotions', icon: <ImageIcon className="h-4 w-4" />, ready: true },
     { href: '/admin/gallery', label: 'Gallery', icon: <ImageIcon className="h-4 w-4" />, ready: true },
     { href: '/admin/staff', label: 'Staff Management', icon: <Users className="h-4 w-4" />, ready: true },
-    { href: '/admin/banquets', label: 'Banquet Halls', icon: <Landmark className="h-4 w-4" />, ready: true },
+    // Super admins reach Banquet Halls directly under Valet Parking above; kitchen
+    // owners keep their existing entry here so no permission changes.
+    ...(user?.role === 'KITCHEN_OWNER' ? [
+      { href: '/admin/banquets', label: 'Banquet Halls', icon: <Landmark className="h-4 w-4" />, ready: true },
+    ] : []),
     ...(user?.role === 'SUPER_ADMIN' ? [
       { href: '/admin/coupons', label: 'Coupons', icon: <Ticket className="h-4 w-4" />, ready: true },
     ] : []),
@@ -349,7 +367,7 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r bg-white md:flex sticky top-0 h-screen">
+      <aside className="hidden w-60 shrink-0 flex-col border-r bg-white md:flex sticky top-0 h-screen z-30">
         <div className="flex items-center justify-between px-5 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center overflow-hidden">

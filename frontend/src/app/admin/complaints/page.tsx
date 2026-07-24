@@ -22,7 +22,6 @@ import {
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Field, Input, FieldError } from '@/components/ui/input';
 import { Badge, Card, CenteredSpinner } from '@/components/ui/primitives';
 import { api, apiErrorMessage } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
@@ -47,15 +46,45 @@ interface Complaint {
   category: 'HOUSEKEEPING' | 'MAINTENANCE' | 'ROOM_SERVICE' | 'OTHER';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   description: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
+  status: TicketStatus;
   assignedStaff?: StaffMember;
   staffNotes?: string;
   createdAt: string;
   updatedAt: string;
 }
 
+/** Ticket lifecycle. REJECTED is a terminal side-exit kept for legacy tickets. */
+const TICKET_STATUSES = [
+  'PENDING',
+  'ASSIGNED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CLOSED',
+  'REJECTED',
+] as const;
+
+type TicketStatus = (typeof TICKET_STATUSES)[number];
+
+const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
+  PENDING: 'Pending',
+  ASSIGNED: 'Assigned',
+  IN_PROGRESS: 'In Progress',
+  COMPLETED: 'Completed',
+  CLOSED: 'Closed',
+  REJECTED: 'Rejected',
+};
+
+const TICKET_STATUS_BADGE: Record<TicketStatus, string> = {
+  PENDING: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  ASSIGNED: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  IN_PROGRESS: 'bg-blue-50 text-blue-700 border-blue-200',
+  COMPLETED: 'bg-green-50 text-green-700 border-green-200',
+  CLOSED: 'bg-zinc-100 text-zinc-700 border-zinc-200',
+  REJECTED: 'bg-red-50 text-red-700 border-red-200',
+};
+
 const updateSchema = z.object({
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED']),
+  status: z.enum(TICKET_STATUSES),
   assignedStaff: z.string().optional().or(z.literal('')),
   staffNotes: z.string().trim().max(1000).optional(),
 });
@@ -143,18 +172,9 @@ export default function AdminComplaintsPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
-      case 'IN_PROGRESS':
-        return <Badge className="bg-blue-50 text-blue-700 border-blue-200">In Progress</Badge>;
-      case 'COMPLETED':
-        return <Badge className="bg-green-50 text-green-700 border-green-200">Completed</Badge>;
-      case 'REJECTED':
-        return <Badge className="bg-red-50 text-red-700 border-red-200">Rejected</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
-    }
+    const cls = TICKET_STATUS_BADGE[status as TicketStatus];
+    if (!cls) return <Badge>{status}</Badge>;
+    return <Badge className={cls}>{TICKET_STATUS_LABEL[status as TicketStatus]}</Badge>;
   };
 
   return (
@@ -214,10 +234,11 @@ export default function AdminComplaintsPage() {
               className="border rounded-lg text-xs font-semibold px-3 py-2 bg-white text-zinc-700 focus:outline-none"
             >
               <option value="">All Statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="REJECTED">Rejected</option>
+              {TICKET_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {TICKET_STATUS_LABEL[s]}
+                </option>
+              ))}
             </select>
 
             <select
@@ -332,11 +353,16 @@ export default function AdminComplaintsPage() {
                   {...register('status')}
                   className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900"
                 >
-                  <option value="PENDING">Pending</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="REJECTED">Rejected</option>
+                  {TICKET_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {TICKET_STATUS_LABEL[s]}
+                    </option>
+                  ))}
                 </select>
+                <p className="text-[10px] text-zinc-400">
+                  Lifecycle: Pending → Assigned → In Progress → Completed → Closed. The guest is emailed on
+                  every status change.
+                </p>
               </div>
 
               <div className="space-y-1">
@@ -354,14 +380,18 @@ export default function AdminComplaintsPage() {
                 </select>
               </div>
 
-              <Field label="Staff Resolution Notes" error={errors.staffNotes?.message}>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Staff Resolution Notes</label>
                 <textarea
                   rows={3}
                   placeholder="Details of action taken, resolution, or reasons..."
                   className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-zinc-900"
                   {...register('staffNotes')}
                 />
-              </Field>
+                {errors.staffNotes?.message && (
+                  <p className="text-xs text-red-600">{errors.staffNotes.message}</p>
+                )}
+              </div>
 
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setSelectedTicket(null)}>

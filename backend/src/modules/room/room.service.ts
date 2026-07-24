@@ -12,31 +12,128 @@ async function assertKitchenExists(kitchenId?: string | null): Promise<void> {
   if (!exists) throw AppError.badRequest('Referenced kitchen does not exist', 'KITCHEN_NOT_FOUND');
 }
 
-export async function createRoom(input: CreateRoomInput) {
-  await assertKitchenExists(input.kitchen);
-  const dup = await Room.findOne({ roomNumber: input.roomNumber, floor: input.floor });
-  if (dup) throw AppError.conflict('A room with this number already exists on this floor', 'ROOM_EXISTS');
+/**
+ * Every room must point at a category that actually exists in the Room
+ * Categories table — otherwise the room shows up on the booking page under a
+ * class the guest can never filter for (the "EXECUTIVE" orphan problem).
+ */
+async function requireCategory(roomType?: string | null) {
+  const known = await RoomCategory.find().select('roomType displayName').sort({ roomType: 1 });
+  if (known.length === 0) {
+    throw AppError.badRequest(
+      'No room categories are configured. Create a room category before adding rooms.',
+      'NO_ROOM_CATEGORIES',
+    );
+  }
+  const wanted = (roomType || '').trim();
+  if (!wanted) {
+    throw AppError.badRequest('A room category is required', 'ROOM_TYPE_REQUIRED');
+  }
+  const category = known.find((c) => c.roomType.toUpperCase() === wanted.toUpperCase());
+  if (!category) {
+    throw AppError.badRequest(
+      `"${wanted}" is not a configured room category. Available: ${known.map((c) => c.roomType).join(', ')}`,
+      'ROOM_TYPE_UNKNOWN',
+    );
+  }
+  return RoomCategory.findById(category._id);
+}
 
-  const category = await RoomCategory.findOne({ roomType: input.roomType || 'STANDARD' });
-  const categoryData = category ? {
+/** Fields a room inherits from its category. Never touches roomNumber/floor/status. */
+function categoryFields(category: { roomType: string; capacity: number; amenities: string[]; pricePerNight: number; images: string[] }) {
+  return {
     roomType: category.roomType,
     capacity: category.capacity,
     amenities: category.amenities,
     pricePerNight: category.pricePerNight,
     images: category.images,
-  } : {
-    roomType: input.roomType || 'STANDARD',
   };
+}
+
+export async function createRoom(input: CreateRoomInput) {
+  await assertKitchenExists(input.kitchen);
+  const dup = await Room.findOne({ roomNumber: input.roomNumber, floor: input.floor });
+  if (dup) throw AppError.conflict('A room with this number already exists on this floor', 'ROOM_EXISTS');
+
+  const category = await requireCategory(input.roomType || 'STANDARD');
 
   return Room.create({
     roomNumber: input.roomNumber,
     floor: input.floor,
     kitchen: input.kitchen,
     internalNote: input.internalNote,
-    ...categoryData,
+    ...categoryFields(category!),
     isActive: true,
     qr: { token: generateQrToken(), isActive: true, version: 1, generatedAt: new Date() },
   });
+}
+
+/**
+ * Rooms whose `roomType` no longer resolves to a Room Category, grouped by the
+ * orphaned type. Surfaced to admins so the inconsistency is visible, not silent.
+ */
+export async function auditRoomCategories() {
+  const categories = await RoomCategory.find().sort({ pricePerNight: 1 });
+  const known = new Set(categories.map((c) => c.roomType.toUpperCase()));
+
+  const rooms = await Room.find().select('roomNumber floor roomType isActive status pricePerNight');
+  const orphans = rooms.filter((r) => !known.has((r.roomType || '').toUpperCase()));
+
+  const byType = new Map<string, { roomType: string; count: number; rooms: { _id: string; roomNumber: string; floor: number }[] }>();
+  for (const r of orphans) {
+    const key = r.roomType || 'UNSET';
+    const entry = byType.get(key) ?? { roomType: key, count: 0, rooms: [] };
+    entry.count += 1;
+    entry.rooms.push({ _id: r._id.toString(), roomNumber: r.roomNumber, floor: r.floor });
+    byType.set(key, entry);
+  }
+
+  return {
+    categories: categories.map((c) => ({
+      _id: c._id.toString(),
+      roomType: c.roomType,
+      displayName: c.displayName,
+      pricePerNight: c.pricePerNight,
+      roomCount: rooms.filter((r) => (r.roomType || '').toUpperCase() === c.roomType.toUpperCase()).length,
+    })),
+    totalRooms: rooms.length,
+    orphanCount: orphans.length,
+    orphanGroups: [...byType.values()].sort((a, b) => b.count - a.count),
+    isConsistent: orphans.length === 0,
+  };
+}
+
+/**
+ * Reassign orphaned rooms onto a real category, syncing the category's pricing
+ * and amenities onto each migrated room. `fromRoomType` narrows the migration to
+ * a single orphaned class; omit it to migrate every orphan.
+ */
+export async function migrateOrphanRooms(input: { toRoomType: string; fromRoomType?: string }) {
+  const target = await requireCategory(input.toRoomType);
+  const categories = await RoomCategory.find().select('roomType');
+  const known = new Set(categories.map((c) => c.roomType.toUpperCase()));
+
+  const rooms = await Room.find().select('roomNumber roomType');
+  const orphans = rooms.filter((r) => {
+    if (known.has((r.roomType || '').toUpperCase())) return false;
+    if (input.fromRoomType) {
+      return (r.roomType || '').toUpperCase() === input.fromRoomType.toUpperCase();
+    }
+    return true;
+  });
+
+  if (orphans.length === 0) {
+    return { migrated: 0, toRoomType: target!.roomType, rooms: [] as string[] };
+  }
+
+  const ids = orphans.map((r) => r._id);
+  await Room.updateMany({ _id: { $in: ids } }, { $set: categoryFields(target!) });
+
+  return {
+    migrated: orphans.length,
+    toRoomType: target!.roomType,
+    rooms: orphans.map((r) => r.roomNumber),
+  };
 }
 
 export async function listRooms(query: {
@@ -90,14 +187,14 @@ export async function updateRoom(id: string, input: UpdateRoomInput) {
   }
   if (input.internalNote !== undefined) room.internalNote = input.internalNote;
   if (input.roomType !== undefined && input.roomType !== room.roomType) {
-    room.roomType = input.roomType as any;
-    const category = await RoomCategory.findOne({ roomType: input.roomType });
-    if (category) {
-      room.capacity = category.capacity;
-      room.amenities = category.amenities;
-      room.pricePerNight = category.pricePerNight;
-      room.images = category.images;
-    }
+    // Reject unknown categories outright rather than silently leaving the room
+    // pointing at a class that no longer exists.
+    const category = await requireCategory(input.roomType);
+    room.roomType = category!.roomType;
+    room.capacity = category!.capacity;
+    room.amenities = category!.amenities;
+    room.pricePerNight = category!.pricePerNight;
+    room.images = category!.images;
   }
 
   await room.save();

@@ -49,6 +49,8 @@ function GuestServicesInner() {
     defaultValues: { category: 'HOUSEKEEPING' },
   });
 
+  const [guestEmail, setGuestEmail] = useState('');
+
   // Load guest details if authenticated
   useEffect(() => {
     const fetchMe = async () => {
@@ -58,6 +60,7 @@ function GuestServicesInner() {
           setValue('guestName', res.data.data.user.name);
           setValue('phone', res.data.data.user.phone || '');
           setLookupPhone(res.data.data.user.phone || '');
+          setGuestEmail(res.data.data.user.email || '');
         }
       } catch {
         // Degrade gracefully
@@ -65,6 +68,20 @@ function GuestServicesInner() {
     };
     fetchMe();
   }, [setValue]);
+
+  // Service requests are only available once the guest has checked in.
+  const { data: eligibility, isLoading: loadingEligibility } = useQuery({
+    queryKey: ['service-eligibility', guestEmail, lookupPhone],
+    enabled: !!guestEmail || !!lookupPhone,
+    queryFn: async () => {
+      const res = await api.get('/complaints/eligibility', {
+        params: { email: guestEmail || undefined, phone: lookupPhone || undefined },
+      });
+      return res.data?.data as { eligible: boolean; reason: string | null; rooms: { roomId: string; roomNumber: string }[] };
+    },
+  });
+
+  const canRequestService = !!eligibility?.eligible;
 
   // Fetch guest's complaints
   const { data: tickets, isLoading: loadingTickets, refetch: executeLookup } = useQuery({
@@ -91,14 +108,25 @@ function GuestServicesInner() {
       });
     });
 
+    // A brand new ticket isn't in the cache to patch — refetch instead.
+    socket.on('complaint:new', () => {
+      queryClient.invalidateQueries({ queryKey: ['my-complaints'] });
+    });
+
     return () => {
       socket.off('complaint:updated');
+      socket.off('complaint:new');
     };
   }, [queryClient, lookupPhone, roomId]);
 
   const submitMutation = useMutation({
     mutationFn: async (data: ComplaintForm) => {
-      const res = await api.post('/complaints', { ...data, roomId });
+      const targetRoomId = roomId || eligibility?.rooms?.[0]?.roomId;
+      const res = await api.post('/complaints', {
+        ...data,
+        roomId: targetRoomId,
+        email: guestEmail || undefined,
+      });
       return res.data?.data?.complaint;
     },
     onSuccess: (data) => {
@@ -128,10 +156,16 @@ function GuestServicesInner() {
     switch (status) {
       case 'PENDING':
         return <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
+      case 'ASSIGNED':
+        return <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200">Assigned</Badge>;
       case 'IN_PROGRESS':
         return <Badge className="bg-blue-50 text-blue-700 border-blue-200">In Progress</Badge>;
-      case 'RESOLVED':
-        return <Badge className="bg-green-50 text-green-700 border-green-200">Resolved</Badge>;
+      case 'COMPLETED':
+        return <Badge className="bg-green-50 text-green-700 border-green-200">Completed</Badge>;
+      case 'CLOSED':
+        return <Badge className="bg-zinc-100 text-zinc-700 border-zinc-200">Closed</Badge>;
+      case 'REJECTED':
+        return <Badge className="bg-red-50 text-red-700 border-red-200">Rejected</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -206,6 +240,18 @@ function GuestServicesInner() {
                   >
                     Track Live Progress
                   </Button>
+                </div>
+              </div>
+            ) : !loadingEligibility && !canRequestService ? (
+              <div className="text-center py-8 space-y-4">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                  <AlertTriangle className="h-6 w-6" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-zinc-900">Check-in required</h3>
+                  <p className="text-zinc-500 text-xs max-w-sm mx-auto">
+                    {eligibility?.reason || 'You can request hotel services after completing check-in.'}
+                  </p>
                 </div>
               </div>
             ) : (

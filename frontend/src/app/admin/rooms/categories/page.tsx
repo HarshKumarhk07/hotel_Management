@@ -9,18 +9,135 @@ import { Field, Input, FieldError } from '@/components/ui/input';
 import { Card, CenteredSpinner, EmptyState } from '@/components/ui/primitives';
 import { Dialog } from '@/components/ui/dialog';
 import { api, apiErrorMessage } from '@/lib/api';
-import { Plus, Edit2, Trash2, ShieldAlert } from 'lucide-react';
+import { Plus, Edit2, Trash2, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { formatINR } from '@/lib/utils';
 
 interface RoomCategory {
   _id: string;
-  roomType: 'STANDARD' | 'DELUXE' | 'EXECUTIVE' | 'SUITE' | 'PRESIDENTIAL';
+  /** Free-form: categories are configurable, so this is not a closed union. */
+  roomType: string;
   displayName: string;
   pricePerNight: number;
   capacity: number;
   amenities: string[];
   images: string[];
   description: string;
+}
+
+interface CategoryAudit {
+  categories: { _id: string; roomType: string; displayName: string; pricePerNight: number; roomCount: number }[];
+  totalRooms: number;
+  orphanCount: number;
+  orphanGroups: { roomType: string; count: number; rooms: { _id: string; roomNumber: string; floor: number }[] }[];
+  isConsistent: boolean;
+}
+
+/**
+ * Surfaces rooms pointing at a category that no longer exists (the "EXECUTIVE
+ * rooms with only Standard/Deluxe categories" case) and offers a one-click
+ * migration onto a real category.
+ */
+function CategoryConsistencyPanel({ categories }: { categories: RoomCategory[] }) {
+  const qc = useQueryClient();
+  const [targets, setTargets] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: audit, isLoading } = useQuery({
+    queryKey: ['room-category-audit'],
+    queryFn: async () => {
+      const res = await api.get<{ data: { audit: CategoryAudit } }>('/rooms/categories-audit');
+      return res.data.data.audit;
+    },
+  });
+
+  const migrate = useMutation({
+    mutationFn: ({ fromRoomType, toRoomType }: { fromRoomType: string; toRoomType: string }) =>
+      api.post('/rooms/categories-migrate', { fromRoomType, toRoomType }),
+    onSuccess: () => {
+      setError(null);
+      qc.invalidateQueries({ queryKey: ['room-category-audit'] });
+      qc.invalidateQueries({ queryKey: ['admin-rooms'] });
+    },
+    onError: (err) => setError(apiErrorMessage(err, 'Failed to migrate rooms')),
+  });
+
+  if (isLoading || !audit) return null;
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+            {audit.isConsistent ? (
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            ) : (
+              <ShieldAlert className="h-4 w-4 text-amber-600" />
+            )}
+            Category Consistency
+          </h2>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            {audit.isConsistent
+              ? `All ${audit.totalRooms} rooms reference an existing category.`
+              : `${audit.orphanCount} of ${audit.totalRooms} rooms reference a category that no longer exists. These rooms cannot be filtered or booked correctly until migrated.`}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {audit.categories.map((c) => (
+          <span
+            key={c._id}
+            className="text-[11px] bg-zinc-100 text-zinc-700 px-2.5 py-1 rounded-md font-semibold"
+          >
+            {c.displayName} · {c.roomCount} room{c.roomCount === 1 ? '' : 's'}
+          </span>
+        ))}
+      </div>
+
+      {error && <FieldError message={error} />}
+
+      {!audit.isConsistent && (
+        <div className="space-y-3 border-t pt-4">
+          {audit.orphanGroups.map((g) => (
+            <div
+              key={g.roomType}
+              className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="text-xs text-amber-900">
+                <b>{g.roomType}</b> — {g.count} room{g.count === 1 ? '' : 's'} (
+                {g.rooms.slice(0, 5).map((r) => r.roomNumber).join(', ')}
+                {g.rooms.length > 5 ? `, +${g.rooms.length - 5} more` : ''})
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={targets[g.roomType] ?? ''}
+                  onChange={(e) => setTargets((p) => ({ ...p, [g.roomType]: e.target.value }))}
+                  className="h-9 rounded-lg border border-zinc-300 bg-white px-2 text-xs"
+                >
+                  <option value="">— Migrate to —</option>
+                  {categories.map((c) => (
+                    <option key={c._id} value={c.roomType}>
+                      {c.displayName}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  size="sm"
+                  disabled={!targets[g.roomType] || migrate.isPending}
+                  onClick={() =>
+                    migrate.mutate({ fromRoomType: g.roomType, toRoomType: targets[g.roomType] })
+                  }
+                  className="bg-[#D4AF37] hover:bg-[#AE963C] text-white text-xs"
+                >
+                  Migrate
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
 }
 
 export default function RoomCategoriesPage() {
@@ -41,6 +158,7 @@ export default function RoomCategoriesPage() {
     mutationFn: (id: string) => api.delete(`/rooms/categories/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-room-categories'] });
+      qc.invalidateQueries({ queryKey: ['room-category-audit'] });
     },
     onError: (err) => {
       setError(apiErrorMessage(err, 'Failed to delete category'));
@@ -72,6 +190,8 @@ export default function RoomCategoriesPage() {
             <ShieldAlert className="h-4 w-4" /> {error}
           </div>
         )}
+
+        {categories && categories.length > 0 && <CategoryConsistencyPanel categories={categories} />}
 
         {isLoading ? (
           <CenteredSpinner />
@@ -167,6 +287,7 @@ function CategoryModal({ category, onClose }: { category: RoomCategory | null, o
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-room-categories'] });
+      qc.invalidateQueries({ queryKey: ['room-category-audit'] });
       onClose();
     },
     onError: (err) => {

@@ -16,6 +16,7 @@ router.use(authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.KITCHEN_OWNER));
 router.get('/', ctrl.listContactMessages);
 router.get('/:id', ctrl.getMessage);
 router.patch('/:id/read', ctrl.markAsRead);
+router.patch('/:id/status', ctrl.updateStatus);
 router.delete('/:id', ctrl.deleteMessage);
 
 export default router;

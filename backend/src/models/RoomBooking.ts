@@ -35,6 +35,38 @@ export interface ITimelineEvent {
   updatedBy?: string;
 }
 
+export type TransferKind = 'NORMAL' | 'UPGRADE' | 'DOWNGRADE';
+export type TransferState = 'PENDING_PAYMENT' | 'COMPLETED' | 'CANCELLED';
+
+/**
+ * A single room-transfer record. Same-category moves and downgrades complete
+ * immediately; upgrades are parked in `PENDING_PAYMENT` until an admin confirms
+ * the differential payment has been collected.
+ */
+export interface IRoomTransfer {
+  type: TransferKind;
+  state: TransferState;
+  fromRoom: Types.ObjectId;
+  toRoom: Types.ObjectId;
+  fromRoomNumber: string;
+  toRoomNumber: string;
+  fromRoomType: string;
+  toRoomType: string;
+  fromFloor: number;
+  toFloor: number;
+  nights: number;
+  /** Upgrade only — differential the guest still owes (incl. tax + service). */
+  amountDue: number;
+  /** Downgrade only — differential owed back to the guest. */
+  refundAmount: number;
+  refundStatus?: 'PENDING' | 'PROCESSED';
+  requestedAt: Date;
+  completedAt?: Date;
+  requestedBy?: string;
+  completedBy?: string;
+  note?: string;
+}
+
 export interface IRoomBooking extends Document {
   _id: Types.ObjectId;
   room: Types.ObjectId;
@@ -57,6 +89,10 @@ export interface IRoomBooking extends Document {
   payment: IBookingPayment;
   confirmationNumber?: string;
   timeline: ITimelineEvent[];
+  /** Completed/cancelled transfer history, newest appended last. */
+  transfers: IRoomTransfer[];
+  /** The single in-flight upgrade awaiting admin payment confirmation. */
+  pendingTransfer?: IRoomTransfer;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -108,6 +144,31 @@ const timelineEventSchema = new Schema<ITimelineEvent>(
   { _id: false }
 );
 
+const roomTransferSchema = new Schema<IRoomTransfer>(
+  {
+    type: { type: String, enum: ['NORMAL', 'UPGRADE', 'DOWNGRADE'], required: true },
+    state: { type: String, enum: ['PENDING_PAYMENT', 'COMPLETED', 'CANCELLED'], required: true },
+    fromRoom: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
+    toRoom: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
+    fromRoomNumber: { type: String, default: '' },
+    toRoomNumber: { type: String, default: '' },
+    fromRoomType: { type: String, default: '' },
+    toRoomType: { type: String, default: '' },
+    fromFloor: { type: Number, default: 0 },
+    toFloor: { type: Number, default: 0 },
+    nights: { type: Number, default: 1 },
+    amountDue: { type: Number, default: 0 },
+    refundAmount: { type: Number, default: 0 },
+    refundStatus: { type: String, enum: ['PENDING', 'PROCESSED'] },
+    requestedAt: { type: Date, default: Date.now },
+    completedAt: { type: Date },
+    requestedBy: { type: String },
+    completedBy: { type: String },
+    note: { type: String, trim: true, maxlength: 500 },
+  },
+  { _id: false }
+);
+
 const roomBookingSchema = new Schema<IRoomBooking>(
   {
     room: { type: Schema.Types.ObjectId, ref: 'Room', required: true, index: true },
@@ -140,6 +201,8 @@ const roomBookingSchema = new Schema<IRoomBooking>(
     payment: { type: bookingPaymentSchema, default: () => ({}) },
     confirmationNumber: { type: String, unique: true, sparse: true, index: true },
     timeline: { type: [timelineEventSchema], default: [] },
+    transfers: { type: [roomTransferSchema], default: [] },
+    pendingTransfer: { type: roomTransferSchema, default: undefined },
   },
   { timestamps: true }
 );

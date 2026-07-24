@@ -5,6 +5,7 @@ import * as service from './roomBooking.service';
 import { generateInvoicePdfBuffer } from './roomInvoicePdf.service';
 import { uploadFile } from '@/services/cloudinary.service';
 import { AppError } from '@/utils/AppError';
+import { ROLES } from '@/constants';
 
 export const uploadIdProof = asyncHandler(async (req: Request, res) => {
   if (!req.file) {
@@ -62,7 +63,7 @@ export const listBookings = asyncHandler(async (req: Request, res) => {
 export const updateBookingStatus = asyncHandler(async (req: Request, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  const booking = await service.updateBookingStatus(id, status);
+  const booking = await service.updateBookingStatus(id, status, staffActor(req));
   return ok(res, { booking });
 });
 
@@ -91,32 +92,60 @@ export const downloadBookingInvoice = asyncHandler(async (req: Request, res) => 
 });
 
 export const checkIn = asyncHandler(async (req: Request, res) => {
-  const { id } = req.params;
-  const user = (req as any).user;
-  const booking = await service.checkInGuest(id, user?.name || user?.email || 'Staff');
+  const booking = await service.checkInGuest(req.params.id, staffActor(req));
   return ok(res, { booking });
 });
 
 export const checkOut = asyncHandler(async (req: Request, res) => {
-  const { id } = req.params;
-  const user = (req as any).user;
-  const result = await service.checkOutGuest(id, user?.name || user?.email || 'Staff');
+  const result = await service.checkOutGuest(req.params.id, staffActor(req));
   return ok(res, result);
 });
+
+/** The human-readable actor recorded on timeline entries and audit logs. */
+function staffActor(req: Request) {
+  return req.auth?.email || 'Staff';
+}
 
 export const upgradeRoom = asyncHandler(async (req: Request, res) => {
   const { id } = req.params;
   const { newRoomId } = req.body;
-  const user = (req as any).user;
-  const booking = await service.upgradeRoom(id, newRoomId, user?.name || user?.email || 'Staff');
-  return ok(res, { booking });
+  const result = await service.upgradeRoom(id, newRoomId, staffActor(req));
+  return ok(res, result);
 });
 
 export const transferRoom = asyncHandler(async (req: Request, res) => {
   const { id } = req.params;
   const { newRoomId } = req.body;
-  const user = (req as any).user;
-  const booking = await service.transferRoom(id, newRoomId, user?.name || user?.email || 'Staff');
+  const result = await service.transferRoom(id, newRoomId, staffActor(req));
+  return ok(res, result);
+});
+
+export const getTransferOptions = asyncHandler(async (req: Request, res) => {
+  const options = await service.getTransferOptions(req.params.id);
+  return ok(res, options);
+});
+
+export const confirmTransferPayment = asyncHandler(async (req: Request, res) => {
+  const result = await service.confirmTransferPayment(req.params.id, staffActor(req));
+  return ok(res, result);
+});
+
+export const cancelPendingTransfer = asyncHandler(async (req: Request, res) => {
+  const result = await service.cancelPendingTransfer(req.params.id, staffActor(req));
+  return ok(res, result);
+});
+
+export const markTransferRefundProcessed = asyncHandler(async (req: Request, res) => {
+  const booking = await service.markTransferRefundProcessed(req.params.id, staffActor(req));
+  return ok(res, { booking });
+});
+
+export const recordPayment = asyncHandler(async (req: Request, res) => {
+  const booking = await service.recordBookingPayment(
+    req.params.id,
+    { status: req.body.status, method: req.body.method, reference: req.body.reference },
+    staffActor(req),
+  );
   return ok(res, { booking });
 });
 
@@ -139,14 +168,20 @@ export const verifyPayment = asyncHandler(async (req: Request, res) => {
 
 export const cancelGuestBooking = asyncHandler(async (req: Request, res) => {
   const { id } = req.params;
-  const { reason } = req.body;
-  const user = (req as any).user;
-  
-  if (!user || !user.email) {
-    throw AppError.unauthorized('User email is required to cancel a booking');
-  }
+  const { reason, confirmationNumber } = req.body;
 
-  const booking = await service.cancelGuestBooking(id, user.email, reason);
+  // No email is ever collected from the guest here — ownership is proven by the
+  // signed-in session or by the confirmation number printed on their own ticket.
+  const booking = await service.cancelGuestBooking(
+    id,
+    {
+      email: req.auth?.email,
+      role: req.auth?.role,
+      confirmationNumber,
+      isStaff: req.auth?.role === ROLES.SUPER_ADMIN || req.auth?.role === ROLES.KITCHEN_OWNER,
+    },
+    reason,
+  );
   return ok(res, { booking });
 });
 

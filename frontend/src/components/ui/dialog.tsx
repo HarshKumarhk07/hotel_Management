@@ -21,7 +21,7 @@ export function Dialog({
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
           <motion.div
             className="absolute inset-0 bg-black/40"
             initial={{ opacity: 0 }}
@@ -30,7 +30,7 @@ export function Dialog({
             onClick={onClose}
           />
           <motion.div
-            className={`relative z-10 w-full ${widthClass} overflow-hidden rounded-2xl bg-white shadow-xl`}
+            className={`relative z-10 w-full ${widthClass} m-4 overflow-hidden rounded-2xl bg-white shadow-xl`}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}

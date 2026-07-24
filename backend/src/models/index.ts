@@ -20,7 +20,12 @@ export { RefreshToken, type IRefreshToken } from './RefreshToken';
 export { VerificationToken, type IVerificationToken } from './VerificationToken';
 export { AuditLog, type IAuditLog } from './AuditLog';
 export { Notification, type INotification } from './Notification';
-export { ContactMessage, type IContactMessage } from './ContactMessage';
+export {
+  ContactMessage,
+  type IContactMessage,
+  type ContactStatus,
+  CONTACT_STATUSES,
+} from './ContactMessage';
 export { Coupon, type ICoupon } from './Coupon';
 export { CouponRedemption, type ICouponRedemption } from './CouponRedemption';
 export { CouponUserCounter, type ICouponUserCounter } from './CouponUserCounter';
@@ -49,14 +54,26 @@ export { BanquetHall, type IBanquetHall } from './BanquetHall';
 export { BanquetBooking, type IBanquetBooking } from './BanquetBooking';
 
 // Room Booking Module Models
-export { RoomBooking, type IRoomBooking } from './RoomBooking';
+export { RoomCategory, type IRoomCategory } from './RoomCategory';
+export {
+  RoomBooking,
+  type IRoomBooking,
+  type IRoomTransfer,
+  type TransferKind,
+  type TransferState,
+} from './RoomBooking';
 export { BookingInvoice, type IBookingInvoice } from './BookingInvoice';
 
 // Restaurant Waitlist Module Models
 export { Waitlist, type IWaitlist } from './Waitlist';
 
 // Complaint and Feedback Models
-export { Complaint, type IComplaint } from './Complaint';
+export {
+  Complaint,
+  type IComplaint,
+  type ComplaintStatus,
+  COMPLAINT_STATUSES,
+} from './Complaint';
 export { Feedback, type IFeedback } from './Feedback';
 
 // Gallery Model

@@ -282,6 +282,178 @@ export function roomBookingPendingTemplate(
   };
 }
 
+export interface RoomTransferData {
+  name: string;
+  confirmationNumber: string;
+  oldRoomNumber: string;
+  oldRoomType: string;
+  oldFloor: number | string;
+  newRoomNumber: string;
+  newRoomType: string;
+  newFloor: number | string;
+  transferTime: string;
+  /** Present when the new room carries a different ordering QR. */
+  qrScanUrl?: string;
+  type: 'NORMAL' | 'UPGRADE' | 'DOWNGRADE';
+  amountDue?: number;
+  refundAmount?: number;
+}
+
+function transferDetailTable(d: RoomTransferData): string {
+  const row = (label: string, value: string) =>
+    `<tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a;width:160px">${label}</td><td style="padding:8px 0;font-weight:bold">${value}</td></tr>`;
+  return `<table style="font-size:14px;color:#3f3f46;margin:16px 0;border-collapse:collapse;width:100%">
+    ${row('Confirmation Code', escapeHtml(d.confirmationNumber))}
+    ${row('Previous Room', `Room ${escapeHtml(d.oldRoomNumber)} · ${escapeHtml(d.oldRoomType)} · Floor ${escapeHtml(String(d.oldFloor))}`)}
+    ${row('New Room', `Room ${escapeHtml(d.newRoomNumber)} · ${escapeHtml(d.newRoomType)} · Floor ${escapeHtml(String(d.newFloor))}`)}
+    ${row('Transfer Time', escapeHtml(new Date(d.transferTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })))}
+  </table>`;
+}
+
+function qrBlock(qrScanUrl?: string): string {
+  if (!qrScanUrl) return '';
+  return `<div style="background:#faf9f6;border:1px solid #e4e4e7;border-radius:8px;padding:16px;margin:16px 0">
+      <p style="margin:0;font-weight:bold;color:#3f3f46">📱 Your in-room ordering QR has changed</p>
+      <p style="margin:8px 0 0;font-size:13px;color:#71717a">Use the QR code inside your new room, or open this link directly:<br/>
+      <a href="${qrScanUrl}" style="color:#D4AF37;word-break:break-all">${qrScanUrl}</a></p>
+    </div>`;
+}
+
+/** Guest notice that their stay has been moved to a different room. */
+export function roomTransferTemplate(d: RoomTransferData): EmailContent {
+  const safeName = escapeHtml(d.name);
+
+  let intro: string;
+  let money = '';
+  let subject: string;
+
+  if (d.type === 'UPGRADE') {
+    subject = `⬆️ Room Upgrade Confirmed: Room ${d.newRoomNumber} - ${d.confirmationNumber}`;
+    intro = `Your stay has been upgraded from <strong>${escapeHtml(d.oldRoomType)}</strong> to <strong>${escapeHtml(d.newRoomType)}</strong>.`;
+    money = `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0">
+        <p style="margin:0;color:#15803d;font-weight:bold">✅ Upgrade payment received</p>
+        <p style="margin:8px 0 0;color:#166534;font-size:13px">The upgrade differential of <strong>₹${d.amountDue ?? 0}</strong> has been settled. No further action is required.</p>
+      </div>`;
+  } else if (d.type === 'DOWNGRADE') {
+    subject = `🔄 Room Change Confirmed: Room ${d.newRoomNumber} - ${d.confirmationNumber}`;
+    intro = `Your stay has been moved from <strong>${escapeHtml(d.oldRoomType)}</strong> to <strong>${escapeHtml(d.newRoomType)}</strong>.`;
+    money = `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:16px 0">
+        <p style="margin:0;color:#c2410c;font-weight:bold">💰 Refund of ₹${d.refundAmount ?? 0} initiated</p>
+        <p style="margin:8px 0 0;color:#92400e;font-size:13px">The difference will be returned to your original payment method, or settled at the front desk if you are paying at the hotel.</p>
+      </div>`;
+  } else {
+    subject = `🔑 Room Transfer Confirmed: Room ${d.newRoomNumber} - ${d.confirmationNumber}`;
+    intro = `Your stay has been moved to a different room of the same <strong>${escapeHtml(d.newRoomType)}</strong> class. There is no change to your billing.`;
+  }
+
+  return {
+    subject,
+    html: layout(
+      'Room Transfer Confirmed',
+      `<p>Hi ${safeName},</p>
+       <p>${intro}</p>
+       ${transferDetailTable(d)}
+       ${money}
+       ${qrBlock(d.qrScanUrl)}
+       <p>Our front desk team has the keys to your new room ready. Please contact us if anything is not as expected.</p>`,
+    ),
+    text: `Room transfer: Hi ${d.name}, your booking ${d.confirmationNumber} has moved from Room ${d.oldRoomNumber} (${d.oldRoomType}, Floor ${d.oldFloor}) to Room ${d.newRoomNumber} (${d.newRoomType}, Floor ${d.newFloor}) at ${new Date(d.transferTime).toLocaleString('en-IN')}.${d.qrScanUrl ? ` New room QR: ${d.qrScanUrl}` : ''}`,
+  };
+}
+
+/** Guest notice that an upgrade is reserved but awaiting the differential payment. */
+export function roomUpgradePaymentTemplate(d: RoomTransferData): EmailContent {
+  const safeName = escapeHtml(d.name);
+  return {
+    subject: `💳 Upgrade Payment Pending: Room ${d.newRoomNumber} - ${d.confirmationNumber}`,
+    html: layout(
+      'Room Upgrade — Payment Pending',
+      `<p>Hi ${safeName},</p>
+       <p>We have reserved a <strong>${escapeHtml(d.newRoomType)}</strong> room for your stay. The upgrade completes as soon as the differential is settled.</p>
+       ${transferDetailTable(d)}
+       <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:16px 0">
+         <p style="margin:0;color:#c2410c;font-weight:bold">⚠️ Amount due: ₹${d.amountDue ?? 0}</p>
+         <p style="margin:8px 0 0;color:#92400e;font-size:13px">Please settle this amount at the front desk. Your existing room remains reserved for you until the upgrade is confirmed.</p>
+       </div>
+       <p>Quote your confirmation code above when you speak to our team.</p>`,
+    ),
+    text: `Upgrade pending: Hi ${d.name}, your upgrade to Room ${d.newRoomNumber} (${d.newRoomType}) on booking ${d.confirmationNumber} requires a differential payment of ₹${d.amountDue ?? 0}. Please settle at the front desk.`,
+  };
+}
+
+export function roomBookingCancelledTemplate(
+  name: string,
+  roomNumber: string,
+  confirmationNumber: string,
+  reason: string,
+  refundNote: string
+): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeRoomNumber = escapeHtml(roomNumber);
+  const safeConfirmationNumber = escapeHtml(confirmationNumber);
+  const safeReason = escapeHtml(reason);
+  const safeRefundNote = escapeHtml(refundNote);
+
+  return {
+    subject: `❌ Booking Cancelled: Room ${safeRoomNumber} - ${safeConfirmationNumber}`,
+    html: layout(
+      'Reservation Cancelled',
+      `<p>Hi ${safeName},</p>
+       <p>Your reservation at <strong>The Page Hotel</strong> has been cancelled as requested.</p>
+       <table style="font-size:14px;color:#3f3f46;margin:16px 0;border-collapse:collapse;width:100%">
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a;width:150px">Confirmation Code</td><td style="padding:8px 0;font-weight:bold;font-family:monospace">${safeConfirmationNumber}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Room Number</td><td style="padding:8px 0;font-weight:bold">Room ${safeRoomNumber}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Reason</td><td style="padding:8px 0">${safeReason}</td></tr>
+       </table>
+       <p style="font-size:13px;color:#71717a">${safeRefundNote}</p>
+       <p>We hope to welcome you another time.</p>`,
+    ),
+    text: `Booking cancelled: Hi ${name}, your reservation ${confirmationNumber} for Room ${roomNumber} has been cancelled. Reason: ${reason}. ${refundNote}`,
+  };
+}
+
+const TICKET_STATUS_COPY: Record<string, string> = {
+  PENDING: 'has been received and is queued for our operations team',
+  ASSIGNED: 'has been assigned to a member of our staff',
+  IN_PROGRESS: 'is now being worked on',
+  COMPLETED: 'has been completed',
+  CLOSED: 'has been closed',
+  REJECTED: 'could not be actioned',
+};
+
+export function serviceTicketStatusTemplate(
+  name: string,
+  ticketId: string,
+  roomNumber: string,
+  category: string,
+  status: string,
+  staffNotes?: string
+): EmailContent {
+  const safeName = escapeHtml(name);
+  const safeTicketId = escapeHtml(ticketId);
+  const safeRoomNumber = escapeHtml(roomNumber);
+  const safeCategory = escapeHtml(category);
+  const safeStatus = escapeHtml(status);
+  const copy = TICKET_STATUS_COPY[status] ?? `is now marked ${safeStatus}`;
+
+  return {
+    subject: `🎫 Service Request ${safeStatus}: #${safeTicketId}`,
+    html: layout(
+      'Service Request Update',
+      `<p>Hi ${safeName},</p>
+       <p>Your ${safeCategory.toLowerCase().replace(/_/g, ' ')} request for Room ${safeRoomNumber} ${copy}.</p>
+       <table style="font-size:14px;color:#3f3f46;margin:16px 0;border-collapse:collapse;width:100%">
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a;width:150px">Ticket</td><td style="padding:8px 0;font-weight:bold;font-family:monospace">#${safeTicketId}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Room</td><td style="padding:8px 0;font-weight:bold">Room ${safeRoomNumber}</td></tr>
+         <tr style="border-bottom:1px solid #e4e4e7"><td style="padding:8px 0;color:#71717a">Status</td><td style="padding:8px 0;font-weight:bold">${safeStatus}</td></tr>
+       </table>
+       ${staffNotes ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0"><p style="margin:0;color:#15803d;font-weight:bold">Note from our team</p><p style="margin:8px 0 0;color:#166534;font-size:13px">${escapeHtml(staffNotes)}</p></div>` : ''}
+       <p>You can follow live progress from the Service tab of your guest dashboard.</p>`,
+    ),
+    text: `Service request #${ticketId} (${category}, Room ${roomNumber}) ${copy}.${staffNotes ? ` Note: ${staffNotes}` : ''}`,
+  };
+}
+
 export function checkoutFeedbackTemplate(
   name: string,
   roomNumber: string,
