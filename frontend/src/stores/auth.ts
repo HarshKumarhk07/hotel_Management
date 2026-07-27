@@ -8,6 +8,7 @@ export interface AuthUser {
   avatarUrl?: string;
   kitchenId?: string;
   isEmailVerified: boolean;
+  phone?: string;
 }
 
 type Status = 'loading' | 'authenticated' | 'unauthenticated';

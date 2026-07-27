@@ -86,7 +86,7 @@ export default function GuestWaitlistPage() {
     setLookupError(null);
     setSearchEnabled(true);
     refetch().then((result) => {
-      if (result.isError) {
+      if (result.isError || result.data?.status === 'NONE') {
         setLookupError('No active waitlist entry found matching details.');
       }
     });
@@ -192,7 +192,7 @@ export default function GuestWaitlistPage() {
 
               {isLookingUp && <CenteredSpinner />}
 
-              {statusData && (
+              {statusData && statusData.status !== 'NONE' && !lookupError && (
                 <div className="space-y-5 animate-fade-in">
                   <div className="rounded-2xl border border-[#ECECEC] bg-[#FAF9F6] p-6 space-y-5 text-center">
                     <div>

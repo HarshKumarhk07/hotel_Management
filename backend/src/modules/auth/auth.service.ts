@@ -41,6 +41,7 @@ export function publicUser(user: IUser) {
     avatarUrl: user.avatarUrl,
     kitchenId: user.kitchen?.toString(),
     isEmailVerified: user.isEmailVerified,
+    phone: user.phone,
   };
 }
 export type PublicUser = ReturnType<typeof publicUser>;

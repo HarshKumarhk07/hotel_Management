@@ -1,7 +1,8 @@
 import request from 'supertest';
+import { Types } from 'mongoose';
 import { createApp } from '@/app';
-import { Kitchen, User } from '@/models';
-import { ROLES } from '@/constants';
+import { Kitchen, User, Order } from '@/models';
+import { ROLES, PAYMENT_METHODS } from '@/constants';
 import { createUserWithToken } from './helpers';
 
 const app = createApp();
@@ -73,5 +74,67 @@ describe('Kitchens — CRUD (Super Admin)', () => {
     const res = await request(app).get(`${api}?limit=10`).set('Authorization', bearer).expect(200);
     expect(res.body.meta.total).toBeGreaterThanOrEqual(1);
     expect(res.body.data.kitchens).toBeInstanceOf(Array);
+  });
+});
+
+describe('Kitchens — delete', () => {
+  it('deletes a kitchen and its provisioned owner when it has no orders', async () => {
+    const { bearer } = await createUserWithToken(ROLES.SUPER_ADMIN);
+    const createRes = await request(app)
+      .post(api)
+      .set('Authorization', bearer)
+      .send({
+        name: 'Deletable Kitchen',
+        owner: { name: 'Del Owner', email: 'del-owner@example.com', password: 'Str0ng!Pass' },
+      })
+      .expect(201);
+    const id = createRes.body.data.kitchen._id ?? createRes.body.data.kitchen.id;
+
+    await request(app).delete(`${api}/${id}`).set('Authorization', bearer).expect(204);
+
+    expect(await Kitchen.findById(id)).toBeNull();
+    expect(await User.findOne({ email: 'del-owner@example.com' })).toBeNull();
+  });
+
+  it('refuses to delete a kitchen that has orders', async () => {
+    const { bearer } = await createUserWithToken(ROLES.SUPER_ADMIN);
+    const createRes = await request(app)
+      .post(api)
+      .set('Authorization', bearer)
+      .send({ name: 'Busy Kitchen' })
+      .expect(201);
+    const id = createRes.body.data.kitchen._id ?? createRes.body.data.kitchen.id;
+
+    await Order.create({
+      orderNumber: `DEL-${Date.now()}`,
+      kitchen: id,
+      table: new Types.ObjectId(),
+      guestInfo: { name: 'Guest', email: 'guest-del@example.com', phone: '9876543210' },
+      items: [
+        {
+          menuItem: new Types.ObjectId(),
+          name: 'Test Item',
+          foodLabel: 'VEG',
+          unitPrice: 100,
+          taxPercent: 5,
+          quantity: 1,
+          lineSubtotal: 100,
+          lineTax: 5,
+          lineTotal: 105,
+        },
+      ],
+      pricing: { subtotal: 100, taxTotal: 5, serviceCharge: 0, discount: 0, total: 105 },
+      payment: { method: PAYMENT_METHODS.COD, amount: 105 },
+    });
+
+    const res = await request(app).delete(`${api}/${id}`).set('Authorization', bearer).expect(409);
+    expect(res.body.error.code).toBe('KITCHEN_HAS_ORDERS');
+    expect(await Kitchen.findById(id)).not.toBeNull();
+  });
+
+  it('forbids a kitchen owner from deleting kitchens', async () => {
+    const { bearer } = await createUserWithToken(ROLES.KITCHEN_OWNER);
+    const id = new Types.ObjectId().toString();
+    await request(app).delete(`${api}/${id}`).set('Authorization', bearer).expect(403);
   });
 });

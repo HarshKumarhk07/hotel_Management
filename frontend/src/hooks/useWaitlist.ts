@@ -36,7 +36,7 @@ export function useGuestWaitlistStatus(emailOrPhone: string, enabled = false) {
       const params = isEmail ? { email: emailOrPhone } : { phone: emailOrPhone };
       const res = await api.get<{
         data: {
-          status: 'PENDING' | 'SEATED' | 'CANCELLED';
+          status: 'PENDING' | 'SEATED' | 'CANCELLED' | 'NONE';
           position: number;
           estimatedWaitMinutes: number;
           guestName: string;

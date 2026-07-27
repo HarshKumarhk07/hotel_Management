@@ -46,7 +46,13 @@ export async function checkWaitlistStatus(query: { phone?: string; email?: strin
     }).sort({ createdAt: -1 });
 
     if (!recent) {
-      throw AppError.notFound('No active waitlist entry found');
+      return {
+        status: 'NONE',
+        position: 0,
+        estimatedWaitMinutes: 0,
+        guestName: '',
+        guestsCount: 0,
+      };
     }
     return {
       status: recent.status,
