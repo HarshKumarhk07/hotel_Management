@@ -31,7 +31,7 @@ export interface RequestMeta {
 
 const googleClient = env.GOOGLE_CLIENT_ID ? new OAuth2Client(env.GOOGLE_CLIENT_ID) : null;
 
-function publicUser(user: IUser) {
+export function publicUser(user: IUser) {
   return {
     id: user._id.toString(),
     name: user.name,

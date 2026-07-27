@@ -112,7 +112,11 @@ export const resetPassword = asyncHandler(async (req, res) => {
 export const me = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findById(req.auth!.userId);
   if (!user) throw AppError.notFound('User not found');
-  return ok(res, { user });
+  // Serialize to the same public shape as login (id, role, kitchenId, …) so the
+  // client's user object is consistent across login AND session restore. The raw
+  // document exposes `kitchen` (not `kitchenId`), which broke kitchen scoping
+  // (menu/stock/settings) after a refresh.
+  return ok(res, { user: authService.publicUser(user) });
 });
 
 export const checkRole = asyncHandler(async (req: Request, res: Response) => {

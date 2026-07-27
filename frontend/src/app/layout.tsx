@@ -39,7 +39,9 @@ import { Toaster } from 'sonner';
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${outfit.variable} ${playfair.variable}`}>
-      <body className="font-sans">
+      {/* Browser extensions (Grammarly, etc.) inject attributes onto <body>
+          before hydration; suppress the resulting attribute-only mismatch. */}
+      <body className="font-sans" suppressHydrationWarning>
         <Providers>{children}</Providers>
         <Toaster position="top-right" richColors />
       </body>

@@ -28,7 +28,8 @@ export const createBookingSchema = z.object({
   guestCount: z.number().min(1, 'Guest count must be at least 1'),
   eventType: z.string().trim().min(1, 'Event type is required'),
   menuPreset: z.string().trim().optional(),
-  paymentStatus: z.enum(['PENDING', 'PAID']).optional(),
+  // paymentStatus is intentionally NOT accepted here: the public booking path
+  // must never let a caller self-declare a booking PAID.
 }).superRefine((data, ctx) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

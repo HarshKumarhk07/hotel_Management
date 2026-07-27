@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Pencil, Plus, Power } from 'lucide-react';
+import { Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -302,11 +302,57 @@ function EditKitchenDialog({ kitchen, onClose }: { kitchen: AdminKitchen | null;
   );
 }
 
+function DeleteKitchenDialog({ kitchen, onClose }: { kitchen: AdminKitchen | null; onClose: () => void }) {
+  const { remove } = useKitchenMutations();
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (kitchen) setError(null);
+  }, [kitchen]);
+
+  const onDelete = async () => {
+    if (!kitchen) return;
+    setError(null);
+    try {
+      await remove.mutateAsync(kitchen._id);
+      onClose();
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not delete kitchen'));
+    }
+  };
+
+  return (
+    <Dialog open={!!kitchen} onClose={onClose} title={`Delete ${kitchen?.name ?? 'kitchen'}?`} widthClass="max-w-md">
+      <div className="space-y-4">
+        <p className="text-sm text-zinc-600">
+          This permanently removes the kitchen along with its menu, categories, and owner account. This action cannot
+          be undone. Kitchens that already have orders can&apos;t be deleted — deactivate them instead to preserve records.
+        </p>
+        {error ? <FieldError message={error} /> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={onDelete}
+            disabled={remove.isPending}
+            className="bg-red-600 text-white hover:bg-red-700"
+          >
+            {remove.isPending ? 'Deleting…' : 'Delete kitchen'}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 function KitchensInner() {
   const { data: kitchens, isLoading } = useAdminKitchens();
   const { setActive } = useKitchenMutations();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AdminKitchen | null>(null);
+  const [deleting, setDeleting] = useState<AdminKitchen | null>(null);
 
   return (
     <div>
@@ -352,6 +398,14 @@ function KitchensInner() {
                   <Power className="h-4 w-4" />
                   {k.isActive ? 'Deactivate' : 'Activate'}
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleting(k)}
+                  className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
               </div>
             </Card>
           ))}
@@ -360,6 +414,7 @@ function KitchensInner() {
 
       <CreateKitchenDialog open={open} onClose={() => setOpen(false)} />
       <EditKitchenDialog kitchen={editing} onClose={() => setEditing(null)} />
+      <DeleteKitchenDialog kitchen={deleting} onClose={() => setDeleting(null)} />
     </div>
   );
 }

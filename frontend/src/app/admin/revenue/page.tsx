@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Card, CenteredSpinner } from '@/components/ui/primitives';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth';
 import { formatINR } from '@/lib/utils';
 import {
   BarChart,
@@ -47,9 +48,12 @@ const COLORS = ['#D4AF37', '#111111', '#8884d8'];
 export default function RevenueDashboardPage() {
   const [kitchen, setKitchen] = useState('');
   const qs = kitchen ? `?kitchen=${kitchen}` : '';
+  const authStatus = useAuthStore((s) => s.status);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-revenue', kitchen],
+    // Wait until the session is restored so we never fire a tokenless request.
+    enabled: authStatus === 'authenticated',
     queryFn: async () => {
       const res = await api.get<{ data: Dashboard }>(`/analytics/dashboard${qs}`);
       return res.data.data;

@@ -90,8 +90,16 @@ export async function getSummary(scope: AnalyticsScope) {
     RestaurantTable.countDocuments({ ...filter, isActive: true }),
     RestaurantTable.countDocuments({ ...filter, status: 'OCCUPIED', isActive: true }),
     TableReservation.countDocuments({ ...filter, status: 'CONFIRMED' }),
-    Vehicle.countDocuments({ status: { $ne: 'DELIVERED' } }),
-    BanquetBooking.countDocuments({ status: 'PENDING' }),
+    // Valet vehicles are not kitchen-scoped — a kitchen owner must not see the
+    // hotel-wide active-vehicle count, so it is zeroed when a kitchen is scoped.
+    scope.kitchenId
+      ? Promise.resolve(0)
+      : Vehicle.countDocuments({ status: { $ne: 'DELIVERED' } }),
+    // Pending banquet enquiries scoped to the kitchen's own halls.
+    BanquetBooking.countDocuments({
+      status: 'PENDING',
+      ...(banquetHallsFilter ? { hall: { $in: banquetHallsFilter } } : {}),
+    }),
     // Room Revenue (Not applicable if a specific kitchen is scoped)
     scope.kitchenId ? Promise.resolve([{ revenue: 0 }]) : RoomBooking.aggregate([
       { $match: { ...match, paymentStatus: 'PAID' } },
@@ -307,10 +315,21 @@ export async function getDashboard(scope: AnalyticsScope) {
     getPeakHours(scope),
     getRefundAnalytics(scope),
     getKitchenPerformance(scope),
-    Room.countDocuments({ isActive: true }),
-    Order.distinct('room', { status: { $in: [ORDER_STATUS.NEW_ORDER, ORDER_STATUS.ACCEPTED, ORDER_STATUS.PREPARING, ORDER_STATUS.READY] } }),
-    RestaurantTable.countDocuments({ isActive: true }),
-    RestaurantTable.countDocuments({ status: 'OCCUPIED' }),
+    // Rooms are hotel-wide (not kitchen-partitioned): zeroed for a scoped owner.
+    scope.kitchenId ? Promise.resolve(0) : Room.countDocuments({ isActive: true }),
+    Order.distinct('room', {
+      status: { $in: [ORDER_STATUS.NEW_ORDER, ORDER_STATUS.ACCEPTED, ORDER_STATUS.PREPARING, ORDER_STATUS.READY] },
+      ...(scope.kitchenId ? { kitchen: new Types.ObjectId(scope.kitchenId) } : {}),
+    }),
+    // Restaurant tables carry a kitchen ref, so scope the counts to the owner.
+    RestaurantTable.countDocuments({
+      isActive: true,
+      ...(scope.kitchenId ? { kitchen: new Types.ObjectId(scope.kitchenId) } : {}),
+    }),
+    RestaurantTable.countDocuments({
+      status: 'OCCUPIED',
+      ...(scope.kitchenId ? { kitchen: new Types.ObjectId(scope.kitchenId) } : {}),
+    }),
   ]);
 
   const roomOccupancy = {

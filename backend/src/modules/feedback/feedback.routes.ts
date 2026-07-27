@@ -11,7 +11,9 @@ const router = Router();
 // Guest side: post reviews
 router.post('/', validate({ body: createFeedbackSchema }), ctrl.createFeedback);
 
-// Admin side: view feedback list & aggregate scores
-router.get('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.KITCHEN_OWNER), ctrl.listFeedback);
+// Admin side: view feedback list & aggregate scores. Feedback is hotel-global
+// (not kitchen-partitioned), so this is Super Admin only — kitchen owners could
+// previously read all guest feedback and global rating analytics.
+router.get('/', authenticate, authorize(ROLES.SUPER_ADMIN), ctrl.listFeedback);
 
 export default router;

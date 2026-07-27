@@ -46,7 +46,15 @@ export function useAdminKitchens() {
 
 export function useKitchenMutations() {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-kitchens'] });
+  // Invalidate every view that reads a kitchen so a save is reflected everywhere
+  // immediately — the admin list, the owner's own kitchen (settings / operating
+  // hours), and the owner dashboard. Without this, the 30s query cache showed
+  // stale data on return and made saves look like they were lost.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['admin-kitchens'] });
+    qc.invalidateQueries({ queryKey: ['kitchen-self'] });
+    qc.invalidateQueries({ queryKey: ['kitchen-dashboard'] });
+  };
 
   const create = useMutation({
     mutationFn: (input: CreateKitchenInput) => api.post('/kitchens', input),
@@ -61,6 +69,10 @@ export function useKitchenMutations() {
     mutationFn: ({ id, input }: { id: string; input: any }) => api.patch(`/kitchens/${id}`, input),
     onSuccess: invalidate,
   });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.delete(`/kitchens/${id}`),
+    onSuccess: invalidate,
+  });
 
-  return { create, setActive, update };
+  return { create, setActive, update, remove };
 }

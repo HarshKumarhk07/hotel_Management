@@ -107,7 +107,7 @@ export const listBookings = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const createBooking = asyncHandler(async (req: Request, res: Response) => {
-  const { hallId, guestName, phone, email, eventDate, startTime, endTime, guestCount, eventType, menuPreset, paymentStatus } = req.body;
+  const { hallId, guestName, phone, email, eventDate, startTime, endTime, guestCount, eventType, menuPreset } = req.body;
 
   logger.info({
     requestId: req.context?.requestId,
@@ -173,7 +173,9 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
     menuPreset,
     totalPrice,
     status: 'PENDING',
-    paymentStatus: paymentStatus || 'PENDING',
+    // Never trust a client-supplied payment status on the public create path —
+    // payment is only ever marked PAID by the payment/webhook flow.
+    paymentStatus: 'PENDING',
   });
 
   logger.info({

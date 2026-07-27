@@ -4,47 +4,14 @@ import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  BarChart3,
-  Bell,
-  Car,
-  ChefHat,
-  DoorOpen,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  ScrollText,
-  Tag,
-  Ticket,
-  UtensilsCrossed,
-  X,
-  Boxes,
-  Clock,
-  RotateCcw,
-  Settings,
-  Users,
-  Image as ImageIcon,
-  Landmark,
-  Heart,
-  LifeBuoy,
-  Globe,
-  Settings2,
-  Hotel,
-  MessageSquare,
-} from 'lucide-react';
+import { Bell, LogOut, Menu, X } from 'lucide-react';
 import { AdminGate } from './AdminGate';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/auth';
 import { getSocket } from '@/lib/socket';
 import { playNewOrderChime } from '@/lib/sound';
 import { cn } from '@/lib/utils';
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: ReactNode;
-  ready?: boolean;
-}
+import { ADMIN_NAV } from '@/lib/nav';
 
 interface Notif {
   id: string;
@@ -231,51 +198,10 @@ function Shell({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const NAV: NavItem[] = [
-    { href: '/', label: 'Go to Website', icon: <Globe className="h-4 w-4" />, ready: true },
-    { href: '/admin', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" />, ready: true },
-    { href: '/admin/revenue', label: 'Revenue Dashboard', icon: <BarChart3 className="h-4 w-4" />, ready: true },
-    ...(user?.role === 'SUPER_ADMIN' ? [
-      { href: '/admin/kitchens', label: 'Kitchens', icon: <ChefHat className="h-4 w-4" />, ready: true },
-      { href: '/admin/rooms/categories', label: 'Room Categories', icon: <Hotel className="h-4 w-4" />, ready: true },
-      { href: '/admin/rooms', label: 'Rooms & QR', icon: <DoorOpen className="h-4 w-4" />, ready: true },
-      { href: '/admin/housekeeping', label: 'Housekeeping', icon: <Boxes className="h-4 w-4" />, ready: true },
-      { href: '/admin/valet', label: 'Valet Parking', icon: <Car className="h-4 w-4" />, ready: true },
-      { href: '/admin/banquets', label: 'Banquet Halls', icon: <Landmark className="h-4 w-4" />, ready: true },
-      { href: '/admin/restaurant', label: 'Restaurant', icon: <UtensilsCrossed className="h-4 w-4" />, ready: true },
-      { href: '/admin/complaints', label: 'Service Tickets', icon: <LifeBuoy className="h-4 w-4" />, ready: true },
-      { href: '/admin/contact', label: 'Contact Messages', icon: <MessageSquare className="h-4 w-4" />, ready: true },
-      { href: '/admin/guests', label: 'Guests', icon: <Users className="h-4 w-4" />, ready: true },
-      { href: '/admin/feedback', label: 'Guest Feedback', icon: <Heart className="h-4 w-4" />, ready: true },
-    ] : []),
-    { href: '/admin/menu', label: 'Menu', icon: <UtensilsCrossed className="h-4 w-4" />, ready: true },
-    ...(user?.role === 'KITCHEN_OWNER' ? [
-      { href: '/admin/stock', label: 'Stock', icon: <Boxes className="h-4 w-4" />, ready: true },
-    ] : []),
-    { href: '/admin/orders', label: 'Orders', icon: <ScrollText className="h-4 w-4" />, ready: true },
-    { href: '/admin/banners', label: 'Promotions', icon: <ImageIcon className="h-4 w-4" />, ready: true },
-    { href: '/admin/gallery', label: 'Gallery', icon: <ImageIcon className="h-4 w-4" />, ready: true },
-    { href: '/admin/staff', label: 'Staff Management', icon: <Users className="h-4 w-4" />, ready: true },
-    // Super admins reach Banquet Halls directly under Valet Parking above; kitchen
-    // owners keep their existing entry here so no permission changes.
-    ...(user?.role === 'KITCHEN_OWNER' ? [
-      { href: '/admin/banquets', label: 'Banquet Halls', icon: <Landmark className="h-4 w-4" />, ready: true },
-    ] : []),
-    ...(user?.role === 'SUPER_ADMIN' ? [
-      { href: '/admin/coupons', label: 'Coupons', icon: <Ticket className="h-4 w-4" />, ready: true },
-    ] : []),
-    { href: '/admin/analytics', label: 'Analytics', icon: <BarChart3 className="h-4 w-4" />, ready: true },
-    ...(user?.role === 'KITCHEN_OWNER' ? [
-      { href: '/admin/operating-hours', label: 'Operating Hours', icon: <Clock className="h-4 w-4" />, ready: true },
-      { href: '/admin/refunds', label: 'Refunds', icon: <RotateCcw className="h-4 w-4" />, ready: true },
-      { href: '/admin/settings', label: 'Kitchen Settings', icon: <Settings className="h-4 w-4" />, ready: true },
-    ] : []),
-    ...(user?.role === 'SUPER_ADMIN' ? [
-      { href: '/admin/settings', label: 'Global Settings', icon: <Settings2 className="h-4 w-4" />, ready: true },
-      { href: '/admin/audit', label: 'Audit log', icon: <Tag className="h-4 w-4" />, ready: true },
-    ] : []),
-  ];
-
+  // Single source of truth — the Admin portal renders ADMIN_NAV only. There is
+  // no per-role branching here: kitchen owners can never reach this shell (the
+  // AdminGate + edge middleware redirect them to /kitchen).
+  const NAV = ADMIN_NAV;
 
   const onLogout = async () => {
     await logout();
@@ -339,6 +265,7 @@ function Shell({ children }: { children: ReactNode }) {
         <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
           {NAV.map((item) => {
             const active = pathname === item.href;
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
@@ -349,7 +276,7 @@ function Shell({ children }: { children: ReactNode }) {
                   active ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-100',
                 )}
               >
-                {item.icon}
+                <Icon className="h-4 w-4" />
                 {item.label}
               </Link>
             );
@@ -380,19 +307,7 @@ function Shell({ children }: { children: ReactNode }) {
         <nav className="flex-1 space-y-1 px-3 py-2 overflow-y-auto">
           {NAV.map((item) => {
             const active = pathname === item.href;
-            if (!item.ready) {
-              return (
-                <span
-                  key={item.href}
-                  className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-300"
-                  title="Coming soon"
-                >
-                  {item.icon}
-                  {item.label}
-                  <span className="ml-auto text-[10px] uppercase">soon</span>
-                </span>
-              );
-            }
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
@@ -402,7 +317,7 @@ function Shell({ children }: { children: ReactNode }) {
                   active ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-100',
                 )}
               >
-                {item.icon}
+                <Icon className="h-4 w-4" />
                 {item.label}
               </Link>
             );

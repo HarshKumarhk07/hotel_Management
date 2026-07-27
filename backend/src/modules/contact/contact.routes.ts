@@ -12,7 +12,10 @@ const router = Router();
 router.post('/', validate({ body: createContactSchema }), ctrl.createMessage);
 
 // ── Protected Admin Routes ──
-router.use(authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.KITCHEN_OWNER));
+// Contact messages are hotel-global (not kitchen-partitioned), so only Super
+// Admins may read/mutate/delete them. Kitchen owners have no business here and
+// were previously able to read and delete all guests' messages (IDOR).
+router.use(authenticate, authorize(ROLES.SUPER_ADMIN));
 router.get('/', ctrl.listContactMessages);
 router.get('/:id', ctrl.getMessage);
 router.patch('/:id/read', ctrl.markAsRead);

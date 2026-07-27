@@ -43,6 +43,13 @@ export const createKitchenSchema = z.object({
     .optional(),
 });
 
+const holidayTiming = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  open: time.optional(),
+  close: time.optional(),
+  closed: z.boolean().default(false),
+});
+
 export const updateKitchenSchema = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   description: z.string().trim().max(1000).optional(),
@@ -50,6 +57,12 @@ export const updateKitchenSchema = z.object({
   contactPhone: z.string().trim().min(6).max(20).optional(),
   timings,
   settings,
+  // Operational open/closed controls — previously omitted here, so the
+  // Temporarily-Close toggle and the weekly-schedule / holiday overrides
+  // silently never persisted.
+  temporarilyClosed: z.boolean().optional(),
+  weeklySchedule: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+  holidayTimings: z.array(holidayTiming).optional(),
 });
 
 export const listKitchensSchema = paginationSchema.extend({

@@ -43,8 +43,13 @@ router.post('/reservations/:id/verify',   verifyPaymentHandler);
 router.post('/waitlist', validate({ body: joinWaitlistSchema }), waitlistCtrl.join);
 router.get('/waitlist/status', validate({ query: checkWaitlistSchema }), waitlistCtrl.status);
 
-// ─── Staff (admin + kitchen owner) ───────────────────────────────────────────
-const staff = [authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.KITCHEN_OWNER)];
+// ─── Staff (Super Admin only) ────────────────────────────────────────────────
+// Restaurant tables/reservations/waitlist are a hotel-wide front-desk function
+// and are exposed only in the Admin portal. These handlers load resources by id
+// with NO kitchen-ownership scoping, so admitting KITCHEN_OWNER here was a
+// cross-tenant IDOR (an owner could read/mutate any kitchen's tables & QR
+// tokens). Locking to SUPER_ADMIN removes that class of bug entirely.
+const staff = [authenticate, authorize(ROLES.SUPER_ADMIN)];
 
 router.get   ('/tables',                    ...staff, listTablesHandler);
 router.post  ('/tables',                    ...staff, ...createTableHandler);

@@ -45,10 +45,26 @@ async function refreshAccessToken(): Promise<string | null> {
     accessToken = null;
     if (typeof window !== 'undefined') {
       localStorage.removeItem('has_session');
+      document.cookie = 'hm_role=; Path=/; Max-Age=0; SameSite=Lax';
       useAuthStore.getState().setUser(null);
     }
     return null;
   }
+}
+
+/**
+ * Refresh the access token, coalescing concurrent callers onto a single
+ * in-flight request. This is critical because the backend ROTATES refresh
+ * tokens with reuse-detection — two parallel /auth/refresh calls (e.g. the
+ * session bootstrap and a page query that fired before the token was ready)
+ * would race, invalidate each other, and leave the app 401'd. Everyone must go
+ * through this one promise.
+ */
+export function refreshSession(): Promise<string | null> {
+  refreshing ??= refreshAccessToken().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
 }
 
 api.interceptors.response.use(
@@ -60,10 +76,7 @@ api.interceptors.response.use(
     // Attempt a single silent refresh on 401 for non-auth requests.
     if (status === 401 && original && !original._retry && !original.url?.includes('/auth/')) {
       original._retry = true;
-      refreshing ??= refreshAccessToken().finally(() => {
-        refreshing = null;
-      });
-      const token = await refreshing;
+      const token = await refreshSession();
       if (token) {
         original.headers = original.headers ?? {};
         original.headers.Authorization = `Bearer ${token}`;

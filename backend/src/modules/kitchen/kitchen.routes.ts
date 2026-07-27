@@ -44,6 +44,13 @@ router
     authorize(ROLES.SUPER_ADMIN, ROLES.KITCHEN_OWNER),
     validate({ params: kitchenIdParam, body: updateKitchenSchema }),
     ctrl.update,
+  )
+  // Hard delete — Super Admin only. Refuses if the kitchen has orders.
+  .delete(
+    authenticate,
+    authorize(ROLES.SUPER_ADMIN),
+    validate({ params: kitchenIdParam }),
+    ctrl.remove,
   );
 
 // Admin-only activation states

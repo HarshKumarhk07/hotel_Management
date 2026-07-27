@@ -14,8 +14,10 @@ router.post('/', optionalAuthenticate, validate({ body: createComplaintSchema })
 router.get('/my', optionalAuthenticate, ctrl.getGuestComplaints);
 router.get('/eligibility', optionalAuthenticate, ctrl.getServiceEligibility);
 
-// Admin/Staff routes
-router.get('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.KITCHEN_OWNER), ctrl.listComplaints);
-router.patch('/:id', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.KITCHEN_OWNER), validate({ body: updateComplaintSchema }), ctrl.updateComplaint);
+// Admin routes. Complaints are hotel-global (not kitchen-partitioned); only
+// Super Admins may read/triage them. Kitchen owners were previously able to
+// read and re-status every guest's complaint hotel-wide.
+router.get('/', authenticate, authorize(ROLES.SUPER_ADMIN), ctrl.listComplaints);
+router.patch('/:id', authenticate, authorize(ROLES.SUPER_ADMIN), validate({ body: updateComplaintSchema }), ctrl.updateComplaint);
 
 export default router;

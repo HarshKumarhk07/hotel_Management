@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect } from 'react';
-import { api, setAccessToken } from '@/lib/api';
+import { api, setAccessToken, refreshSession } from '@/lib/api';
 import { useAuthStore, type AuthUser } from '@/stores/auth';
+import { setRoleCookie, clearRoleCookie } from '@/lib/session';
 
 interface SessionResponse {
   data: { user: AuthUser; accessToken: string };
@@ -21,17 +22,24 @@ export function useAuth() {
     if (!hasSession) {
       setAccessToken(null);
       setUser(null);
+      clearRoleCookie();
       return;
     }
 
     try {
-      const refresh = await api.post<{ data: { accessToken: string } }>('/auth/refresh');
-      setAccessToken(refresh.data.data.accessToken);
+      // Use the shared, deduped refresh so we never race the axios interceptor's
+      // own refresh (the backend rotates refresh tokens — two in parallel would
+      // invalidate each other and 401 the session).
+      const token = await refreshSession();
+      if (!token) throw new Error('refresh failed');
       const me = await api.get<{ data: { user: AuthUser } }>('/auth/me');
       setUser(me.data.data.user);
+      // Re-mirror the role for the edge middleware after a refresh/deep-link.
+      setRoleCookie(me.data.data.user.role);
     } catch {
       setAccessToken(null);
       setUser(null);
+      clearRoleCookie();
       if (typeof window !== 'undefined') {
         localStorage.removeItem('has_session');
       }
@@ -43,6 +51,7 @@ export function useAuth() {
       const res = await api.post<SessionResponse>('/auth/login', { email, password, secretCode });
       setAccessToken(res.data.data.accessToken);
       setUser(res.data.data.user);
+      setRoleCookie(res.data.data.user.role);
       if (typeof window !== 'undefined') {
         localStorage.setItem('has_session', 'true');
       }
@@ -56,6 +65,7 @@ export function useAuth() {
       const res = await api.post<SessionResponse>('/auth/google', { idToken });
       setAccessToken(res.data.data.accessToken);
       setUser(res.data.data.user);
+      setRoleCookie(res.data.data.user.role);
       if (typeof window !== 'undefined') {
         localStorage.setItem('has_session', 'true');
       }
@@ -77,6 +87,7 @@ export function useAuth() {
     } finally {
       setAccessToken(null);
       setUser(null);
+      clearRoleCookie();
       if (typeof window !== 'undefined') {
         localStorage.removeItem('has_session');
       }

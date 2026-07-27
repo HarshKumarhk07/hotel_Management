@@ -1,6 +1,6 @@
 import { startSession, Types, type FilterQuery } from 'mongoose';
 import { AUTH_PROVIDERS, ROLES } from '@/constants';
-import { Kitchen, User, Order, MenuItem, type IKitchen } from '@/models';
+import { Kitchen, User, Order, MenuItem, Category, type IKitchen } from '@/models';
 import { getPageParams, pageMeta } from '@/utils/pagination';
 import { slugify } from '@/utils/slug';
 import { AppError } from '@/utils/AppError';
@@ -116,6 +116,11 @@ export async function updateKitchen(id: string, input: UpdateKitchenInput) {
   if (input.settings !== undefined) {
     kitchen.settings = { ...kitchen.settings, ...input.settings };
   }
+  if (input.temporarilyClosed !== undefined) kitchen.temporarilyClosed = input.temporarilyClosed;
+  if (input.weeklySchedule !== undefined) kitchen.weeklySchedule = input.weeklySchedule;
+  if (input.holidayTimings !== undefined) {
+    kitchen.holidayTimings = input.holidayTimings as typeof kitchen.holidayTimings;
+  }
   await kitchen.save();
   return kitchen;
 }
@@ -133,6 +138,40 @@ export async function setKitchenActive(id: string, isActive: boolean) {
     await User.updateOne({ _id: kitchen.owner }, { $set: { isActive } });
   }
   return kitchen;
+}
+
+/**
+ * Permanently delete a kitchen and its owned data (menu items, categories, and
+ * the provisioned owner account) in a transaction. Refuses when the kitchen has
+ * any orders — those are financial/audit records and must be preserved, so an
+ * operator should deactivate the kitchen instead of deleting it.
+ */
+export async function deleteKitchen(id: string) {
+  const kitchen = await Kitchen.findById(id);
+  if (!kitchen) throw AppError.notFound('Kitchen not found');
+
+  const orderCount = await Order.countDocuments({ kitchen: kitchen._id });
+  if (orderCount > 0) {
+    throw AppError.conflict(
+      'This kitchen has existing orders and cannot be deleted. Deactivate it instead to preserve records.',
+      'KITCHEN_HAS_ORDERS',
+    );
+  }
+
+  const session = await startSession();
+  try {
+    await session.withTransaction(async () => {
+      await MenuItem.deleteMany({ kitchen: kitchen._id }, { session });
+      await Category.deleteMany({ kitchen: kitchen._id }, { session });
+      if (kitchen.owner) {
+        await User.deleteOne({ _id: kitchen.owner }, { session });
+      }
+      await Kitchen.deleteOne({ _id: kitchen._id }, { session });
+    });
+  } finally {
+    await session.endSession();
+  }
+  return { id };
 }
 
 /** Compute kitchen dashboard analytics and operational overview. */
@@ -157,6 +196,23 @@ export async function getKitchenDashboard(kitchenId: string) {
         totalToday: { $sum: 1 },
         revenueToday: {
           $sum: { $cond: [{ $in: ['$payment.status', ['PAID', 'PARTIALLY_REFUNDED']] }, '$pricing.total', 0] },
+        },
+      },
+    },
+  ]);
+
+  // All-time totals (orders placed + revenue actually collected + delivered).
+  const [lifetimeAgg] = await Order.aggregate([
+    { $match: { kitchen: new Types.ObjectId(kitchenId) } },
+    {
+      $group: {
+        _id: null,
+        totalOrders: { $sum: 1 },
+        totalRevenue: {
+          $sum: { $cond: [{ $in: ['$payment.status', ['PAID', 'PARTIALLY_REFUNDED']] }, '$pricing.total', 0] },
+        },
+        deliveredOrders: {
+          $sum: { $cond: [{ $eq: ['$status', 'DELIVERED'] }, 1, 0] },
         },
       },
     },
@@ -222,6 +278,11 @@ export async function getKitchenDashboard(kitchenId: string) {
     today: {
       ordersCount: countsAgg?.totalToday ?? 0,
       revenue: countsAgg?.revenueToday ?? 0,
+    },
+    lifetime: {
+      totalOrders: lifetimeAgg?.totalOrders ?? 0,
+      totalRevenue: lifetimeAgg?.totalRevenue ?? 0,
+      deliveredOrders: lifetimeAgg?.deliveredOrders ?? 0,
     },
     statusCounts: {
       pending: (activeMap.NEW_ORDER ?? 0) + (activeMap.ACCEPTED ?? 0),

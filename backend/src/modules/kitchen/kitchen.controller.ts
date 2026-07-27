@@ -2,7 +2,7 @@ import type { Request } from 'express';
 import { AUDIT_ACTIONS } from '@/constants';
 import { Kitchen } from '@/models';
 import { asyncHandler } from '@/utils/asyncHandler';
-import { ok, created } from '@/utils/apiResponse';
+import { ok, created, noContent } from '@/utils/apiResponse';
 import { auditFromRequest } from '@/services/audit.service';
 import { assertKitchenAccess } from '@/utils/scope';
 import { AppError } from '@/utils/AppError';
@@ -55,6 +55,17 @@ export const update = asyncHandler(async (req: Request, res) => {
     target: `kitchen:${kitchen._id.toString()}`,
   });
   return ok(res, { kitchen });
+});
+
+export const remove = asyncHandler(async (req: Request, res) => {
+  await service.deleteKitchen(req.params.id);
+  void auditFromRequest(req, {
+    action: AUDIT_ACTIONS.KITCHEN_DELETED,
+    actor: req.auth!.userId,
+    role: req.auth!.role,
+    target: `kitchen:${req.params.id}`,
+  });
+  return noContent(res);
 });
 
 export const activate = asyncHandler(async (req: Request, res) => {
