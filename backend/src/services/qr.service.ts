@@ -15,8 +15,9 @@ export function generateQrToken(): string {
 }
 
 /** The public URL a guest lands on after scanning. */
-export function buildScanUrl(token: string): string {
-  return `${env.APP_URL}/r/${token}`;
+export function buildScanUrl(token: string, baseUrl?: string): string {
+  const base = baseUrl ?? env.APP_URL;
+  return `${base.replace(/\/$/, '')}/r/${token}`;
 }
 
 export interface QrRenderOptions {
@@ -26,8 +27,8 @@ export interface QrRenderOptions {
 }
 
 /** Render the QR for a token as a PNG buffer (for download endpoints). */
-export function renderQrPng(token: string, opts: QrRenderOptions = {}): Promise<Buffer> {
-  return QRCode.toBuffer(buildScanUrl(token), {
+export function renderQrPng(token: string, opts: QrRenderOptions = {}, baseUrl?: string): Promise<Buffer> {
+  return QRCode.toBuffer(buildScanUrl(token, baseUrl), {
     type: 'png',
     width: opts.size ?? 512,
     margin: opts.margin ?? 2,
@@ -36,8 +37,8 @@ export function renderQrPng(token: string, opts: QrRenderOptions = {}): Promise<
 }
 
 /** Render the QR as a base64 data URL (for inline display / JSON responses). */
-export function renderQrDataUrl(token: string, opts: QrRenderOptions = {}): Promise<string> {
-  return QRCode.toDataURL(buildScanUrl(token), {
+export function renderQrDataUrl(token: string, opts: QrRenderOptions = {}, baseUrl?: string): Promise<string> {
+  return QRCode.toDataURL(buildScanUrl(token, baseUrl), {
     width: opts.size ?? 512,
     margin: opts.margin ?? 2,
     errorCorrectionLevel: 'M',
@@ -45,6 +46,6 @@ export function renderQrDataUrl(token: string, opts: QrRenderOptions = {}): Prom
 }
 
 /** Render the QR as crisp, scalable SVG markup. */
-export function renderQrSvg(token: string): Promise<string> {
-  return QRCode.toString(buildScanUrl(token), { type: 'svg', margin: 2 });
+export function renderQrSvg(token: string, baseUrl?: string): Promise<string> {
+  return QRCode.toString(buildScanUrl(token, baseUrl), { type: 'svg', margin: 2 });
 }

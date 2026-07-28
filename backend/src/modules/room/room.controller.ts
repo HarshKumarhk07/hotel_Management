@@ -85,10 +85,11 @@ export const generateQr = asyncHandler(async (req: Request, res) => {
     target: `room:${room._id.toString()}`,
     metadata: { version: room.qr.version },
   });
-  const dataUrl = await renderQrDataUrl(room.qr.token);
+  const baseUrl = req.headers.origin;
+  const dataUrl = await renderQrDataUrl(room.qr.token, {}, baseUrl);
   return ok(res, {
     room,
-    qr: { token: room.qr.token, scanUrl: buildScanUrl(room.qr.token), dataUrl },
+    qr: { token: room.qr.token, scanUrl: buildScanUrl(room.qr.token, baseUrl), dataUrl },
   });
 });
 
@@ -102,20 +103,21 @@ export const downloadQr = asyncHandler(async (req: Request, res: Response) => {
   const format = (req.query.format as string) ?? 'png';
   const size = req.query.size ? Number(req.query.size) : undefined;
   const filename = `room-${room.roomNumber}-qr`;
+  const baseUrl = req.headers.origin;
 
   if (format === 'svg') {
-    const svg = await renderQrSvg(token);
+    const svg = await renderQrSvg(token, baseUrl);
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.svg"`);
     res.send(svg);
     return;
   }
   if (format === 'dataurl') {
-    const dataUrl = await renderQrDataUrl(token, { size });
-    ok(res, { dataUrl, scanUrl: buildScanUrl(token) });
+    const dataUrl = await renderQrDataUrl(token, { size }, baseUrl);
+    ok(res, { dataUrl, scanUrl: buildScanUrl(token, baseUrl) });
     return;
   }
-  const png = await renderQrPng(token, { size });
+  const png = await renderQrPng(token, { size }, baseUrl);
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}.png"`);
   res.send(png);
