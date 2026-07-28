@@ -1,4 +1,4 @@
-import { Cart, Kitchen, MenuItem, Room, type ICart } from '@/models';
+import { Cart, Kitchen, MenuItem, Room, RestaurantTable, type ICart } from '@/models';
 import { computePricing } from '@/services/pricing.service';
 import { isAvailableNow } from '@/utils/availability';
 import { AppError } from '@/utils/AppError';
@@ -22,22 +22,33 @@ async function loadOrderableItem(menuItemId: string, kitchenId?: string) {
 
 export async function addItem(
   customerId: string,
-  input: { room: string; menuItem: string; quantity: number; note?: string },
+  input: { room?: string; table?: string; menuItem: string; quantity: number; note?: string },
 ) {
   const item = await loadOrderableItem(input.menuItem);
   const kitchenId = item.kitchen.toString();
 
-  const room = await Room.findById(input.room);
-  if (!room || !room.isActive) throw AppError.badRequest('Invalid or inactive room', 'ROOM_INVALID');
-  if (room.kitchen && room.kitchen.toString() !== kitchenId) {
-    throw AppError.badRequest('This item is not served to your room', 'ROOM_KITCHEN_MISMATCH');
+  if (input.room) {
+    const room = await Room.findById(input.room);
+    if (!room || !room.isActive) throw AppError.badRequest('Invalid or inactive room', 'ROOM_INVALID');
+    if (room.kitchen && room.kitchen.toString() !== kitchenId) {
+      throw AppError.badRequest('This item is not served to your room', 'ROOM_KITCHEN_MISMATCH');
+    }
+  } else if (input.table) {
+    const table = await RestaurantTable.findById(input.table);
+    if (!table || !table.isActive) throw AppError.badRequest('Invalid or inactive table', 'TABLE_INVALID');
+    if (table.kitchen.toString() !== kitchenId) {
+      throw AppError.badRequest('This item is not served to your table', 'TABLE_KITCHEN_MISMATCH');
+    }
+  } else {
+    throw AppError.badRequest('Room or table is required', 'MISSING_CONTEXT');
   }
 
   let cart = await Cart.findOne({ customer: customerId, kitchen: kitchenId });
   if (!cart) {
-    cart = new Cart({ customer: customerId, kitchen: kitchenId, room: input.room, items: [] });
+    cart = new Cart({ customer: customerId, kitchen: kitchenId, room: input.room, table: input.table, items: [] });
   } else {
     cart.room = input.room as never; // keep cart pinned to the latest scanned room
+    cart.table = input.table as never; // keep cart pinned to the latest scanned table
   }
 
   const existing = cart.items.find((i) => i.menuItem.toString() === input.menuItem);
@@ -151,7 +162,8 @@ export async function buildCartView(cart: ICart) {
     id: cart._id.toString(),
     kitchen: cart.kitchen.toString(),
     kitchenName: kitchen?.name,
-    room: cart.room.toString(),
+    room: cart.room?.toString(),
+    table: cart.table?.toString(),
     customerNote: cart.customerNote,
     lines,
     hasUnavailable: lines.some((l) => !l.available),

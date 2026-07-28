@@ -19,14 +19,18 @@ interface CartState {
   kitchenName?: string;
   roomId?: string;
   roomNumber?: string;
+  tableId?: string;
+  tableNumber?: string;
   serviceChargePercent: number;
   lines: CartLine[];
 
   setContext: (ctx: {
     kitchenId: string;
     kitchenName: string;
-    roomId: string;
-    roomNumber: string;
+    roomId?: string;
+    roomNumber?: string;
+    tableId?: string;
+    tableNumber?: string;
     serviceChargePercent: number;
   }) => void;
   add: (item: PublicMenuItem, qty?: number) => void;

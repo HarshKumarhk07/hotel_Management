@@ -24,6 +24,8 @@ function KitchenMenuInner() {
   const search = useSearchParams();
   const roomId = search.get('room') ?? undefined;
   const roomNumber = search.get('rno') ?? undefined;
+  const tableId = search.get('table') ?? undefined;
+  const tableNumber = search.get('tno') ?? undefined;
 
   const { data: menu, isLoading, isError, refetch } = useMenu(kitchenId);
   const { data: bannersRes } = useQuery<{ data: { banners: any[] } }>({
@@ -44,18 +46,20 @@ function KitchenMenuInner() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [dietaryFilter, setDietaryFilter] = useState<'ALL' | 'VEG' | 'NON_VEG'>('ALL');
 
-  // Pin the cart to this kitchen + room once the menu (with settings) loads.
+  // Pin the cart to this kitchen + room/table once the menu (with settings) loads.
   useEffect(() => {
-    if (menu && roomId && roomNumber) {
+    if (menu && (roomId || tableId)) {
       setContext({
         kitchenId: menu.kitchen.id,
         kitchenName: menu.kitchen.name,
         roomId,
         roomNumber,
+        tableId,
+        tableNumber,
         serviceChargePercent: menu.kitchen.settings?.serviceChargePercent ?? 0,
       });
     }
-  }, [menu, roomId, roomNumber, setContext]);
+  }, [menu, roomId, roomNumber, tableId, tableNumber, setContext]);
 
   const categories = useMemo(() => menu?.categories ?? [], [menu]);
 
@@ -93,6 +97,8 @@ function KitchenMenuInner() {
             <h1 className="text-xl font-bold text-zinc-900">{menu ? menu.kitchen.name : 'Loading...'}</h1>
             {roomNumber ? (
               <p className="text-xs text-zinc-500 mt-0.5">Delivering to Room {roomNumber}</p>
+            ) : tableNumber ? (
+              <p className="text-xs text-zinc-500 mt-0.5">Ordering for Table {tableNumber}</p>
             ) : null}
           </div>
 

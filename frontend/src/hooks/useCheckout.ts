@@ -26,13 +26,14 @@ export function useCheckout() {
   const user = useAuthStore((s) => s.user);
 
   const syncServerCart = useCallback(async () => {
-    if (!cart.kitchenId || !cart.roomId) throw new Error('Missing room/kitchen context');
+    if (!cart.kitchenId || (!cart.roomId && !cart.tableId)) throw new Error('Missing room/table context');
     // Start clean so quantities are exact (idempotent re-checkout).
     await api.delete(`/cart/${cart.kitchenId}`).catch(() => undefined);
     for (const line of cart.lines) {
       // eslint-disable-next-line no-await-in-loop
       await api.post('/cart/items', {
         room: cart.roomId,
+        table: cart.tableId,
         menuItem: line.menuItem,
         quantity: line.quantity,
         note: line.note,
@@ -116,13 +117,14 @@ export function useCheckout() {
       couponCode?: string;
       customerNote?: string;
     }) => {
-      if (!cart.kitchenId || !cart.roomId) throw new Error('Missing room/kitchen context');
+      if (!cart.kitchenId || (!cart.roomId && !cart.tableId)) throw new Error('Missing room/table context');
 
       const res = await api.post<{ data: { order: PlacedOrder; guestAccessToken: string } }>(
         '/orders/guest-checkout',
         {
           kitchen: cart.kitchenId,
           room: cart.roomId,
+          table: cart.tableId,
           items: cart.lines.map((l) => ({ menuItem: l.menuItem, quantity: l.quantity, note: l.note })),
           guest: opts.guest,
           paymentMethod: opts.paymentMethod,

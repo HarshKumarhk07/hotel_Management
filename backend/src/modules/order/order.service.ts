@@ -17,6 +17,7 @@ import {
   MenuItem,
   Order,
   Room,
+  RestaurantTable,
   type IOrder,
   type IOrderItem,
 } from '@/models';
@@ -86,8 +87,17 @@ export async function checkout(
   }
   assertPaymentMethodAllowed(input.paymentMethod, kitchen);
 
-  const room = await Room.findById(cart.room);
-  if (!room || !room.isActive) throw AppError.badRequest('Room is no longer active', 'ROOM_INVALID');
+  let room;
+  let table;
+  if (cart.room) {
+    room = await Room.findById(cart.room);
+    if (!room || !room.isActive) throw AppError.badRequest('Room is no longer active', 'ROOM_INVALID');
+  } else if (cart.table) {
+    table = await RestaurantTable.findById(cart.table);
+    if (!table || !table.isActive) throw AppError.badRequest('Table is no longer active', 'TABLE_INVALID');
+  } else {
+    throw AppError.badRequest('Cart is missing room or table context', 'CONTEXT_INVALID');
+  }
 
   // Re-validate every line against the live menu (stock/availability/price).
   const menuItems = await MenuItem.find({ _id: { $in: cart.items.map((i) => i.menuItem) } });
@@ -157,8 +167,10 @@ export async function checkout(
       order = await Order.create({
         orderNumber: generateOrderNumber(),
         kitchen: kitchen._id,
-        room: room._id,
-        roomSnapshot: { roomNumber: room.roomNumber, floor: room.floor },
+        room: room?._id,
+        roomSnapshot: room ? { roomNumber: room.roomNumber, floor: room.floor } : undefined,
+        table: table?._id,
+        tableSnapshot: table ? { number: table.number, section: table.section } : undefined,
         customer: customerId,
         items: pricing.items,
         pricing: { ...pricing, currency: 'INR' },
@@ -196,7 +208,7 @@ export async function checkout(
   void recordAudit({
     action: AUDIT_ACTIONS.ORDER_PLACED,
     actor: customerId,
-    metadata: { orderId: order._id, kitchenId: kitchen._id, roomNumber: room.roomNumber }
+    metadata: { orderId: order._id, kitchenId: kitchen._id, roomNumber: room?.roomNumber, tableNumber: table?.number }
   });
 
   // Record the coupon redemption (drives per-user limits).
@@ -241,7 +253,8 @@ export async function checkout(
 // ─────────────────────────────────────────────────────────────────────────────
 export interface GuestCheckoutInput {
   kitchen: string;
-  room: string;
+  room?: string;
+  table?: string;
   items: { menuItem: string; quantity: number; note?: string }[];
   guest: { name: string; email: string; phone: string };
   paymentMethod: PaymentMethod;
@@ -262,10 +275,22 @@ export async function guestCheckout(
   }
   assertPaymentMethodAllowed(input.paymentMethod, kitchen);
 
-  const room = await Room.findById(input.room);
-  if (!room || !room.isActive) throw AppError.badRequest('Room is no longer active', 'ROOM_INVALID');
-  if (room.kitchen && room.kitchen.toString() !== kitchen._id.toString()) {
-    throw AppError.badRequest('This room is not served by that kitchen', 'ROOM_KITCHEN_MISMATCH');
+  let room;
+  let table;
+  if (input.room) {
+    room = await Room.findById(input.room);
+    if (!room || !room.isActive) throw AppError.badRequest('Room is no longer active', 'ROOM_INVALID');
+    if (room.kitchen && room.kitchen.toString() !== kitchen._id.toString()) {
+      throw AppError.badRequest('This room is not served by that kitchen', 'ROOM_KITCHEN_MISMATCH');
+    }
+  } else if (input.table) {
+    table = await RestaurantTable.findById(input.table);
+    if (!table || !table.isActive) throw AppError.badRequest('Table is no longer active', 'TABLE_INVALID');
+    if (table.kitchen.toString() !== kitchen._id.toString()) {
+      throw AppError.badRequest('This table is not served by that kitchen', 'TABLE_KITCHEN_MISMATCH');
+    }
+  } else {
+    throw AppError.badRequest('Missing room or table context', 'CONTEXT_INVALID');
   }
 
   // Re-validate every requested line against the live menu (server price authority).
@@ -331,8 +356,10 @@ export async function guestCheckout(
       order = await Order.create({
         orderNumber: generateOrderNumber(),
         kitchen: kitchen._id,
-        room: room._id,
-        roomSnapshot: { roomNumber: room.roomNumber, floor: room.floor },
+        room: room?._id,
+        roomSnapshot: room ? { roomNumber: room.roomNumber, floor: room.floor } : undefined,
+        table: table?._id,
+        tableSnapshot: table ? { number: table.number, section: table.section } : undefined,
         guestInfo: {
           name: input.guest.name,
           email,
@@ -370,7 +397,7 @@ export async function guestCheckout(
   void recordAudit({
     action: AUDIT_ACTIONS.GUEST_ORDER_PLACED,
     actor: undefined,
-    metadata: { orderId: order._id, kitchenId: kitchen._id, roomNumber: room.roomNumber }
+    metadata: { orderId: order._id, kitchenId: kitchen._id, roomNumber: room?.roomNumber, tableNumber: table?.number }
   });
 
   // Decrement stock for the ordered items.

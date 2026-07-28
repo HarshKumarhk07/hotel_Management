@@ -16,7 +16,8 @@ export interface ICart extends Document {
   _id: Types.ObjectId;
   customer: Types.ObjectId;
   kitchen: Types.ObjectId;
-  room: Types.ObjectId;
+  room?: Types.ObjectId;
+  table?: Types.ObjectId;
   items: ICartItem[];
   customerNote?: string;
   createdAt: Date;
@@ -27,7 +28,8 @@ const cartSchema = new Schema<ICart>(
   {
     customer: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     kitchen: { type: Schema.Types.ObjectId, ref: 'Kitchen', required: true },
-    room: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
+    room: { type: Schema.Types.ObjectId, ref: 'Room', sparse: true },
+    table: { type: Schema.Types.ObjectId, ref: 'RestaurantTable', sparse: true },
     items: [
       {
         menuItem: { type: Schema.Types.ObjectId, ref: 'MenuItem', required: true },

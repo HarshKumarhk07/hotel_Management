@@ -20,7 +20,8 @@ export const orderIdParam = z.object({ id: objectId });
 /** Guest checkout — items come in the request (no server cart); contact required. */
 export const guestCheckoutSchema = z.object({
   kitchen: objectId,
-  room: objectId,
+  room: objectId.optional(),
+  table: objectId.optional(),
   items: z
     .array(
       z.object({
@@ -46,6 +47,9 @@ export const guestCheckoutSchema = z.object({
   ]),
   customerNote: z.string().trim().max(500).optional(),
   couponCode: z.string().trim().min(3).max(30).optional(),
+}).refine(data => data.room || data.table, {
+  message: "Either room or table must be provided",
+  path: ["room", "table"]
 });
 
 /** Opaque guest access token (hex from a 32-byte secret = 64 chars). */

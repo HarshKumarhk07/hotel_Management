@@ -59,12 +59,12 @@ function CheckoutInner() {
     );
   }
 
-  if (!cart.roomId) {
+  if (!cart.roomId && !cart.tableId) {
     return (
       <div className="mx-auto max-w-xl w-full px-4 py-12 text-center">
         <EmptyState
-          title="Room not scanned"
-          description="In-room dining orders require a room number for delivery. Please scan the QR code in your room to continue."
+          title="Context missing"
+          description="Orders require a scanned QR code (Room or Table) to proceed. Please scan a QR code to continue."
         />
         <Link href="/" className="mt-4 mx-auto block w-fit text-sm font-semibold text-brand hover:underline">
           Scan QR Code
@@ -146,6 +146,8 @@ function CheckoutInner() {
       <div className="space-y-4 p-4">
         {cart.roomNumber ? (
           <p className="text-sm text-zinc-500">Delivering to Room {cart.roomNumber}</p>
+        ) : cart.tableNumber ? (
+          <p className="text-sm text-zinc-500">Ordering for Table {cart.tableNumber}</p>
         ) : null}
 
         {/* Items */}
