@@ -302,8 +302,10 @@ export async function resolveScan(token: string) {
   // Find the active booking for this room
   const activeBooking = await RoomBooking.findOne({
     room: room._id,
-    status: { $in: ['PENDING', 'CONFIRMED', 'CHECKED_IN'] },
-    checkOutDate: { $gte: new Date() },
+    $or: [
+      { status: 'CHECKED_IN' },
+      { status: { $in: ['PENDING', 'CONFIRMED'] }, checkOutDate: { $gte: new Date() } },
+    ],
   }).sort({ checkInDate: 1 });
 
   if (!activeBooking) {

@@ -2,9 +2,8 @@ import { redirect } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { ApiSuccess, ScanResolution } from '@/lib/types';
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
-
+const envApiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+const API = envApiUrl.endsWith('/api/v1') ? envApiUrl : `${envApiUrl.replace(/\/$/, '')}/api/v1`;
 /**
  * QR landing route. The printed code points here (`/r/<token>`). We resolve the
  * token to a room + kitchen server-side, then forward to that kitchen's menu
@@ -35,6 +34,14 @@ export default async function ScanPage({ params }: { params: Promise<{ token: st
     const { room, kitchen } = resolution;
     redirect(`/k/${kitchen._id}?room=${room.id}&rno=${encodeURIComponent(room.roomNumber)}`);
   }
+  let errorTitle = 'QR code not available';
+  if (errorMessage?.toLowerCase().includes('reservation')) {
+    errorTitle = 'No active reservation';
+  } else if (errorMessage?.toLowerCase().includes('unavailable')) {
+    errorTitle = 'Room unavailable';
+  } else if (errorMessage?.toLowerCase().includes('disabled')) {
+    errorTitle = 'QR code disabled';
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
@@ -42,7 +49,7 @@ export default async function ScanPage({ params }: { params: Promise<{ token: st
         <AlertTriangle className="h-8 w-8" />
       </div>
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-zinc-900">QR code not available</h1>
+        <h1 className="text-lg font-semibold text-zinc-900">{errorTitle}</h1>
         <p className="text-sm text-zinc-500">{errorMessage ?? 'This code is no longer active.'}</p>
       </div>
       <Link href="/" className="text-sm font-semibold text-brand">

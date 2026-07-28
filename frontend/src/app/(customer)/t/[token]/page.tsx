@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { AlertTriangle, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api/v1";
-
+const envApiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+const API = envApiUrl.endsWith('/api/v1') ? envApiUrl : `${envApiUrl.replace(/\/$/, '')}/api/v1`;
 export default async function TableScanPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   let resolution = null;
