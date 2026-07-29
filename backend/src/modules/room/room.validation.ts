@@ -109,7 +109,7 @@ export const createBookingSchema = z.object({
     })
     .optional(),
   couponCode: z.string().trim().max(40).optional(),
-  paymentMethod: z.enum(['RAZORPAY', 'CASH']).optional(),
+  paymentMethod: z.enum(['RAZORPAY', 'CASH', 'PAY_AT_CHECKOUT']).optional(),
 });
 
 export const cancelBookingSchema = z.object({
@@ -125,6 +125,7 @@ export const recordPaymentSchema = z.object({
   status: z.enum(['PAID', 'PENDING']),
   method: z.string().trim().max(40).optional(),
   reference: z.string().trim().max(120).optional(),
+  note: z.string().trim().max(1000).optional(),
 });
 
 export const migrateCategorySchema = z.object({

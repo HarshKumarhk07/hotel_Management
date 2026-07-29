@@ -47,6 +47,6 @@ export const couponIdParam = z.object({ id: objectId });
 
 export const validateCouponSchema = z.object({
   code: z.string().trim().min(3).max(30),
-  kitchen: objectId,
+  kitchen: objectId.optional(),
   subtotal: z.coerce.number().min(0),
 });

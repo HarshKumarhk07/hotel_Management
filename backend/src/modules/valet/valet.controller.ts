@@ -101,12 +101,28 @@ export const requestByToken = asyncHandler(async (req: Request, res: Response) =
 
 export const list = asyncHandler(async (req: Request, res: Response) => {
   const activeOnly = req.query.activeOnly === 'true';
-  const status = req.query.status ? (req.query.status as ValetStatus) : undefined;
-  const search = req.query.search ? (req.query.search as string) : undefined;
+  const status = req.query.status as string | undefined;
+  const search = req.query.search as string | undefined;
   const page = req.query.page ? Number(req.query.page) : undefined;
   const limit = req.query.limit ? Number(req.query.limit) : undefined;
+  
+  const fromDate = req.query.fromDate as string | undefined;
+  const toDate = req.query.toDate as string | undefined;
+  const bookingStatus = req.query.bookingStatus as string | undefined;
+  const paymentStatus = req.query.paymentStatus as string | undefined;
+  const assignedValet = req.query.assignedValet as string | undefined;
+  const customerName = req.query.customerName as string | undefined;
+  const bookingId = req.query.bookingId as string | undefined;
+  const carNumber = req.query.carNumber as string | undefined;
+  const vehicleType = req.query.vehicleType as string | undefined;
+  const property = req.query.property as string | undefined;
 
-  const result = await valetService.listVehicles({ page, limit, status, search, activeOnly });
+  const result = await valetService.listVehicles({
+    page, limit, status, search, activeOnly,
+    fromDate, toDate, bookingStatus, paymentStatus,
+    assignedValet, customerName, bookingId,
+    carNumber, vehicleType, property
+  });
   return ok(res, result);
 });
 

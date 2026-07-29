@@ -23,6 +23,7 @@ import {
   type AdminRoom,
   type RoomBookingInfo,
 } from '@/hooks/useAdminRooms';
+import { PaymentManagementDialog } from '@/components/admin/PaymentManagementDialog';
 import { api, apiErrorMessage } from '@/lib/api';
 import { downloadAuthed } from '@/lib/download';
 import { formatDate } from '@/lib/utils';
@@ -414,6 +415,7 @@ function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }
     markRefundProcessed,
   } = useBookingMutations();
   const [transferBooking, setTransferBooking] = useState<RoomBookingInfo | null>(null);
+  const [managePaymentBookingId, setManagePaymentBookingId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     description: string;
@@ -516,29 +518,14 @@ function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }
 
             <div className="flex flex-wrap gap-2">
               {/* Settlement is always an explicit action — never implied by check-in. */}
-              {booking.status !== 'CANCELLED' && booking.paymentStatus !== 'PAID' && (
+              {booking.status !== 'CANCELLED' && (
                 <Button
                   size="sm"
-                  className="bg-emerald-700 hover:bg-emerald-800"
-                  onClick={() => {
-                    setConfirmDialog({
-                      title: 'Confirm Payment',
-                      description: `Record ₹${booking.totalPrice} as received from ${booking.guestName}?`,
-                      confirmText: 'Record Payment',
-                      onConfirm: () => {
-                        recordPayment.mutate(
-                          { id: booking._id, status: 'PAID' },
-                          {
-                            onSuccess: () => toast.success('Payment recorded. Revenue and guest email updated.'),
-                            onError: (err) => toast.error(apiErrorMessage(err, 'Failed to record payment')),
-                          },
-                        );
-                      }
-                    });
-                  }}
-                  disabled={recordPayment.isPending}
+                  variant="outline"
+                  className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                  onClick={() => setManagePaymentBookingId(booking._id)}
                 >
-                  Mark Payment Received
+                  Manage Payment
                 </Button>
               )}
 
@@ -689,11 +676,18 @@ function BookingsList({ onViewInvoice }: { onViewInvoice: (id: string) => void }
       {confirmDialog && (
         <ConfirmDialog
           open={!!confirmDialog}
-          onClose={() => setConfirmDialog(null)}
           title={confirmDialog.title}
           description={confirmDialog.description}
           confirmText={confirmDialog.confirmText}
           onConfirm={confirmDialog.onConfirm}
+          onClose={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {managePaymentBookingId && (
+        <PaymentManagementDialog 
+          bookingId={managePaymentBookingId} 
+          onClose={() => setManagePaymentBookingId(null)} 
         />
       )}
     </div>

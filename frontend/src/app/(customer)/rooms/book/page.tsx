@@ -83,7 +83,7 @@ function BookRoomInner() {
 
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'CASH'>('RAZORPAY');
+  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'PAY_AT_CHECKOUT'>('RAZORPAY');
 
   // Fetch room details
   const { data: room, isLoading } = useQuery<RoomDetail>({
@@ -126,7 +126,7 @@ function BookRoomInner() {
     mutationFn: async (code: string) => {
       const res = await api.post<{ data: { discount: number } }>('/coupons/validate', {
         code,
-        kitchenId: room?.kitchen || 'room-billing',
+        ...(room?.kitchen && { kitchen: room.kitchen }),
         subtotal: subtotal,
       });
       return res.data.data;
@@ -241,7 +241,7 @@ function BookRoomInner() {
 
       const booking = bookingRes.data.data.booking;
 
-      if (paymentMethod === 'CASH') {
+      if (paymentMethod === 'PAY_AT_CHECKOUT') {
         router.push(`/rooms/confirm/${booking._id}`);
         return;
       }
@@ -249,6 +249,7 @@ function BookRoomInner() {
       // 2. Load Razorpay
       const razorpayLoaded = await loadRazorpay();
       if (!razorpayLoaded) {
+        await api.post(`/rooms/bookings/${booking._id}/cancel-pending`).catch(() => {});
         throw new Error('Razorpay Checkout failed to load. Please verify your internet connection.');
       }
 
@@ -289,6 +290,8 @@ function BookRoomInner() {
         },
         modal: {
           ondismiss: () => {
+            // Free the room inventory immediately
+            api.post(`/rooms/bookings/${booking._id}/cancel-pending`).catch(console.error);
             setPaymentError('Payment window was closed by the user.');
             setSubmitting(false);
           },
@@ -553,15 +556,15 @@ function BookRoomInner() {
                   <span className="text-[10px] text-zinc-400 text-center">Instant confirmation via Razorpay checkout</span>
                 </div>
                 <div
-                  onClick={() => setPaymentMethod('CASH')}
+                  onClick={() => setPaymentMethod('PAY_AT_CHECKOUT')}
                   className={`border-2 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${
-                    paymentMethod === 'CASH'
+                    paymentMethod === 'PAY_AT_CHECKOUT'
                       ? 'border-[#D4AF37] bg-amber-50/20'
                       : 'border-zinc-200 hover:border-zinc-300 bg-white'
                   }`}
                 >
-                  <span className="text-xs font-bold text-zinc-800">Pay at Hotel</span>
-                  <span className="text-[10px] text-zinc-400 text-center">Settle bill at hotel counter during check-in</span>
+                  <span className="text-xs font-bold text-zinc-800">Pay at Checkout</span>
+                  <span className="text-[10px] text-zinc-400 text-center">Settle bill at hotel counter during checkout</span>
                 </div>
               </div>
             </Card>
@@ -572,11 +575,11 @@ function BookRoomInner() {
               className="w-full bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl py-3.5 font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg"
             >
               {submitting
-                ? paymentMethod === 'CASH'
+                ? paymentMethod === 'PAY_AT_CHECKOUT'
                   ? 'Confirming Stay…'
                   : 'Initiating Razorpay Settle…'
-                : paymentMethod === 'CASH'
-                ? 'Confirm Reservation (Pay at Hotel)'
+                : paymentMethod === 'PAY_AT_CHECKOUT'
+                ? 'Confirm Reservation (Pay at Checkout)'
                 : 'Secure Booking Payment & Confirm'}{' '}
               <ArrowRight className="h-5 w-5" />
             </Button>

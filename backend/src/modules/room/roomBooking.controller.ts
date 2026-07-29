@@ -74,6 +74,12 @@ export const setRoomStatus = asyncHandler(async (req: Request, res) => {
   return ok(res, { room });
 });
 
+export const cancelPending = asyncHandler(async (req: Request, res) => {
+  const { id } = req.params;
+  await service.cancelPendingBooking(id);
+  return ok(res, { message: 'Booking cancelled' });
+});
+
 export const getBookingInvoice = asyncHandler(async (req: Request, res) => {
   const { id } = req.params;
   const invoiceData = await service.getBookingInvoiceData(id);
@@ -143,7 +149,7 @@ export const markTransferRefundProcessed = asyncHandler(async (req: Request, res
 export const recordPayment = asyncHandler(async (req: Request, res) => {
   const booking = await service.recordBookingPayment(
     req.params.id,
-    { status: req.body.status, method: req.body.method, reference: req.body.reference },
+    { status: req.body.status, method: req.body.method, reference: req.body.reference, note: req.body.note },
     staffActor(req),
   );
   return ok(res, { booking });

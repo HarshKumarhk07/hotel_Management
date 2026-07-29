@@ -369,26 +369,90 @@ export async function resolveRoomGuest(token: string) {
 export async function listVehicles(query: {
   page?: number;
   limit?: number;
-  status?: ValetStatus;
+  status?: ValetStatus | string;
   search?: string;
   activeOnly?: boolean;
+  fromDate?: string;
+  toDate?: string;
+  bookingStatus?: string;
+  paymentStatus?: string;
+  assignedValet?: string;
+  customerName?: string;
+  bookingId?: string;
+  carNumber?: string;
+  vehicleType?: string;
+  property?: string;
 }) {
   const { page, limit, skip } = getPageParams(query);
   const filter: FilterQuery<IVehicle> = {};
 
-  if (query.status) {
-    filter.status = query.status;
+  if (query.status && query.status !== 'all') {
+    // Check if multiple statuses are passed (comma-separated or array)
+    if (typeof query.status === 'string' && query.status.includes(',')) {
+      filter.status = { $in: query.status.split(',') as ValetStatus[] };
+    } else {
+      filter.status = query.status as ValetStatus;
+    }
   } else if (query.activeOnly) {
     filter.status = { $in: ['PARKED', 'REQUESTED', 'BRINGING', 'READY'] };
   }
 
+  // Date Range Filtering
+  if (query.fromDate || query.toDate) {
+    filter.checkedInAt = {};
+    if (query.fromDate) {
+      filter.checkedInAt.$gte = new Date(query.fromDate);
+    }
+    if (query.toDate) {
+      filter.checkedInAt.$lte = new Date(query.toDate);
+    }
+  }
+
+  // Exact Match Filters
+  if (query.bookingStatus && query.bookingStatus !== 'all') {
+    filter.bookingStatus = query.bookingStatus;
+  }
+  if (query.paymentStatus && query.paymentStatus !== 'all') {
+    filter.paymentStatus = query.paymentStatus;
+  }
+  if (query.assignedValet && query.assignedValet !== 'all') {
+    filter.assignedValet = query.assignedValet;
+  }
+  if (query.bookingId) {
+    filter.bookingId = query.bookingId;
+  }
+  if (query.property && query.property !== 'all') {
+    filter.property = query.property;
+  }
+
+  // Specific Search Fields
+  if (query.customerName) {
+    filter['guestInfo.name'] = { $regex: query.customerName, $options: 'i' };
+  }
+  if (query.carNumber) {
+    filter.carNumber = { $regex: query.carNumber.replace(/\s+/g, ''), $options: 'i' };
+  }
+  if (query.vehicleType) {
+    const vehicleTypeRegex = { $regex: query.vehicleType, $options: 'i' };
+    filter.$or = filter.$or || [];
+    filter.$or.push({ brand: vehicleTypeRegex }, { model: vehicleTypeRegex });
+  }
+
+  // Global Search
   if (query.search) {
     const searchRegex = { $regex: query.search, $options: 'i' };
-    filter.$or = [
+    const searchOr = [
       { carNumber: searchRegex },
       { 'guestInfo.name': searchRegex },
       { 'guestInfo.roomNumber': searchRegex }
     ];
+    
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: searchOr }];
+      delete filter.$or;
+    } else {
+      filter.$or = searchOr;
+    }
   }
 
   const [items, total] = await Promise.all([

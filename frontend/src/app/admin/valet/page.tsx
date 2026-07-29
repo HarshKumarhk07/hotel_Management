@@ -28,8 +28,9 @@ import { Badge, Card, CenteredSpinner } from '@/components/ui/primitives';
 import { api, apiErrorMessage } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { toast } from 'sonner';
+import { ValetFilters, ValetFilterState } from '@/components/valet/ValetFilters';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -423,6 +424,36 @@ function ValetManagementContent() {
 
   const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0]);
 
+  // Tab State
+  const [adminTab, setAdminTab] = useState<'managers' | 'vehicles'>('managers');
+
+  // Vehicles List State
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [vehicleFilters, setVehicleFilters] = useState<ValetFilterState>({});
+  const [vehiclePage, setVehiclePage] = useState(1);
+  const [vehicleLimit] = useState(20);
+  const [vehicleSearch, setVehicleSearch] = useState('');
+
+  // Fetch Vehicles
+  const { data: vehiclesData, isLoading: vehiclesLoading } = useQuery({
+    queryKey: ['admin-valet-vehicles', vehiclePage, vehicleFilters, vehicleSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append('page', vehiclePage.toString());
+      params.append('limit', vehicleLimit.toString());
+      
+      if (vehicleSearch) params.append('search', vehicleSearch);
+      
+      Object.entries(vehicleFilters).forEach(([k, v]) => {
+        if (v) params.append(k, v);
+      });
+
+      const res = await api.get(`/valet/admin/vehicles?${params.toString()}`);
+      return res.data.data;
+    },
+    enabled: status === 'authenticated' && adminTab === 'vehicles'
+  });
+
   const handleDownloadReport = async (format: 'pdf' | 'xlsx') => {
     try {
       const res = await api.get('/valet/reports/export', {
@@ -600,9 +631,29 @@ function ValetManagementContent() {
         </div>
       </Card>
 
-      {/* Managers Table & Activity Feed */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Managers Table (2/3 width) */}
+      {/* Tabs */}
+      <div className="flex items-center gap-4 border-b border-zinc-200">
+        <button
+          onClick={() => setAdminTab('managers')}
+          className={`pb-3 text-sm font-bold transition-colors border-b-2 ${
+            adminTab === 'managers' ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-transparent text-zinc-500 hover:text-zinc-700'
+          }`}
+        >
+          Valet Managers
+        </button>
+        <button
+          onClick={() => setAdminTab('vehicles')}
+          className={`pb-3 text-sm font-bold transition-colors border-b-2 ${
+            adminTab === 'vehicles' ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-transparent text-zinc-500 hover:text-zinc-700'
+          }`}
+        >
+          Vehicle Logs
+        </button>
+      </div>
+
+      {adminTab === 'managers' && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Managers Table (2/3 width) */}
         <div className="lg:col-span-2 space-y-4">
           {/* Filters */}
           <Card className="p-4">
@@ -756,6 +807,119 @@ function ValetManagementContent() {
         {/* Activity Feed (1/3 width) */}
         <ActivityFeed />
       </div>
+      )}
+
+      {adminTab === 'vehicles' && (
+        <div className="space-y-4 relative">
+          <div className="flex flex-col sm:flex-row justify-between gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                value={vehicleSearch}
+                onChange={(e) => {
+                  setVehicleSearch(e.target.value);
+                  setVehiclePage(1);
+                }}
+                placeholder="Search car, guest, room..."
+                className="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]"
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setIsFilterOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Filter className="h-4 w-4" /> Filters
+              {Object.values(vehicleFilters).filter(v => v !== undefined && v !== '').length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#D4AF37] text-[10px] font-bold text-white">
+                  {Object.values(vehicleFilters).filter(v => v !== undefined && v !== '').length}
+                </span>
+              )}
+            </Button>
+          </div>
+
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-40">
+            <div className="h-full w-full pointer-events-auto">
+              <ValetFilters 
+                isOpen={isFilterOpen}
+                setIsOpen={setIsFilterOpen}
+                filters={vehicleFilters}
+                onFilterChange={(f) => {
+                  setVehicleFilters(f);
+                  setVehiclePage(1);
+                }}
+              />
+            </div>
+          </div>
+
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b bg-zinc-50">
+                  <tr className="text-xs uppercase tracking-wide text-zinc-500 font-bold">
+                    <th className="px-4 py-3">Car Plate</th>
+                    <th className="px-4 py-3">Guest</th>
+                    <th className="px-4 py-3">Room</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Slot</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {vehiclesLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12 text-center text-zinc-500">Loading vehicles...</td>
+                    </tr>
+                  ) : !vehiclesData?.items || vehiclesData.items.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12 text-center text-zinc-500">No vehicles found matching filters.</td>
+                    </tr>
+                  ) : (
+                    vehiclesData.items.map((v: any) => (
+                      <tr key={v._id} className="hover:bg-zinc-50">
+                        <td className="px-4 py-3 font-bold text-zinc-900 uppercase">{v.carNumber}</td>
+                        <td className="px-4 py-3">{v.guestInfo?.name}</td>
+                        <td className="px-4 py-3">{v.guestInfo?.roomNumber}</td>
+                        <td className="px-4 py-3 text-zinc-500">{new Date(v.checkedInAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-3">
+                          <Badge className="bg-zinc-100 text-zinc-600">{v.status}</Badge>
+                        </td>
+                        <td className="px-4 py-3 font-semibold">{v.parkingSlot}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {vehiclesData?.meta && vehiclesData.meta.total > vehicleLimit && (
+              <div className="flex items-center justify-between border-t border-zinc-100 p-4 text-sm bg-zinc-50">
+                <div className="text-zinc-500">
+                  Total {vehiclesData.meta.total} vehicles
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setVehiclePage(p => Math.max(1, p - 1))}
+                    disabled={vehiclePage === 1}
+                    className="p-1 rounded hover:bg-zinc-200 disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="font-semibold px-2">Page {vehiclePage}</span>
+                  <button
+                    onClick={() => setVehiclePage(p => p + 1)}
+                    disabled={vehiclePage * vehicleLimit >= vehiclesData.meta.total}
+                    className="p-1 rounded hover:bg-zinc-200 disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
       {/* ── Modals ── */}
 

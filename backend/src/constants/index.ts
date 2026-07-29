@@ -246,6 +246,7 @@ export const PAYMENT_METHODS = {
   COD: 'COD',
   ROOM_BILLING: 'ROOM_BILLING',
   TABLE_BILLING: 'TABLE_BILLING',
+  PAY_AT_CHECKOUT: 'PAY_AT_CHECKOUT',
 } as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[keyof typeof PAYMENT_METHODS];
 

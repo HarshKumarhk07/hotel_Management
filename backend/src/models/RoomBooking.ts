@@ -35,6 +35,15 @@ export interface ITimelineEvent {
   updatedBy?: string;
 }
 
+export interface IPaymentHistoryEvent {
+  previousStatus: string;
+  newStatus: string;
+  method: string;
+  note?: string;
+  updatedBy?: string;
+  timestamp: Date;
+}
+
 export type TransferKind = 'NORMAL' | 'UPGRADE' | 'DOWNGRADE';
 export type TransferState = 'PENDING_PAYMENT' | 'COMPLETED' | 'CANCELLED';
 
@@ -87,6 +96,8 @@ export interface IRoomBooking extends Document {
   specialRequests: ISpecialRequests;
   priceBreakdown: IPriceBreakdown;
   payment: IBookingPayment;
+  paymentNote?: string;
+  paymentHistory: IPaymentHistoryEvent[];
   confirmationNumber?: string;
   timeline: ITimelineEvent[];
   /** Completed/cancelled transfer history, newest appended last. */
@@ -140,6 +151,18 @@ const timelineEventSchema = new Schema<ITimelineEvent>(
     timestamp: { type: Date, default: Date.now },
     note: { type: String, required: true },
     updatedBy: { type: String },
+  },
+  { _id: false }
+);
+
+const paymentHistorySchema = new Schema<IPaymentHistoryEvent>(
+  {
+    previousStatus: { type: String, required: true },
+    newStatus: { type: String, required: true },
+    method: { type: String, required: true },
+    note: { type: String, trim: true },
+    updatedBy: { type: String },
+    timestamp: { type: Date, default: Date.now },
   },
   { _id: false }
 );
@@ -199,6 +222,8 @@ const roomBookingSchema = new Schema<IRoomBooking>(
     specialRequests: { type: specialRequestsSchema, default: () => ({}) },
     priceBreakdown: { type: priceBreakdownSchema, required: true },
     payment: { type: bookingPaymentSchema, default: () => ({}) },
+    paymentNote: { type: String, trim: true },
+    paymentHistory: { type: [paymentHistorySchema], default: [] },
     confirmationNumber: { type: String, unique: true, sparse: true, index: true },
     timeline: { type: [timelineEventSchema], default: [] },
     transfers: { type: [roomTransferSchema], default: [] },

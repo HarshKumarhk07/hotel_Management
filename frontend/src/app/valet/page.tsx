@@ -31,8 +31,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/auth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { playNewOrderChime, primeAudio } from '@/lib/sound';
-import { Eye } from 'lucide-react';
+import { Eye, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { ValetFilters, ValetFilterState } from '@/components/valet/ValetFilters';
 
 interface VehiclePhoto {
   url: string;
@@ -120,6 +121,13 @@ export default function ValetDashboardPage() {
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Advanced Filters & Pagination
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [historyFilters, setHistoryFilters] = useState<ValetFilterState>({});
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLimit] = useState(20);
+  const [historyTotal, setHistoryTotal] = useState(0);
 
   // Protect route
   useEffect(() => {
@@ -144,19 +152,38 @@ export default function ValetDashboardPage() {
     enabled: status === 'authenticated'
   });
 
-  // Fetch delivered vehicles (history)
+  // Fetch delivered vehicles (history) with filters & pagination
   const {
-    data: historyQueue,
+    data: historyData,
     isLoading: isLoadingHistory,
     refetch: refetchHistory
-  } = useQuery<Vehicle[]>({
-    queryKey: ['valet-history'],
+  } = useQuery<{ items: Vehicle[], meta: { total: number } }>({
+    queryKey: ['valet-history', historyPage, historyFilters, searchQuery],
     queryFn: async () => {
-      const res = await api.get('/valet/vehicles?status=DELIVERED');
-      return res.data.data.items;
+      const params = new URLSearchParams();
+      params.append('status', 'DELIVERED');
+      params.append('page', historyPage.toString());
+      params.append('limit', historyLimit.toString());
+      
+      if (searchQuery) params.append('search', searchQuery);
+      
+      Object.entries(historyFilters).forEach(([k, v]) => {
+        if (v) params.append(k, v);
+      });
+
+      const res = await api.get(`/valet/vehicles?${params.toString()}`);
+      return res.data.data;
     },
     enabled: status === 'authenticated' && activeTab === 'history'
   });
+  
+  const historyQueue = historyData?.items || [];
+  
+  useEffect(() => {
+    if (historyData?.meta?.total !== undefined) {
+      setHistoryTotal(historyData.meta.total);
+    }
+  }, [historyData]);
 
   // Fetch parking slots
   const {
@@ -325,7 +352,7 @@ export default function ValetDashboardPage() {
     });
   };
 
-  // Filter lists based on search
+  // Filter lists based on search (Client side for queue, Server side for history)
   const filterVehicles = (list?: Vehicle[]) => {
     if (!list) return [];
     if (!searchQuery.trim()) return list;
@@ -338,7 +365,9 @@ export default function ValetDashboardPage() {
   };
 
   const filteredQueue = filterVehicles(activeQueue);
-  const filteredHistory = filterVehicles(historyQueue);
+  const filteredHistory = historyQueue; // Server-side filtered
+
+  const activeFilterCount = Object.values(historyFilters).filter(v => v !== undefined && v !== '').length;
 
   if (status !== 'authenticated') {
     return (
@@ -486,19 +515,55 @@ export default function ValetDashboardPage() {
             <p className="text-[10px] md:text-xs text-zinc-400 font-medium">Hotel Parking Slots & Valet State Panel</p>
           </div>
 
-          <div className="w-full sm:w-72 relative">
-            <span className="absolute inset-y-0 left-3 flex items-center text-zinc-400">
-              <Search className="h-4 w-4" />
-            </span>
-            <input
-              type="text"
-              placeholder="Search car, name, or room..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2 pl-9 pr-4 text-xs font-semibold text-zinc-800 placeholder-zinc-400 shadow-inner focus:border-brand focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand"
-            />
+          <div className="w-full sm:w-auto flex flex-1 sm:flex-none items-center gap-2">
+            <div className="w-full sm:w-72 relative">
+              <span className="absolute inset-y-0 left-3 flex items-center text-zinc-400">
+                <Search className="h-4 w-4" />
+              </span>
+              <input
+                type="text"
+                placeholder="Search car, name, or room..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setHistoryPage(1); // Reset page on new search
+                }}
+                className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2 pl-9 pr-4 text-xs font-semibold text-zinc-800 placeholder-zinc-400 shadow-inner focus:border-brand focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+              />
+            </div>
+            
+            {activeTab === 'history' && (
+              <button 
+                onClick={() => setIsFilterOpen(true)}
+                className="relative flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-800 shadow-inner transition-colors hover:bg-zinc-100"
+              >
+                <Filter className="h-4 w-4" />
+                <span className="hidden sm:inline">Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white shadow-sm">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </header>
+
+        {activeTab === 'history' && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-40">
+            <div className="h-full w-full pointer-events-auto">
+              <ValetFilters 
+                isOpen={isFilterOpen}
+                setIsOpen={setIsFilterOpen}
+                filters={historyFilters}
+                onFilterChange={(f) => {
+                  setHistoryFilters(f);
+                  setHistoryPage(1);
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 p-4 md:p-8 overflow-y-auto">
           <AnimatePresence mode="wait">
@@ -965,6 +1030,32 @@ export default function ValetDashboardPage() {
                         ))
                       )}
                     </div>
+
+                    {/* Pagination */}
+                    {historyTotal > historyLimit && (
+                      <div className="flex items-center justify-between border-t border-zinc-200 pt-4 mt-4 text-sm bg-white p-4 rounded-xl shadow-sm">
+                        <div className="text-zinc-500 font-medium">
+                          Showing <span className="font-bold text-zinc-900">{(historyPage - 1) * historyLimit + 1}</span> to <span className="font-bold text-zinc-900">{Math.min(historyPage * historyLimit, historyTotal)}</span> of <span className="font-bold text-zinc-900">{historyTotal}</span> logs
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                            disabled={historyPage === 1}
+                            className="flex items-center justify-center p-2 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-500 hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <span className="font-bold text-zinc-700 px-3">Page {historyPage}</span>
+                          <button
+                            onClick={() => setHistoryPage(p => p + 1)}
+                            disabled={historyPage * historyLimit >= historyTotal}
+                            className="flex items-center justify-center p-2 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-500 hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </motion.div>

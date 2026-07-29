@@ -52,7 +52,7 @@ export const remove = asyncHandler(async (req: Request, res) => {
 /** Customer: preview a coupon's discount for a kitchen + cart subtotal. */
 export const validate = asyncHandler(async (req: Request, res) => {
   const { coupon, discount } = await service.validateCoupon(req.body.code, {
-    userId: req.auth!.userId,
+    userId: req.auth?.userId,
     kitchenId: req.body.kitchen,
     subtotal: req.body.subtotal,
   });

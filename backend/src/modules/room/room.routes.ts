@@ -80,6 +80,7 @@ router.post('/bookings/upload-id', uploadDocument, bookingCtrl.uploadIdProof);
 router.post('/bookings', validate({ body: createBookingSchema }), bookingCtrl.createBooking);
 router.get('/bookings/my-bookings', bookingCtrl.getGuestBookings);
 router.get('/bookings/:id', bookingCtrl.getBookingById);
+router.post('/bookings/:id/cancel-pending', bookingCtrl.cancelPending);
 router.post('/bookings/:id/razorpay', bookingCtrl.createRazorpayOrder);
 router.post('/bookings/:id/verify', bookingCtrl.verifyPayment);
 // Cancellation never prompts for an email: `optionalAuthenticate` lets a signed-in

@@ -26,6 +26,13 @@ export interface IVehicle {
   keyTag: string;
   status: ValetStatus;
   
+  // New filtering fields
+  bookingId?: string;
+  bookingStatus?: string;
+  paymentStatus?: string;
+  assignedValet?: Types.ObjectId;
+  property?: string;
+  
   guestInfo: {
     name: string;
     roomNumber: string;
@@ -96,6 +103,11 @@ const vehicleSchema = new Schema<IVehicle>(
       default: 'PARKED',
       index: true,
     },
+    bookingId: { type: String, trim: true, index: true },
+    bookingStatus: { type: String, trim: true, index: true },
+    paymentStatus: { type: String, trim: true, index: true },
+    assignedValet: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    property: { type: String, trim: true, index: true },
     guestInfo: {
       name: { type: String, required: true, trim: true },
       roomNumber: { type: String, trim: true, index: true },
@@ -121,5 +133,7 @@ const vehicleSchema = new Schema<IVehicle>(
 // Compound indexes for searching vehicles and filtering active requests
 vehicleSchema.index({ status: 1, carNumber: 1 });
 vehicleSchema.index({ 'guestInfo.roomNumber': 1, status: 1 });
+vehicleSchema.index({ checkedInAt: -1 });
+vehicleSchema.index({ checkedInAt: -1, status: 1, assignedValet: 1 });
 
 export const Vehicle = model<IVehicle>('Vehicle', vehicleSchema);

@@ -132,7 +132,7 @@ export async function createRoomBooking(input: {
   // We consider CONFIRMED/CHECKED_IN as hard conflicts.
   // PENDING bookings are only considered conflicts if they were created in the last 15 minutes (to allow time for payment checkout).
   const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
-  const conflict = await RoomBooking.findOne({
+  const conflicts = await RoomBooking.find({
     room: room._id,
     checkInDate: { $lt: checkOut },
     checkOutDate: { $gt: checkIn },
@@ -141,8 +141,15 @@ export async function createRoomBooking(input: {
       { status: 'PENDING', createdAt: { $gt: fifteenMinsAgo } }
     ]
   });
-  if (conflict) {
-    throw AppError.conflict('Room is already booked during this date range', 'ROOM_BOOKED');
+
+  for (const conflict of conflicts) {
+    if (conflict.status === 'PENDING' && conflict.email === input.email) {
+      // The same user is retrying their booking (e.g., cancelled Razorpay and clicked Submit again)
+      // We delete their old pending reservation to release the lock and allow this new attempt.
+      await RoomBooking.findByIdAndDelete(conflict._id);
+    } else {
+      throw AppError.conflict('Room is already booked during this date range', 'ROOM_BOOKED');
+    }
   }
 
   const nights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
@@ -406,7 +413,7 @@ export async function updateBookingStatus(
  */
 export async function recordBookingPayment(
   bookingId: string,
-  input: { status: 'PAID' | 'PENDING'; method?: string; reference?: string },
+  input: { status: 'PAID' | 'PENDING'; method?: string; reference?: string; note?: string },
   updatedBy?: string
 ) {
   const booking = await RoomBooking.findById(bookingId).populate('room');
@@ -416,25 +423,47 @@ export async function recordBookingPayment(
   if (booking.status === 'CANCELLED') {
     throw AppError.badRequest('Cannot record payment against a cancelled booking');
   }
-  if (booking.paymentStatus === input.status) {
-    throw AppError.conflict(`Payment is already marked ${input.status}`, 'PAYMENT_STATUS_UNCHANGED');
-  }
+  
+  // Even if status hasn't changed, we might be adding a note or changing method, so don't error out entirely,
+  // but let's allow it if there's a note update.
 
   const method = input.method || booking.payment?.method || 'CASH';
+  const previousStatus = booking.paymentStatus;
+  
   booking.paymentStatus = input.status;
   booking.payment.status = input.status;
   booking.payment.method = method;
-  booking.payment.paidAt = input.status === 'PAID' ? new Date() : undefined;
+  
+  if (input.status === 'PAID' && previousStatus !== 'PAID') {
+    booking.payment.paidAt = new Date();
+  }
 
-  booking.timeline.push({
-    status: booking.status,
-    timestamp: new Date(),
-    note:
-      input.status === 'PAID'
-        ? `Payment of ₹${booking.totalPrice} received via ${method}${input.reference ? ` (ref: ${input.reference})` : ''}.`
-        : 'Payment marked as pending by the front desk.',
+  if (input.note !== undefined) {
+    booking.paymentNote = input.note;
+  }
+
+  // Create payment history audit log
+  booking.paymentHistory.push({
+    previousStatus,
+    newStatus: input.status,
+    method,
+    note: input.note,
     updatedBy,
+    timestamp: new Date(),
   });
+
+  // Only push to timeline if status actually changed
+  if (previousStatus !== input.status) {
+    booking.timeline.push({
+      status: booking.status,
+      timestamp: new Date(),
+      note:
+        input.status === 'PAID'
+          ? `Payment of ₹${booking.totalPrice} received via ${method}${input.reference ? ` (ref: ${input.reference})` : ''}.`
+          : 'Payment marked as pending by the front desk.',
+      updatedBy,
+    });
+  }
 
   await booking.save();
 
@@ -1384,4 +1413,30 @@ export async function cancelGuestBooking(
   }
 
   return booking;
+}
+
+/**
+ * Cancels a pending booking explicitly (e.g. if user closes Razorpay modal).
+ * This instantly frees up the room inventory.
+ */
+export async function cancelPendingBooking(id: string) {
+  const booking = await RoomBooking.findById(id);
+  if (!booking) {
+    throw AppError.notFound('Booking not found');
+  }
+  
+  if (booking.status !== 'PENDING') {
+    throw AppError.badRequest('Only pending bookings can be cancelled to free inventory');
+  }
+
+  // Delete the pending booking or mark it as CANCELLED. We'll delete it to clean up the DB.
+  await RoomBooking.findByIdAndDelete(id);
+
+  void recordAudit({
+    action: 'ROOM_BOOKING_CANCELLED' as any,
+    actor: 'SYSTEM',
+    metadata: { bookingId: booking._id, reason: 'User closed payment window' }
+  });
+
+  return { success: true };
 }

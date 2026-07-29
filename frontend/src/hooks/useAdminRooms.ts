@@ -71,6 +71,8 @@ export interface RoomBookingInfo {
   status: 'PENDING' | 'CONFIRMED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED';
   paymentStatus: 'PENDING' | 'PAID';
   payment?: { method?: string; status?: string; paidAt?: string };
+  paymentNote?: string;
+  paymentHistory?: { previousStatus: string; newStatus: string; method: string; note?: string; updatedBy?: string; timestamp: string }[];
   transfers?: RoomTransfer[];
   pendingTransfer?: RoomTransfer | null;
   createdAt: string;
@@ -169,8 +171,8 @@ export function useBookingMutations() {
   });
 
   const recordPayment = useMutation({
-    mutationFn: ({ id, status, method }: { id: string; status: 'PAID' | 'PENDING'; method?: string }) =>
-      api.patch(`/rooms/bookings/${id}/payment`, { status, method }),
+    mutationFn: ({ id, status, method, note }: { id: string; status: 'PAID' | 'PENDING'; method?: string; note?: string }) =>
+      api.patch(`/rooms/bookings/${id}/payment`, { status, method, note }),
     onSuccess: invalidate,
   });
 
