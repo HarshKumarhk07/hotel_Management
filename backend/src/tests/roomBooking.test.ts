@@ -152,8 +152,8 @@ describe('Room Booking — API Endpoints', () => {
     // First booking
     await request(app).post(`${api}/bookings`).send(payload).expect(201);
 
-    // Conflicting booking
-    await request(app).post(`${api}/bookings`).send(payload).expect(409);
+    // Conflicting booking from a different user should be rejected
+    await request(app).post(`${api}/bookings`).send({ ...payload, email: 'stealer@example.com' }).expect(409);
   });
 
   it('allows lookup of bookings by phone or email', async () => {
