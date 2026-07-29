@@ -312,9 +312,16 @@ export async function resolveScan(token: string) {
     throw AppError.notFound('No active reservation found for this room.', 'NO_RESERVATION');
   }
 
+  let activeKitchen: any = room.kitchen;
+  if (!activeKitchen) {
+    // Fallback: For single-kitchen hotels, rooms might not have a kitchen explicitly assigned.
+    // We pick the first active kitchen so the guest can still order food.
+    activeKitchen = await Kitchen.findOne({ isActive: true }).select('name slug isActive timings settings').lean();
+  }
+
   return {
     room: { id: room._id.toString(), roomNumber: room.roomNumber, floor: room.floor },
-    kitchen: room.kitchen,
+    kitchen: activeKitchen,
     bookingId: activeBooking._id.toString(),
   };
 }
