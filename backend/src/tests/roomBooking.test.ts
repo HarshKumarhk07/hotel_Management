@@ -66,9 +66,6 @@ describe('Room Booking — API Endpoints', () => {
       .query({
         checkInDate: new Date('2026-08-01T12:00:00.000Z').toISOString(),
         checkOutDate: new Date('2026-08-05T12:00:00.000Z').toISOString(),
-      governmentId: 'ID123',
-      idProofUrl: 'https://example.com/id.jpg',
-      idProofType: 'Aadhaar',
       })
       .expect(200);
 
@@ -96,9 +93,6 @@ describe('Room Booking — API Endpoints', () => {
       .query({
         checkInDate: new Date('2026-08-01T12:00:00.000Z').toISOString(),
         checkOutDate: new Date('2026-08-05T12:00:00.000Z').toISOString(),
-      governmentId: 'ID123',
-      idProofUrl: 'https://example.com/id.jpg',
-      idProofType: 'Aadhaar',
       })
       .expect(200);
 
