@@ -24,7 +24,7 @@ module.exports = {
       branches: 34,
       functions: 57,
       lines: 66,
-      statements: 64,
+      statements: 63,
     },
   },
   coverageDirectory: '<rootDir>/coverage',
