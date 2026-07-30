@@ -69,6 +69,11 @@ export const requestBillHandler = asyncHandler(async (req: Request, res: Respons
   ok(res, table);
 });
 
+export const customerRequestBillHandler = asyncHandler(async (req: Request, res: Response) => {
+  const table = await svc.customerRequestBill(req.params.id);
+  ok(res, table);
+});
+
 export const closeTableHandler = asyncHandler(async (req: Request, res: Response) => {
   const table = await svc.closeTable(req.params.id, userId(req));
   ok(res, table);

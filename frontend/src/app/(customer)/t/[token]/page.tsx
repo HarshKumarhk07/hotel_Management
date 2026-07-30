@@ -19,7 +19,7 @@ export default async function TableScanPage({ params }: { params: Promise<{ toke
   } catch {
     errorMessage = "We could not reach the server. Please try again.";
   }
-  if (resolution && resolution.status !== "OCCUPIED") {
+  if (resolution && resolution.status !== "OCCUPIED" && resolution.status !== "AVAILABLE") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600">

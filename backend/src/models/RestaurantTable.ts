@@ -14,6 +14,7 @@ export interface ITableSession {
   reservationId?: Types.ObjectId;
   notes?: string;
   billAmount?: number;
+  sessionId: string;
 }
 
 export interface IRestaurantTable extends Document {
@@ -67,6 +68,7 @@ const tableSchema = new Schema<IRestaurantTable>(
       reservationId: { type: Schema.Types.ObjectId, ref: 'TableReservation' },
       notes:         { type: String, trim: true, maxlength: 300 },
       billAmount:    { type: Number, min: 0 },
+      sessionId:     { type: String, index: true },
     },
   },
   { timestamps: true },

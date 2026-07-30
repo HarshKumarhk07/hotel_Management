@@ -89,12 +89,34 @@ export async function checkout(
 
   let room;
   let table;
+  let diningSessionId: string | undefined;
   if (cart.room) {
     room = await Room.findById(cart.room);
     if (!room || !room.isActive) throw AppError.badRequest('Room is no longer active', 'ROOM_INVALID');
   } else if (cart.table) {
     table = await RestaurantTable.findById(cart.table);
     if (!table || !table.isActive) throw AppError.badRequest('Table is no longer active', 'TABLE_INVALID');
+    
+    if (table.status === 'BILLING') {
+      throw AppError.badRequest('Table bill has already been requested. No new orders can be placed.', 'SESSION_LOCKED');
+    }
+    
+    if (table.status === 'AVAILABLE') {
+      const crypto = await import('node:crypto');
+      diningSessionId = crypto.randomUUID();
+      table.status = 'OCCUPIED' as any;
+      table.currentSession = {
+        seatedAt: new Date(),
+        partySize: 1, // Default for QR scan without reservation
+        sessionId: diningSessionId,
+      };
+      await table.save();
+      // We should probably emit TABLE_STATUS_CHANGED here, but we will leave that to the real-time layer 
+      // or we can emit it right away
+      emitToAdmins(SOCKET_EVENTS.TABLE_STATUS_CHANGED, { tableId: table._id.toString(), status: 'OCCUPIED', number: table.number });
+    } else if (table.currentSession) {
+      diningSessionId = table.currentSession.sessionId;
+    }
   } else {
     throw AppError.badRequest('Cart is missing room or table context', 'CONTEXT_INVALID');
   }
@@ -171,6 +193,7 @@ export async function checkout(
         roomSnapshot: room ? { roomNumber: room.roomNumber, floor: room.floor } : undefined,
         table: table?._id,
         tableSnapshot: table ? { number: table.number, section: table.section } : undefined,
+        diningSessionId,
         customer: customerId,
         items: pricing.items,
         pricing: { ...pricing, currency: 'INR' },
@@ -277,6 +300,7 @@ export async function guestCheckout(
 
   let room;
   let table;
+  let diningSessionId: string | undefined;
   if (input.room) {
     room = await Room.findById(input.room);
     if (!room || !room.isActive) throw AppError.badRequest('Room is no longer active', 'ROOM_INVALID');
@@ -288,6 +312,28 @@ export async function guestCheckout(
     if (!table || !table.isActive) throw AppError.badRequest('Table is no longer active', 'TABLE_INVALID');
     if (table.kitchen.toString() !== kitchen._id.toString()) {
       throw AppError.badRequest('This table is not served by that kitchen', 'TABLE_KITCHEN_MISMATCH');
+    }
+
+    if (table.status === 'BILLING') {
+      throw AppError.badRequest('Table bill has already been requested. No new orders can be placed.', 'SESSION_LOCKED');
+    }
+    
+    if (table.status === 'AVAILABLE') {
+      const crypto = await import('node:crypto');
+      diningSessionId = crypto.randomUUID();
+      table.status = 'OCCUPIED' as any;
+      table.currentSession = {
+        seatedAt: new Date(),
+        partySize: 1, // Default for QR scan without reservation
+        guestName: input.guest.name,
+        phone: input.guest.phone,
+        email: input.guest.email,
+        sessionId: diningSessionId,
+      };
+      await table.save();
+      emitToAdmins(SOCKET_EVENTS.TABLE_STATUS_CHANGED, { tableId: table._id.toString(), status: 'OCCUPIED', number: table.number });
+    } else if (table.currentSession) {
+      diningSessionId = table.currentSession.sessionId;
     }
   } else {
     throw AppError.badRequest('Missing room or table context', 'CONTEXT_INVALID');
@@ -360,6 +406,7 @@ export async function guestCheckout(
         roomSnapshot: room ? { roomNumber: room.roomNumber, floor: room.floor } : undefined,
         table: table?._id,
         tableSnapshot: table ? { number: table.number, section: table.section } : undefined,
+        diningSessionId,
         guestInfo: {
           name: input.guest.name,
           email,

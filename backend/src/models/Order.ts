@@ -68,6 +68,8 @@ export interface IOrder extends Document {
   /** Set for dine-in table orders. Exactly one of room/table must be present. */
   table?: Types.ObjectId;
   tableSnapshot?: ITableSnapshot;
+  /** Links table orders to a specific dining session. */
+  diningSessionId?: string;
   /** The owning account. Absent for guest orders until they are linked. */
   customer?: Types.ObjectId;
   /** Captured at checkout for guest (un-authenticated) orders. */
@@ -160,6 +162,7 @@ const orderSchema = new Schema<IOrder>(
       number:  { type: String },
       section: { type: String },
     },
+    diningSessionId: { type: String, index: true, sparse: true },
     // Optional: guest orders have no owner until they are linked to an account.
     customer: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     guestInfo: {

@@ -13,6 +13,7 @@ import {
   requestBillHandler,
   closeTableHandler,
   getTableBillHandler,
+  customerRequestBillHandler,
   resolveTableHandler,
   availabilityHandler,
   listReservationsHandler,
@@ -33,6 +34,8 @@ const router = Router();
 // ─── Public (no auth) ────────────────────────────────────────────────────────
 router.get('/availability',          availabilityHandler);
 router.get('/tables/resolve/:token', resolveTableHandler);
+router.get('/tables/:id/bill',       getTableBillHandler);
+router.post('/tables/:id/customer-request-bill', customerRequestBillHandler);
 
 // Public reservations & payments
 router.post('/reservations',         ...createReservationHandler);
@@ -59,7 +62,6 @@ router.post  ('/tables/:id/qr',             ...staff, regenerateQrHandler);
 router.post  ('/tables/:id/seat',           ...staff, ...seatTableHandler);
 router.post  ('/tables/:id/request-bill',   ...staff, requestBillHandler);
 router.post  ('/tables/:id/close',          ...staff, closeTableHandler);
-router.get   ('/tables/:id/bill',           ...staff, getTableBillHandler);
 
 router.get   ('/reservations',              ...staff, listReservationsHandler);
 // Staff can still create reservations manually via the same handler but they provide auth headers

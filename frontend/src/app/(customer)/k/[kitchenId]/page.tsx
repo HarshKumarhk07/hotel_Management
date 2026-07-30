@@ -11,6 +11,7 @@ import { MenuItemRow } from '@/components/menu/MenuItemRow';
 import { CartSheet } from '@/components/cart/CartSheet';
 import { CenteredSpinner, EmptyState, FoodLabel } from '@/components/ui/primitives';
 import { ProductRowSkeleton, ProductError, ProductEmptyState } from '@/components/ui/ProductSkeleton';
+import { TableSessionBill } from '@/components/restaurant/TableSessionBill';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { formatINR } from '@/lib/utils';
@@ -45,6 +46,7 @@ function KitchenMenuInner() {
   const [cartOpen, setCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [dietaryFilter, setDietaryFilter] = useState<'ALL' | 'VEG' | 'NON_VEG'>('ALL');
+  const [billOpen, setBillOpen] = useState(false);
 
   // Pin the cart to this kitchen + room/table once the menu (with settings) loads.
   useEffect(() => {
@@ -134,6 +136,16 @@ function KitchenMenuInner() {
                 </Link>
               </div>
             ) : null}
+            {tableId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBillOpen(true)}
+                className="text-xs font-semibold text-brand border-brand/30 hover:bg-brand/5 ml-2"
+              >
+                View Bill
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -437,6 +449,9 @@ function KitchenMenuInner() {
       ) : null}
 
       <CartSheet open={cartOpen} onClose={() => setCartOpen(false)} />
+      {tableId && (
+        <TableSessionBill tableId={tableId} open={billOpen} onClose={() => setBillOpen(false)} />
+      )}
     </div>
   );
 }

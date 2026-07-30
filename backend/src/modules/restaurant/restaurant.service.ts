@@ -1,4 +1,5 @@
 import { type FilterQuery } from 'mongoose';
+import crypto from 'node:crypto';
 import {
   AUDIT_ACTIONS,
   ORDER_STATUS,
@@ -176,6 +177,7 @@ export async function seatTable(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     reservationId: data.reservationId as any,
     notes:         data.notes,
+    sessionId:     crypto.randomUUID(),
   };
   await table.save();
 
@@ -207,10 +209,10 @@ export async function closeTable(id: string, actorId: string) {
   if (!table) throw AppError.notFound('Table not found');
   assertTransition(table.status, TABLE_STATUS.AVAILABLE);
 
-  if (table.currentSession?.seatedAt) {
+  if (table.currentSession?.sessionId) {
+    const sessionId = table.currentSession.sessionId;
     const openOrders = await Order.find({
-      table: id,
-      createdAt: { $gte: table.currentSession.seatedAt },
+      diningSessionId: sessionId,
       status: { $in: [ORDER_STATUS.NEW_ORDER, ORDER_STATUS.ACCEPTED, ORDER_STATUS.PREPARING] },
     }).select('_id orderNumber status');
 
@@ -224,8 +226,7 @@ export async function closeTable(id: string, actorId: string) {
 
     await Order.updateMany(
       {
-        table: id,
-        createdAt: { $gte: table.currentSession.seatedAt },
+        diningSessionId: sessionId,
         'payment.method': PAYMENT_METHODS.TABLE_BILLING,
         'payment.status': PAYMENT_STATUS.PENDING,
       },
@@ -263,18 +264,68 @@ export async function getTableBill(id: string) {
   const table = await RestaurantTable.findById(id);
   if (!table) throw AppError.notFound('Table not found');
   
-  const seatedAt = table.currentSession?.seatedAt || table.updatedAt || new Date();
+  if (!table.currentSession?.sessionId) {
+    return { table, orders: [], consolidated: null };
+  }
 
   const orders = await Order.find({
-    table: id,
-    createdAt: { $gte: seatedAt },
+    diningSessionId: table.currentSession.sessionId,
   }).select('orderNumber status items pricing payment createdAt');
 
-  let grandTotal = orders.reduce((sum, o) => sum + o.pricing.total, 0);
+  const deliveredOrders = orders.filter(o => o.status === ORDER_STATUS.DELIVERED);
+
+  let subtotal = 0;
+  let taxTotal = 0;
+  let serviceCharge = 0;
+  let discount = 0;
+  let total = 0;
+  let amountPaid = 0;
+
+  for (const o of deliveredOrders) {
+    subtotal += o.pricing.subtotal;
+    taxTotal += o.pricing.taxTotal;
+    serviceCharge += o.pricing.serviceCharge;
+    discount += o.pricing.discount;
+    total += o.pricing.total;
+    if (o.payment.status === PAYMENT_STATUS.PAID) {
+      amountPaid += o.payment.amount;
+    }
+  }
+
+  const amountDue = Math.max(0, total - amountPaid);
+  
+  let grandTotal = total;
   if (grandTotal === 0 && table.currentSession?.billAmount !== undefined) {
     grandTotal = table.currentSession.billAmount;
   }
-  return { table, orders, grandTotal };
+
+  return { 
+    table, 
+    orders, 
+    consolidated: {
+      subtotal,
+      taxTotal,
+      serviceCharge,
+      discount,
+      grandTotal,
+      amountPaid,
+      amountDue
+    }
+  };
+}
+
+export async function customerRequestBill(id: string) {
+  const table = await RestaurantTable.findById(id);
+  if (!table) throw AppError.notFound('Table not found');
+  if (table.status !== TABLE_STATUS.OCCUPIED && table.status !== TABLE_STATUS.BILLING) {
+    throw AppError.badRequest('Table must be occupied to request a bill', 'INVALID_STATE');
+  }
+  if (table.status !== TABLE_STATUS.BILLING) {
+    table.status = TABLE_STATUS.BILLING;
+    await table.save();
+    emitToAdmins(SOCKET_EVENTS.TABLE_STATUS_CHANGED, { tableId: id, status: TABLE_STATUS.BILLING, number: table.number });
+  }
+  return table;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

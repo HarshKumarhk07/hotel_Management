@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge, CenteredSpinner, FoodLabel } from '@/components/ui/primitives';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAdminOrder, useOrderAdminMutations } from '@/hooks/useAdminOrders';
 import { STATUS_BADGE, STATUS_LABEL } from '@/lib/orderStatus';
 import { apiErrorMessage, api } from '@/lib/api';
@@ -26,6 +27,10 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClo
   const { setStatus, forceStatus, cancel, addNote, refund } = useOrderAdminMutations(orderId);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+  
+  const [confirmStatus, setConfirmStatus] = useState<string | null>(null);
+  const [cancelPromptOpen, setCancelPromptOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const run = async (fn: () => Promise<unknown>) => {
     setError(null);
@@ -111,8 +116,8 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClo
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  const reason = window.prompt('Cancellation reason?');
-                  if (reason && reason.trim().length >= 3) run(() => cancel.mutateAsync({ id: order._id, reason: reason.trim() }));
+                  setCancelReason('');
+                  setCancelPromptOpen(true);
                 }}
               >
                 Cancel order
@@ -139,9 +144,7 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClo
               onChange={(e) => {
                 const val = e.target.value;
                 if (!val) return;
-                if (window.confirm(`Force set status to "${val}"?`)) {
-                  run(() => forceStatus.mutateAsync({ id: order._id, status: val }));
-                }
+                setConfirmStatus(val);
                 e.target.value = '';
               }}
             >
@@ -186,6 +189,49 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClo
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmStatus}
+        onClose={() => setConfirmStatus(null)}
+        title="Confirm Status Change"
+        description={
+          <>
+            Are you sure you want to force set the status to <strong>{confirmStatus?.replace(/_/g, ' ')}</strong>?
+          </>
+        }
+        confirmText="Confirm"
+        onConfirm={() => {
+          if (confirmStatus) run(() => forceStatus.mutateAsync({ id: order._id, status: confirmStatus }));
+        }}
+      />
+
+      <Dialog open={cancelPromptOpen} onClose={() => setCancelPromptOpen(false)} title="Cancel Order" widthClass="max-w-md">
+        <div className="space-y-4">
+          <p className="text-sm text-zinc-600">Please provide a reason for cancellation:</p>
+          <input
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Cancellation reason"
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setCancelPromptOpen(false)}>Close</Button>
+            <Button
+              disabled={cancelReason.trim().length < 3}
+              onClick={() => {
+                if (cancelReason.trim().length >= 3) {
+                  run(() => cancel.mutateAsync({ id: order._id, reason: cancelReason.trim() }));
+                  setCancelPromptOpen(false);
+                }
+              }}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              Confirm Cancellation
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </Dialog>
   );
 }
