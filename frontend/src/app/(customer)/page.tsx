@@ -141,22 +141,6 @@ export default function HomePage() {
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/50 pointer-events-none" />
 
-          {/* Left & Right Interactive Arrows */}
-          <button
-            onClick={() => setCurrentSlide((prev) => (prev - 1 + HERO_IMAGES.length) % HERO_IMAGES.length)}
-            className="absolute left-2 md:left-6 z-20 flex h-9 w-9 md:h-12 md:w-12 items-center justify-center border border-white/20 bg-black/30 hover:bg-[#D4AF37] hover:border-[#D4AF37] text-white backdrop-blur-md transition-all duration-300 active:scale-95"
-            aria-label="Previous Slide"
-          >
-            <ChevronLeft className="h-4 w-4 md:h-6 md:w-6" />
-          </button>
-          <button
-            onClick={() => setCurrentSlide((prev) => (prev + 1) % HERO_IMAGES.length)}
-            className="absolute right-2 md:right-6 z-20 flex h-9 w-9 md:h-12 md:w-12 items-center justify-center border border-white/20 bg-black/30 hover:bg-[#D4AF37] hover:border-[#D4AF37] text-white backdrop-blur-md transition-all duration-300 active:scale-95"
-            aria-label="Next Slide"
-          >
-            <ChevronRight className="h-4 w-4 md:h-6 md:w-6" />
-          </button>
- 
           {/* Hero Content Overlay */}
           <div className="relative z-10 max-w-4xl px-8 text-center space-y-6 text-white mt-12">
             <motion.span

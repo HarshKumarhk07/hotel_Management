@@ -97,6 +97,11 @@ export function useRoomMutations() {
       api.post('/rooms', input),
     onSuccess: invalidate,
   });
+  const update = useMutation({
+    mutationFn: ({ id, ...input }: { id: string; roomNumber?: string; floor?: number; kitchen?: string | null; roomType?: string; internalNote?: string }) =>
+      api.patch(`/rooms/${id}`, input),
+    onSuccess: invalidate,
+  });
   const setActive = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       api.patch(`/rooms/${id}/${active ? 'activate' : 'deactivate'}`),
@@ -121,7 +126,7 @@ export function useRoomMutations() {
     onSuccess: invalidate,
   });
 
-  return { create, setActive, setStatus, regenerateQr, disableQr, reassignQr };
+  return { create, update, setActive, setStatus, regenerateQr, disableQr, reassignQr };
 }
 
 export function useAdminBookings() {

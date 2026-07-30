@@ -15,6 +15,7 @@ import {
   listOrdersSchema,
   orderIdParam,
   updateStatusSchema,
+  forceStatusSchema,
   refundRequestSchema,
 } from './order.validation';
 
@@ -108,13 +109,12 @@ router.get('/:id', staff, validate({ params: orderIdParam }), ctrl.staffGet);
 /**
  * @openapi
  * /orders/{id}/status:
- *   patch:
- *     tags: [Orders]
- *     summary: Advance the order status (validated transitions)
- *     security: [{ bearerAuth: [] }]
- *     responses: { 200: { description: Updated }, 400: { description: Invalid transition } }
+ *   patch: { tags: [Orders], summary: Update order status (forward progression only), security: [{ bearerAuth: [] }] }
+ * /orders/{id}/force-status:
+ *   patch: { tags: [Orders], summary: Force update order status (admin override), security: [{ bearerAuth: [] }] }
  */
 router.patch('/:id/status', staff, validate({ params: orderIdParam, body: updateStatusSchema }), ctrl.updateStatus);
+router.patch('/:id/force-status', staff, validate({ params: orderIdParam, body: forceStatusSchema }), ctrl.forceStatus);
 
 /**
  * @openapi

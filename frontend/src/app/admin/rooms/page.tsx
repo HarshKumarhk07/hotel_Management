@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Download, Plus, Power, QrCode, RefreshCw, Ban, ArrowLeftRight, Calendar, User, Phone, Mail, DollarSign, Printer, FileText } from 'lucide-react';
+import { Download, Plus, Power, QrCode, RefreshCw, Ban, ArrowLeftRight, Calendar, User, Phone, Mail, DollarSign, Printer, FileText, Pencil } from 'lucide-react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -125,6 +125,116 @@ function CreateRoomDialog({ open, onClose }: { open: boolean; onClose: () => voi
           </Button>
           <Button type="submit" disabled={isSubmitting} isLoading={isSubmitting} className="bg-[#D4AF37] hover:bg-[#AE963C] text-white">
             Create room
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+// ── Edit room ──
+const editSchema = z.object({
+  roomNumber: z.string().min(1, 'Room number is required'),
+  floor: z.coerce.number().int(),
+  kitchen: z.string().optional(),
+  roomType: z.string().min(1, 'Select a room category'),
+});
+type EditForm = z.infer<typeof editSchema>;
+
+function EditRoomDialog({ room, onClose }: { room: AdminRoom; onClose: () => void }) {
+  const { update } = useRoomMutations();
+  const { data: kitchens } = useQuery({
+    queryKey: ['public-kitchens-list'],
+    queryFn: async () => {
+      const res = await api.get<{ data: { kitchens: { id: string; name: string }[] } }>('/kitchens/public');
+      return res.data.data.kitchens;
+    },
+  });
+  const { data: categories } = useQuery({
+    queryKey: ['admin-room-categories-list'],
+    queryFn: async () => {
+      const res = await api.get<{ data: { categories: { _id: string; roomType: string; displayName: string }[] } }>('/rooms/categories');
+      return res.data.data.categories;
+    },
+  });
+  const [serverError, setServerError] = useState<string | null>(null);
+  
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<EditForm>({ 
+    resolver: zodResolver(editSchema),
+    defaultValues: {
+      roomNumber: room.roomNumber,
+      floor: room.floor,
+      roomType: room.roomType || '',
+      kitchen: typeof room.kitchen === 'object' && room.kitchen !== null ? room.kitchen._id : typeof room.kitchen === 'string' ? room.kitchen : '',
+    }
+  });
+
+  const onSubmit = async (values: EditForm) => {
+    setServerError(null);
+    try {
+      await update.mutateAsync({
+        id: room._id,
+        roomNumber: values.roomNumber,
+        floor: values.floor,
+        kitchen: values.kitchen || null,
+        roomType: values.roomType,
+      });
+      onClose();
+    } catch (err) {
+      setServerError(apiErrorMessage(err, 'Could not update room'));
+    }
+  };
+
+  return (
+    <Dialog open={true} onClose={onClose} title="Edit room">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Room number" error={errors.roomNumber?.message}>
+            <Input placeholder="101" {...register('roomNumber')} />
+          </Field>
+          <Field label="Floor" error={errors.floor?.message}>
+            <Input type="number" placeholder="1" {...register('floor')} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Room Category" error={errors.roomType?.message}>
+            <select
+              className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
+              {...register('roomType')}
+            >
+              <option value="">— Select Category —</option>
+              {categories?.map((c) => (
+                <option key={c.roomType} value={c.roomType}>
+                  {c.displayName}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Serving kitchen">
+            <select
+              className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
+              {...register('kitchen')}
+            >
+              <option value="">— None —</option>
+              {kitchens?.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        {serverError ? <FieldError message={serverError} /> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSubmitting} isLoading={isSubmitting} className="bg-[#D4AF37] hover:bg-[#AE963C] text-white">
+            Save changes
           </Button>
         </div>
       </form>
@@ -701,7 +811,7 @@ function RoomsInner() {
   const [qrRoomId, setQrRoomId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'rooms' | 'bookings'>('rooms');
   const [invoiceBookingId, setInvoiceBookingId] = useState<string | null>(null);
-
+  const [editRoom, setEditRoom] = useState<AdminRoom | null>(null);
   // Resolve from the live list so the QR dialog reflects regenerate/reassign.
   const qrRoom = rooms?.find((r) => r._id === qrRoomId) ?? null;
 
@@ -849,6 +959,9 @@ function RoomsInner() {
                         Check-in
                       </Button>
                     )}
+                    <Button variant="outline" size="sm" onClick={() => setEditRoom(r)} title="Edit room">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setQrRoomId(r._id)} title="QR Details">
                       <QrCode className="h-4 w-4" />
                     </Button>
@@ -866,6 +979,7 @@ function RoomsInner() {
       )}
 
       <CreateRoomDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+      {editRoom && <EditRoomDialog room={editRoom} onClose={() => setEditRoom(null)} />}
       {qrRoom ? <QrDialog room={qrRoom} rooms={rooms ?? []} onClose={() => setQrRoomId(null)} /> : null}
       {invoiceBookingId && (
         <InvoiceModal bookingId={invoiceBookingId} onClose={() => setInvoiceBookingId(null)} />

@@ -109,6 +109,23 @@ export const updateStatus = asyncHandler(async (req: Request, res) => {
   return ok(res, { order: updated });
 });
 
+export const forceStatus = asyncHandler(async (req: Request, res) => {
+  const order = await service.getForStaff(req.params.id, staffScope(req));
+  const updated = await service.forceStatus(
+    order,
+    req.body.status as OrderStatus,
+    req.auth!.userId,
+  );
+  void auditFromRequest(req, {
+    action: AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
+    actor: req.auth!.userId,
+    role: req.auth!.role,
+    target: `order:${updated._id.toString()}`,
+    metadata: { status: updated.status, forced: true },
+  });
+  return ok(res, { order: updated });
+});
+
 export const cancelOrder = asyncHandler(async (req: Request, res) => {
   const order = await service.getForStaff(req.params.id, staffScope(req));
   const updated = await service.cancelOrder(order, req.body.reason, req.auth!.userId);

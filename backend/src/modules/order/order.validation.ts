@@ -99,6 +99,19 @@ export const internalNoteSchema = z.object({
   noteType: z.enum(['PREPARATION', 'CUSTOMER_HANDLING', 'REMARK']).default('REMARK'),
 });
 
+export const forceStatusSchema = z.object({
+  status: z.enum([
+    ORDER_STATUS.NEW_ORDER,
+    ORDER_STATUS.ACCEPTED,
+    ORDER_STATUS.PREPARING,
+    ORDER_STATUS.READY,
+    ORDER_STATUS.OUT_FOR_DELIVERY,
+    ORDER_STATUS.DELIVERED,
+    ORDER_STATUS.REJECTED,
+    ORDER_STATUS.CANCELLED,
+  ]),
+});
+
 export const refundRequestSchema = z.object({
   reason: z.string().trim().min(3).max(300),
 });

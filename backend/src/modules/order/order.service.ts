@@ -544,6 +544,44 @@ export async function updateStatus(
   return order;
 }
 
+export async function forceStatus(
+  order: IOrder,
+  next: OrderStatus,
+  by: string,
+) {
+  order.status = next;
+  order.statusHistory.push({ status: next, at: new Date(), by: by as never, note: 'Forced by admin' });
+
+  void recordAudit({
+    action: AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
+    actor: by,
+    metadata: { orderId: order._id, status: next, forced: true }
+  });
+
+  if (
+    next === ORDER_STATUS.DELIVERED &&
+    order.payment.method !== PAYMENT_METHODS.RAZORPAY &&
+    order.payment.status === PAYMENT_STATUS.PENDING
+  ) {
+    order.payment.status = PAYMENT_STATUS.PAID;
+    order.payment.paidAt = new Date();
+  }
+  
+  if (next === ORDER_STATUS.REJECTED || next === ORDER_STATUS.CANCELLED) {
+    order.refund.status =
+      order.payment.status === PAYMENT_STATUS.PAID ? REFUND_STATUS.INITIATED : REFUND_STATUS.NOT_REQUIRED;
+    if (order.payment.status === PAYMENT_STATUS.PAID) order.refund.amount = order.pricing.total;
+    if (next === ORDER_STATUS.CANCELLED) {
+      order.cancellation = { scope: 'FULL', reason: 'Forced by admin', cancelledBy: by as never, at: new Date() };
+    }
+  }
+
+  await order.save();
+  emitOrderUpdate(order);
+  void notifications.notifyCustomerStatus(order);
+  return order;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Cancellation
 // ─────────────────────────────────────────────────────────────────────────────

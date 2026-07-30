@@ -63,6 +63,11 @@ export function useOrderAdminMutations(orderId: string | null) {
       api.patch(`/orders/${id}/status`, { status }),
     onSuccess: invalidate,
   });
+  const forceStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.patch(`/orders/${id}/force-status`, { status }),
+    onSuccess: invalidate,
+  });
   const cancel = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       api.post(`/orders/${id}/cancel`, { reason }),
@@ -78,5 +83,5 @@ export function useOrderAdminMutations(orderId: string | null) {
     onSuccess: invalidate,
   });
 
-  return { setStatus, cancel, addNote, refund };
+  return { setStatus, forceStatus, cancel, addNote, refund };
 }

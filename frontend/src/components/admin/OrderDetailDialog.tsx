@@ -23,7 +23,7 @@ const CANCELLABLE = ['NEW_ORDER', 'ACCEPTED', 'PREPARING', 'READY'];
 
 export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const { data: order, isLoading } = useAdminOrder(orderId);
-  const { setStatus, cancel, addNote, refund } = useOrderAdminMutations(orderId);
+  const { setStatus, forceStatus, cancel, addNote, refund } = useOrderAdminMutations(orderId);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -140,7 +140,7 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClo
                 const val = e.target.value;
                 if (!val) return;
                 if (window.confirm(`Force set status to "${val}"?`)) {
-                  run(() => setStatus.mutateAsync({ id: order._id, status: val }));
+                  run(() => forceStatus.mutateAsync({ id: order._id, status: val }));
                 }
                 e.target.value = '';
               }}
