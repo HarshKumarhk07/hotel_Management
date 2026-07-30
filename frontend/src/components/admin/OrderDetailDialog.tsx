@@ -201,7 +201,7 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClo
         }
         confirmText="Confirm"
         onConfirm={() => {
-          if (confirmStatus) run(() => forceStatus.mutateAsync({ id: order._id, status: confirmStatus }));
+          if (confirmStatus && order) run(() => forceStatus.mutateAsync({ id: order._id, status: confirmStatus }));
         }}
       />
 
@@ -220,7 +220,7 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: string; onClo
             <Button
               disabled={cancelReason.trim().length < 3}
               onClick={() => {
-                if (cancelReason.trim().length >= 3) {
+                if (cancelReason.trim().length >= 3 && order) {
                   run(() => cancel.mutateAsync({ id: order._id, reason: cancelReason.trim() }));
                   setCancelPromptOpen(false);
                 }
