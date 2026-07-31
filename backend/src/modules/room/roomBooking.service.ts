@@ -260,18 +260,6 @@ export async function createRoomBooking(input: {
         booking.totalPrice,
         true
       );
-    } else {
-      // Online Razorpay: pending email — let guest know booking is held, pay when arrive if needed
-      await emailService.sendRoomBookingPending(
-        booking.email,
-        booking.guestName,
-        roomNum,
-        booking.checkInDate.toISOString(),
-        booking.checkOutDate.toISOString(),
-        booking.confirmationNumber || 'N/A',
-        booking.totalPrice,
-        false
-      );
     }
   } catch (err) {
     logger.error({ err }, 'Failed to dispatch booking notification email');
