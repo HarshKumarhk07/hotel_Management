@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Users, Phone, Mail, Sparkles, Shield, Clock, Search, ArrowRight, CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react';
 import { SiteFooter } from '@/components/site/SiteFooter';
@@ -40,6 +40,8 @@ export default function GuestWaitlistPage() {
     searchEnabled
   );
 
+  const hasPrefilled = useRef(false);
+
   // Enforce login and prefill details
   useEffect(() => {
     if (authStatus !== 'loading') {
@@ -47,17 +49,18 @@ export default function GuestWaitlistPage() {
         toast.info('We are directing you to the sign-in page for further booking.');
         const redirectUrl = encodeURIComponent(window.location.pathname);
         router.replace(`/login?next=${redirectUrl}`);
-      } else {
-        if (!guestName) setGuestName(user.name);
-        if (!email) setEmail(user.email);
-        if (!phone && (user as any).phone) setPhone((user as any).phone);
-        if (!lookupValue) {
-            setLookupValue(user.email);
-            setSearchEnabled(true);
-        }
+      } else if (!hasPrefilled.current) {
+        setGuestName(user.name);
+        setEmail(user.email);
+        if ((user as any).phone) setPhone((user as any).phone);
+        setLookupValue(user.email);
+        setSearchEnabled(true);
+        hasPrefilled.current = true;
       }
     }
-  }, [authStatus, user, router, guestName, email, phone, lookupValue]);
+  }, [authStatus, user, router]);
+
+  const sanitize = (val: string) => val.replace(/[<>]/g, '');
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +105,7 @@ export default function GuestWaitlistPage() {
 
       <main className="flex-1">
         {/* Banner Section */}
-        <section className="relative bg-[#111111] py-20 text-white">
+        <section className="relative bg-[#111111] pt-32 pb-20 text-white">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#D4AF37_0%,transparent_50%)] opacity-20 pointer-events-none" />
           <div className="relative mx-auto max-w-7xl px-8 text-center space-y-4">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#D4AF37] ring-1 ring-[#D4AF37]/30">
@@ -127,14 +130,14 @@ export default function GuestWaitlistPage() {
             <Card className="p-6 border-[#ECECEC] bg-white rounded-3xl">
               <form onSubmit={handleJoin} className="space-y-4">
                 <Field label="Guest Name">
-                  <Input required placeholder="John Doe" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+                  <Input required placeholder="John Doe" value={guestName} onChange={(e) => setGuestName(sanitize(e.target.value))} />
                 </Field>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Phone Number">
-                    <Input required placeholder="+91 99999 88888" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    <Input required placeholder="+91 99999 88888" value={phone} onChange={(e) => setPhone(sanitize(e.target.value))} />
                   </Field>
                   <Field label="Email Address">
-                    <Input required type="email" placeholder="john@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <Input required type="email" placeholder="john@example.com" value={email} onChange={(e) => setEmail(sanitize(e.target.value))} />
                   </Field>
                 </div>
                 <Field label="Number of Guests (Party Size)">
@@ -175,7 +178,7 @@ export default function GuestWaitlistPage() {
                   required
                   placeholder="Enter email or phone"
                   value={lookupValue}
-                  onChange={(e) => setLookupValue(e.target.value)}
+                  onChange={(e) => setLookupValue(sanitize(e.target.value))}
                   className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] min-w-0"
                 />
                 <Button type="submit" className="bg-[#D4AF37] hover:bg-[#AE963C] text-white rounded-xl px-5 h-11 font-semibold shrink-0">

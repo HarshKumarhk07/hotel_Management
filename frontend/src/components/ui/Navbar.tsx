@@ -27,9 +27,9 @@ export function Navbar() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      setScrolled(window.scrollY > 50);
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -144,144 +144,106 @@ export function Navbar() {
     e.target.value = '';
   };
 
+  const isHome = pathname === '/';
+  
+  // Refined styling based on scroll state and route
+  const navBgClass = scrolled 
+    ? 'bg-page-black/95 backdrop-blur-md border-b border-page-ivory/5 shadow-luxury'
+    : isHome 
+      ? 'bg-transparent border-b border-transparent' 
+      : 'bg-page-black/50 backdrop-blur-md border-b border-page-ivory/5';
+
+  const [isLoaded, setIsLoaded] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoaded(true), 1200); // Loads after brand text in Hero
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled || pathname !== '/'
-            ? 'bg-black/70 backdrop-blur-md shadow-lg border-b border-white/10'
-            : 'bg-black/40 backdrop-blur-md border-b border-white/10'
-        }`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-1000 ease-[0.25,0.1,0.25,1] will-change-[background-color,border-color,backdrop-filter] ${navBgClass} ${isHome && !isLoaded ? 'opacity-0 translate-y-[-20px]' : 'opacity-100 translate-y-0'}`}
       >
-        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-white/15 backdrop-blur-sm ring-1 ring-white/20 transition-all duration-300 group-hover:bg-white/25">
-              <NextImage
-                src="/logo.png"
-                alt="The Page Logo"
-                width={40}
-                height={40}
-                priority
-                className="h-full w-full object-contain p-1.5"
-              />
+        <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="flex flex-col items-center group relative z-10">
+            <div className="mb-1 relative">
+              <div className="absolute inset-0 bg-page-gold/20 blur-xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+              <NextImage src="/logo.png" alt="The Page Logo" width={40} height={40} className="object-contain relative z-10 drop-shadow-md group-hover:scale-105 transition-transform duration-700" />
             </div>
-            <div className="flex flex-col text-left">
-              <span className="text-sm font-bold tracking-[0.25em] text-[#D4AF37] font-serif uppercase leading-none">
-                THE PAGE
-              </span>
-              <span className="text-[7px] font-semibold tracking-[0.3em] text-white/60 uppercase mt-1">
-                LUXURY HOTEL
-              </span>
-            </div>
+            <span className="text-sm md:text-base font-serif font-bold tracking-[0.3em] text-page-ivory uppercase leading-none group-hover:text-page-gold transition-colors duration-700 drop-shadow-sm">
+              THE PAGE
+            </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-8 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white">
-            <button
-              onClick={() => handleNavClick('/')}
-              className={`transition-colors pb-1 border-b-2 ${
-                pathname === '/' ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
-              }`}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => handleNavClick('/rooms')}
-              className={`transition-colors pb-1 border-b-2 ${
-                pathname.startsWith('/rooms') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
-              }`}
-            >
-              Rooms
-            </button>
-            <button
-              onClick={() => handleNavClick('/banquets')}
-              className={`transition-colors pb-1 border-b-2 ${
-                pathname.startsWith('/banquets') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
-              }`}
-            >
-              Banquet
-            </button>
-            <button
-              onClick={() => handleNavClick('/restaurant/waitlist')}
-              className={`transition-colors pb-1 border-b-2 ${
-                pathname.startsWith('/restaurant') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
-              }`}
-            >
-              Restaurant
-            </button>
-            <button
-              onClick={() => handleNavClick('/menu')}
-              className={`transition-colors pb-1 border-b-2 ${
-                pathname.startsWith('/menu') ? 'text-[#D4AF37] border-[#D4AF37]' : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
-              }`}
-            >
-              Menu
-            </button>
+          {/* Desktop Nav */}
+          <nav className="hidden lg:flex items-center gap-14 text-[9px] font-medium uppercase tracking-[0.15em] text-page-ivory">
+            {[
+              { label: 'Home', path: '/' },
+              { label: 'Rooms', path: '/rooms' },
+              { label: 'Banquet', path: '/banquets' },
+              { label: 'Restaurant', path: '/restaurant/waitlist' },
+            ].map((link) => {
+              const isActive = link.path === '/' ? pathname === '/' : pathname.startsWith(link.path);
+              return (
+                <button
+                  key={link.label}
+                  onClick={() => handleNavClick(link.path)}
+                  className={`relative group py-2 transition-colors duration-500 ${isActive ? 'text-page-gold drop-shadow-md' : 'text-page-ivory/80 hover:text-white drop-shadow-sm'}`}
+                >
+                  {link.label}
+                  <span className={`absolute left-1/2 bottom-0 h-[2px] bg-page-gold transition-all duration-500 ease-[0.25,0.1,0.25,1] will-change-[width,left] -translate-x-1/2 ${isActive ? 'w-full' : 'w-0 group-hover:w-full'}`} />
+                </button>
+              );
+            })}
+
             {/* More Dropdown */}
-            <div className="relative group pb-1">
+            <div className="relative group py-2 cursor-pointer">
               <button
-                className={`flex items-center gap-1 transition-colors border-b-2 ${
-                  pathname.startsWith('/facilities') || pathname === '/#amenities' || pathname.startsWith('/gallery') || pathname.startsWith('/about') || pathname.startsWith('/contact')
-                    ? 'text-[#D4AF37] border-[#D4AF37]'
-                    : 'border-transparent hover:border-[#D4AF37] hover:text-[#D4AF37]'
+                className={`flex items-center gap-1 transition-colors duration-500 text-page-ivory/90 hover:text-page-gold ${
+                  ['/gallery', '/about', '/contact', '/facilities'].some(p => pathname.startsWith(p)) || pathname === '/#amenities'
+                    ? 'text-page-gold'
+                    : ''
                 }`}
               >
-                More <ChevronDown className="h-3 w-3" />
+                More <ChevronDown className="h-3 w-3 transition-transform duration-500 group-hover:rotate-180" />
               </button>
               
-              <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
-                <div className="flex flex-col gap-3 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl p-4 min-w-[140px] shadow-2xl">
-                  <button
-                    onClick={() => handleNavClick('/gallery')}
-                    className={`text-left transition-colors py-1 ${
-                      pathname.startsWith('/gallery') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'
-                    }`}
-                  >
-                    Gallery
-                  </button>
-                  <button
-                    onClick={() => handleNavClick('/about')}
-                    className={`text-left transition-colors py-1 ${
-                      pathname.startsWith('/about') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'
-                    }`}
-                  >
-                    About
-                  </button>
-                  <button
-                    onClick={() => handleNavClick('/contact')}
-                    className={`text-left transition-colors py-1 ${
-                      pathname.startsWith('/contact') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'
-                    }`}
-                  >
-                    Contact
-                  </button>
-                  <button
-                    onClick={() => handleScrollToSection('amenities')}
-                    className="text-left text-white/80 hover:text-[#D4AF37] transition-colors py-1"
-                  >
-                    Amenities
-                  </button>
-                  <button
-                    onClick={() => handleNavClick('/facilities')}
-                    className={`text-left transition-colors py-1 ${
-                      pathname.startsWith('/facilities') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'
-                    }`}
-                  >
-                    Facilities
-                  </button>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 pt-6 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-500 will-change-[opacity,visibility] translate-y-2 group-hover:translate-y-0">
+                <div className="flex flex-col bg-page-black border border-white/10 shadow-2xl min-w-[180px] py-3 rounded-b-xl overflow-hidden">
+                  {[
+                    { label: 'Gallery', path: '/gallery' },
+                    { label: 'About', path: '/about' },
+                    { label: 'Contact', path: '/contact' },
+                    { label: 'Amenities', path: '#amenities', action: () => handleScrollToSection('amenities') },
+                    { label: 'Facilities', path: '/facilities' },
+                  ].map((sublink) => (
+                    <button
+                      key={sublink.label}
+                      onClick={sublink.action || (() => handleNavClick(sublink.path))}
+                      className={`text-left px-6 py-3 transition-colors duration-medium ${
+                        pathname.startsWith(sublink.path) ? 'text-page-gold bg-page-ivory/5' : 'text-page-ivory/80 hover:text-page-gold hover:bg-page-ivory/5'
+                      }`}
+                    >
+                      {sublink.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
           </nav>
 
-          <nav className="hidden lg:flex items-center gap-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white">
+          {/* Desktop Right Actions */}
+          <nav className="hidden lg:flex items-center gap-8 text-[9px] font-extrabold uppercase tracking-widest text-page-ivory relative z-10">
             <button
               onClick={() => openScanner()}
-              className="hover:text-[#D4AF37] transition-colors text-[#D4AF37] border border-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37]/15 transition-all"
+              className="group relative overflow-hidden text-page-gold border border-page-gold/30 px-6 py-2.5 hover:border-page-gold transition-all duration-500 will-change-[background-color,border-color,color] rounded-sm bg-page-gold/5"
             >
-              Scan QR
+              <span className="relative z-10 group-hover:text-page-black transition-colors duration-500">Scan QR</span>
+              <div className="absolute inset-0 bg-page-gold translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[0.25,0.1,0.25,1]" />
             </button>
             {status === 'authenticated' ? (
-              <>
+              <div className="flex items-center gap-6">
                 <Link
                   href={
                     user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
@@ -290,147 +252,118 @@ export function Navbar() {
                       ? '/valet'
                       : '/orders'
                   }
-                  className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
+                  className="relative group py-2 hover:text-page-gold transition-colors duration-medium"
                 >
                   Dashboard
+                  <span className="absolute left-0 bottom-0 w-0 h-[1px] bg-page-gold transition-all duration-medium group-hover:w-full" />
                 </Link>
                 <button
                   onClick={() => { void logout(); }}
-                  className="hover:text-red-400 text-white/70 transition-colors pb-1 border-b-2 border-transparent hover:border-red-400"
+                  className="relative group py-2 text-page-ivory/60 hover:text-red-400 transition-colors duration-medium"
                 >
                   Logout
+                  <span className="absolute left-0 bottom-0 w-0 h-[1px] bg-red-400 transition-all duration-medium group-hover:w-full" />
                 </button>
-              </>
+              </div>
             ) : (
               <Link
                 href="/login"
-                className="hover:text-[#D4AF37] transition-colors pb-1 border-b-2 border-transparent hover:border-[#D4AF37]"
+                className="relative group py-2 hover:text-page-gold transition-colors duration-medium"
               >
                 Login
+                <span className="absolute left-0 bottom-0 w-0 h-[1px] bg-page-gold transition-all duration-medium group-hover:w-full" />
               </Link>
             )}
           </nav>
 
-          <div className="lg:hidden flex items-center gap-4">
+          {/* Mobile Toggle */}
+          <div className="lg:hidden flex items-center gap-5 relative z-20">
             <button
               onClick={() => openScanner()}
-              className="text-[#D4AF37] border border-[#D4AF37] text-[10px] font-extrabold tracking-wider uppercase px-3 py-1.5 rounded-full"
+              className="text-page-gold border border-page-gold/50 text-[9px] font-extrabold tracking-widest uppercase px-4 py-2 hover:bg-page-gold hover:text-page-black transition-colors"
             >
               Scan QR
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-white hover:text-[#D4AF37] transition-colors p-1"
+              className="text-page-ivory hover:text-page-gold transition-colors p-1"
             >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {mobileMenuOpen ? <X strokeWidth={1.5} className="h-7 w-7" /> : <Menu strokeWidth={1.5} className="h-7 w-7" />}
             </button>
           </div>
         </div>
 
+        {/* Mobile Menu */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
+              animate={{ opacity: 1, height: '100vh' }}
               exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden bg-zinc-950 border-b border-white/10 px-6 py-6 space-y-4 flex flex-col text-[11px] font-extrabold uppercase tracking-[0.2em]"
+              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+              className="lg:hidden fixed inset-0 top-0 bg-page-black z-10 pt-24 px-8 overflow-y-auto flex flex-col"
             >
-              <button
-                onClick={() => handleNavClick('/')}
-                className={`text-left ${pathname === '/' ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
-              >
-                Home
-              </button>
-              <button
-                onClick={() => handleNavClick('/rooms')}
-                className={`text-left ${pathname.startsWith('/rooms') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
-              >
-                Rooms
-              </button>
-              <button
-                onClick={() => handleNavClick('/banquets')}
-                className={`text-left ${pathname.startsWith('/banquets') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
-              >
-                Banquet
-              </button>
-              <button
-                onClick={() => handleNavClick('/restaurant/waitlist')}
-                className={`text-left ${pathname.startsWith('/restaurant') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
-              >
-                Restaurant
-              </button>
-              <button
-                onClick={() => handleNavClick('/menu')}
-                className={`text-left ${pathname.startsWith('/menu') ? 'text-[#D4AF37]' : 'text-white hover:text-[#D4AF37]'}`}
-              >
-                Menu
-              </button>
-              <div className="pt-2 pb-1 border-b border-white/10 text-white/50">More</div>
-              <button
-                onClick={() => handleNavClick('/gallery')}
-                className={`text-left pl-2 ${pathname.startsWith('/gallery') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'}`}
-              >
-                Gallery
-              </button>
-              <button
-                onClick={() => handleNavClick('/about')}
-                className={`text-left pl-2 ${pathname.startsWith('/about') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'}`}
-              >
-                About
-              </button>
-              <button
-                onClick={() => handleNavClick('/contact')}
-                className={`text-left pl-2 ${pathname.startsWith('/contact') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'}`}
-              >
-                Contact
-              </button>
-              <button
-                onClick={() => handleScrollToSection('amenities')}
-                className="text-white/80 hover:text-[#D4AF37] text-left pl-2"
-              >
-                Amenities
-              </button>
-              <button
-                onClick={() => handleNavClick('/facilities')}
-                className={`text-left pl-2 ${pathname.startsWith('/facilities') ? 'text-[#D4AF37]' : 'text-white/80 hover:text-[#D4AF37]'}`}
-              >
-                Facilities
-              </button>
-
-              {status === 'authenticated' ? (
-                <>
-                  <Link
-                    href={
-                      user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
-                        ? '/admin'
-                        : user?.role === 'VALET_MANAGER'
-                        ? '/valet'
-                        : '/orders'
-                    }
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-white hover:text-[#D4AF37] text-left mt-2"
-                  >
-                    Dashboard
-                  </Link>
+              <div className="flex flex-col gap-6 text-[11px] font-extrabold uppercase tracking-widest">
+                {[
+                  { label: 'Home', path: '/' },
+                  { label: 'Rooms', path: '/rooms' },
+                  { label: 'Banquet', path: '/banquets' },
+                  { label: 'Restaurant', path: '/restaurant/waitlist' },
+                  { label: 'Menu', path: '/menu' },
+                  { label: 'Gallery', path: '/gallery' },
+                  { label: 'About', path: '/about' },
+                  { label: 'Contact', path: '/contact' },
+                  { label: 'Amenities', path: '#amenities', action: () => handleScrollToSection('amenities') },
+                  { label: 'Facilities', path: '/facilities' },
+                ].map((link) => (
                   <button
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      void logout();
-                    }}
-                    className="text-white/70 hover:text-red-400 text-left mt-2"
+                    key={link.label}
+                    onClick={link.action || (() => handleNavClick(link.path))}
+                    className={`text-left py-2 border-b border-white/5 ${
+                      (link.path === '/' ? pathname === '/' : pathname.startsWith(link.path.split('#')[0]))
+                        ? 'text-page-gold'
+                        : 'text-page-ivory hover:text-page-gold'
+                    } transition-colors`}
                   >
-                    Logout
+                    {link.label}
                   </button>
-                </>
-              ) : (
-                <Link
-                  href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-white hover:text-[#D4AF37] text-left mt-2"
-                >
-                  Login
-                </Link>
-              )}
+                ))}
+
+                <div className="pt-8 flex flex-col gap-6 border-t border-white/10">
+                  {status === 'authenticated' ? (
+                    <>
+                      <button
+                        onClick={() => handleNavClick(
+                          user?.role === 'SUPER_ADMIN' || user?.role === 'KITCHEN_OWNER'
+                            ? '/admin'
+                            : user?.role === 'VALET_MANAGER'
+                            ? '/valet'
+                            : '/orders'
+                        )}
+                        className="text-left text-page-ivory hover:text-page-gold transition-colors"
+                      >
+                        Dashboard
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          void logout();
+                        }}
+                        className="text-left text-page-ivory/60 hover:text-red-400 transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => handleNavClick('/login')}
+                      className="text-left text-page-ivory hover:text-page-gold transition-colors"
+                    >
+                      Login
+                    </button>
+                  )}
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
